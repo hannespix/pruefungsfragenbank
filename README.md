@@ -1,4 +1,4 @@
-# HortiExam - Prüfungsfragenbank für Gartenbau
+# HortiExam - Fragenbank für Gartenbau-Prüfungen
 
 Ein lokales Web-Tool zur Verwaltung von Prüfungsfragen und Erstellung von Klausuren für den Gartenbau. Das Tool kann als einzelne .exe-Datei auf Windows-PCs ohne Admin-Rechte laufen und ist im lokalen Netzwerk (LAN) für Kollegen erreichbar.
 

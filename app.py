@@ -580,7 +580,9 @@ if __name__ == '__main__':
     local_ip = get_local_ip()
     port = 5000
     print(f"\n{'='*60}")
-    print(f"HortiExam läuft auf:")
+    print(f"HortiExam - Fragenbank für Gartenbau-Prüfungen")
+    print(f"{'='*60}")
+    print(f"Läuft auf:")
     print(f"  Lokal:    http://127.0.0.1:{port}")
     print(f"  LAN:      http://{local_ip}:{port}")
     print(f"{'='*60}\n")
