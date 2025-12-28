@@ -5,6 +5,8 @@ Ein lokales Web-Tool zur Verwaltung von Prüfungsfragen und Erstellung von Klaus
 ## Features
 
 - ✅ **Fragen-Pool Verwaltung**: Import von Fragen aus Word-Dokumenten
+- ✅ **LLM-Integration**: Beliebige Word-Dateien mit KI analysieren (OpenAI, Anthropic, Custom APIs)
+- ✅ **Flexible API-Konfiguration**: Unterstützung für beliebige LLM-APIs über Einstellungsseite
 - ✅ **Exam Builder**: Visueller Editor zum Zusammenstellen von Prüfungen
 - ✅ **Snapshot-Pattern**: Änderungen an Originalfragen beeinflussen bestehende Prüfungen nicht
 - ✅ **Word-Export**: Generierung von sauberen Prüfungsdokumenten
@@ -93,7 +95,9 @@ Die fertige .exe-Datei befindet sich in `dist/HortiExam.exe`.
 
 **Wichtig**: Das Snapshot-Pattern stellt sicher, dass Änderungen an Originalfragen bestehende Prüfungen nicht beeinflussen!
 
-## Word-Import Format
+## Word-Import
+
+### Methode 1: Klassischer Import (strukturiertes Format)
 
 Das Word-Dokument sollte folgendes Format haben:
 
@@ -107,12 +111,37 @@ Lösung: Stickstoff, Phosphor und Kalium sind...
 
 Jede Frage beginnt mit "Frage:" und die zugehörige Lösung mit "Lösung:". Mehrzeilige Fragen und Lösungen werden automatisch erkannt.
 
+### Methode 2: LLM-basierter Import (empfohlen für beliebige Dateien)
+
+Mit einer konfigurierten LLM-API können **beliebige Word-Dateien** importiert werden. Das LLM analysiert den Text automatisch und extrahiert Fragen und Lösungen, auch wenn sie nicht in einem speziellen Format vorliegen.
+
+**Vorteile:**
+- Funktioniert mit jedem Word-Dokument
+- Erkennt Fragen automatisch aus Fließtext
+- Kann auch aus Lehrbüchern oder Skripten Fragen generieren
+
+**Konfiguration:**
+1. Gehe zu "Einstellungen" → "Neue Konfiguration"
+2. Wähle einen Provider (OpenAI, Anthropic, oder Custom)
+3. Gib API-URL und API-Key ein
+4. Beim Import: Aktiviere "LLM-basierte Analyse"
+
 ## Verwendung
 
-1. **Fragen importieren**: Gehe zu "Import" und lade eine Word-Datei hoch
-2. **Prüfung erstellen**: Klicke auf "Neue Prüfung" auf der Hauptseite
-3. **Fragen hinzufügen**: Klicke auf "Hinzufügen" bei den gewünschten Fragen
-4. **Prüfung exportieren**: Klicke auf "Als Word exportieren"
+1. **LLM-API konfigurieren** (optional, für intelligente Importe):
+   - Gehe zu "Einstellungen"
+   - Erstelle eine neue LLM-Konfiguration (OpenAI, Anthropic, oder Custom API)
+   - Gib API-URL und API-Key ein
+
+2. **Fragen importieren**:
+   - Gehe zu "Import" und lade eine Word-Datei hoch
+   - Wähle zwischen klassischem Import (strukturiertes Format) oder LLM-basiertem Import (beliebige Dateien)
+
+3. **Prüfung erstellen**: Klicke auf "Neue Prüfung" auf der Hauptseite
+
+4. **Fragen hinzufügen**: Klicke auf "Hinzufügen" bei den gewünschten Fragen
+
+5. **Prüfung exportieren**: Klicke auf "Als Word exportieren"
 
 ## Datenbank
 

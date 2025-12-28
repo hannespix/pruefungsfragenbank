@@ -55,3 +55,19 @@ class ExamItem(db.Model):
     # Relationships
     exam = relationship("Exam", back_populates="items")
     original_question = relationship("Question", back_populates="exam_items")
+
+
+class LLMConfig(db.Model):
+    """Konfiguration für LLM-APIs"""
+    __tablename__ = 'llm_configs'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)  # z.B. "OpenAI", "Anthropic", "Lokale API"
+    api_url = Column(String(500), nullable=False)  # API-Endpoint URL
+    api_key = Column(String(500))  # API-Key (optional, je nach API)
+    model = Column(String(100))  # Modell-Name (z.B. "gpt-4", "claude-3")
+    provider = Column(String(50), default="custom")  # "openai", "anthropic", "custom"
+    headers = Column(Text)  # JSON-String für zusätzliche Headers
+    prompt_template = Column(Text)  # Template für den Prompt
+    active = Column(Boolean, default=True)  # Aktive Konfiguration
+    date_created = Column(DateTime, default=datetime.utcnow)

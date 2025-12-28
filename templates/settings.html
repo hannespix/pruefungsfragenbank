@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Einstellungen - HortiExam{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2>⚙️ LLM-API Konfigurationen</h2>
+        <p class="text-muted">Konfiguriere LLM-APIs für intelligente Frage-Extraktion aus Word-Dokumenten</p>
+        
+        <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#configModal" onclick="newConfig()">
+            ✨ Neue Konfiguration
+        </button>
+        
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Provider</th>
+                        <th>API URL</th>
+                        <th>Modell</th>
+                        <th>Status</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for config in configs %}
+                    <tr>
+                        <td>{{ config.name }}</td>
+                        <td><span class="badge bg-info">{{ config.provider }}</span></td>
+                        <td><small>{{ config.api_url[:50] }}...</small></td>
+                        <td>{{ config.model or '-' }}</td>
+                        <td>
+                            {% if config.active %}
+                                <span class="badge bg-success">Aktiv</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inaktiv</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="editConfig({{ config.id }})">
+                                ✏️ Bearbeiten
+                            </button>
+                            <form method="POST" style="display:inline;" onsubmit="return confirm('Wirklich löschen?');">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="config_id" value="{{ config.id }}">
+                                <button type="submit" class="btn btn-sm btn-danger">
+                                    🗑️ Löschen
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">Keine Konfigurationen vorhanden</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal für Konfiguration -->
+<div class="modal fade" id="configModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="configModalTitle">✨ Neue LLM-Konfiguration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="configForm">
+                <div class="modal-body">
+                    <input type="hidden" name="action" id="formAction" value="create">
+                    <input type="hidden" name="config_id" id="configId">
+                    
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="name" name="name" required placeholder="z.B. OpenAI GPT-4">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="provider" class="form-label">Provider</label>
+                        <select class="form-select" id="provider" name="provider" onchange="updateProviderTemplate()">
+                            <option value="custom">Custom API</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic (Claude)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="api_url" class="form-label">API URL *</label>
+                        <input type="url" class="form-control" id="api_url" name="api_url" required 
+                               placeholder="https://api.openai.com/v1/chat/completions">
+                        <small class="form-text text-muted">Vollständige URL zum API-Endpoint</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="api_key" class="form-label">API Key</label>
+                        <input type="password" class="form-control" id="api_key" name="api_key" 
+                               placeholder="sk-...">
+                        <small class="form-text text-muted">Wird verschlüsselt gespeichert</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="model" class="form-label">Modell</label>
+                        <input type="text" class="form-control" id="model" name="model" 
+                               placeholder="gpt-4, claude-3-opus-20240229, etc.">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="headers" class="form-label">Zusätzliche Headers (JSON)</label>
+                        <textarea class="form-control" id="headers" name="headers" rows="3"
+                                  placeholder='{"X-Custom-Header": "value"}'></textarea>
+                        <small class="form-text text-muted">Optional: Zusätzliche HTTP-Headers als JSON</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="prompt_template" class="form-label">Prompt Template</label>
+                        <textarea class="form-control" id="prompt_template" name="prompt_template" rows="6"
+                                  placeholder="Verwende {text} für den Dokumenttext und {category} für die Kategorie"></textarea>
+                        <small class="form-text text-muted">
+                            Platzhalter: <code>{text}</code> = Dokumenttext, <code>{category}</code> = Kategorie<br>
+                            Falls leer, wird ein Standard-Prompt verwendet.
+                        </small>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="active" name="active" checked>
+                        <label class="form-check-label" for="active">Aktiv</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function newConfig() {
+    document.getElementById('configModalTitle').textContent = 'Neue LLM-Konfiguration';
+    document.getElementById('formAction').value = 'create';
+    document.getElementById('configId').value = '';
+    document.getElementById('configForm').reset();
+    document.getElementById('active').checked = true;
+    updateProviderTemplate();
+}
+
+function editConfig(configId) {
+    fetch(`/settings/api/${configId}`)
+        .then(response => response.json())
+        .then(config => {
+            document.getElementById('configModalTitle').textContent = 'Konfiguration bearbeiten';
+            document.getElementById('formAction').value = 'update';
+            document.getElementById('configId').value = config.id;
+            document.getElementById('name').value = config.name;
+            document.getElementById('provider').value = config.provider;
+            document.getElementById('api_url').value = config.api_url;
+            document.getElementById('api_key').value = config.api_key;
+            document.getElementById('model').value = config.model || '';
+            document.getElementById('headers').value = config.headers || '';
+            document.getElementById('prompt_template').value = config.prompt_template || '';
+            document.getElementById('active').checked = config.active;
+            
+            updateProviderTemplate();
+            
+            const modal = new bootstrap.Modal(document.getElementById('configModal'));
+            modal.show();
+        });
+}
+
+function updateProviderTemplate() {
+    const provider = document.getElementById('provider').value;
+    const apiUrl = document.getElementById('api_url');
+    const model = document.getElementById('model');
+    
+    if (provider === 'openai') {
+        apiUrl.value = 'https://api.openai.com/v1/chat/completions';
+        model.placeholder = 'gpt-4, gpt-3.5-turbo, etc.';
+    } else if (provider === 'anthropic') {
+        apiUrl.value = 'https://api.anthropic.com/v1/messages';
+        model.placeholder = 'claude-3-opus-20240229, claude-3-sonnet-20240229, etc.';
+    } else {
+        apiUrl.value = '';
+        model.placeholder = 'Modell-Name';
+    }
+}
+</script>
+{% endblock %}

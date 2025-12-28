@@ -2,12 +2,14 @@ import os
 import sys
 import socket
 import re
+import json
+import requests
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
 from werkzeug.utils import secure_filename
 from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from models import db, Question, Exam, ExamItem
+from models import db, Question, Exam, ExamItem, LLMConfig
 
 # PyInstaller Trick: resource_path() Funktion
 def resource_path(relative_path):
@@ -192,7 +194,8 @@ def exam_reorder(exam_id):
 def import_questions():
     """Word-Dokument hochladen und Fragen importieren"""
     if request.method == 'GET':
-        return render_template('import.html')
+        llm_configs = LLMConfig.query.filter_by(active=True).all()
+        return render_template('import.html', llm_configs=llm_configs)
     
     if 'file' not in request.files:
         flash('Keine Datei ausgewählt', 'error')
@@ -209,7 +212,16 @@ def import_questions():
         file.save(filepath)
         
         try:
-            count = import_from_word(filepath)
+            use_llm = request.form.get('use_llm') == 'on'
+            llm_config_id = request.form.get('llm_config_id', type=int)
+            
+            if use_llm and llm_config_id:
+                # LLM-basierter Import
+                count = import_from_word_with_llm(filepath, llm_config_id)
+            else:
+                # Klassischer Import
+                count = import_from_word(filepath)
+            
             flash(f'{count} Fragen erfolgreich importiert!', 'success')
         except Exception as e:
             flash(f'Fehler beim Import: {str(e)}', 'error')
@@ -282,6 +294,226 @@ def import_from_word(filepath):
     
     db.session.commit()
     return count
+
+
+def extract_text_from_word(filepath):
+    """Extrahiert den gesamten Text aus einem Word-Dokument"""
+    doc = Document(filepath)
+    text_parts = []
+    for paragraph in doc.paragraphs:
+        if paragraph.text.strip():
+            text_parts.append(paragraph.text.strip())
+    return '\n\n'.join(text_parts)
+
+
+def call_llm_api(llm_config, text_content, category="Allgemein"):
+    """Ruft die konfigurierte LLM-API auf und extrahiert Fragen"""
+    try:
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        
+        # API-Key hinzufügen falls vorhanden
+        if llm_config.api_key:
+            if llm_config.provider == 'openai':
+                headers['Authorization'] = f'Bearer {llm_config.api_key}'
+            elif llm_config.provider == 'anthropic':
+                headers['x-api-key'] = llm_config.api_key
+                headers['anthropic-version'] = '2023-06-01'
+            else:
+                headers['Authorization'] = f'Bearer {llm_config.api_key}'
+        
+        # Zusätzliche Headers aus JSON parsen
+        if llm_config.headers:
+            try:
+                extra_headers = json.loads(llm_config.headers)
+                headers.update(extra_headers)
+            except:
+                pass
+        
+        # Prompt erstellen
+        if llm_config.prompt_template:
+            prompt = llm_config.prompt_template.replace('{text}', text_content).replace('{category}', category)
+        else:
+            prompt = f"""Analysiere folgenden Text und extrahiere alle Prüfungsfragen mit ihren Lösungen.
+
+Text:
+{text_content}
+
+Bitte gib die Fragen und Lösungen im folgenden JSON-Format zurück:
+{{
+  "questions": [
+    {{
+      "content": "Die Frage hier",
+      "answer": "Die Lösung hier",
+      "category": "{category}",
+      "tags": "Tag1, Tag2",
+      "difficulty": 3
+    }}
+  ]
+}}
+
+Nur JSON zurückgeben, keine zusätzlichen Erklärungen."""
+
+        # Request-Body je nach Provider
+        if llm_config.provider == 'openai':
+            body = {
+                "model": llm_config.model or "gpt-4",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3
+            }
+        elif llm_config.provider == 'anthropic':
+            body = {
+                "model": llm_config.model or "claude-3-opus-20240229",
+                "max_tokens": 4000,
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ]
+            }
+        else:
+            # Custom API - erwartet Standard-Format
+            body = {
+                "model": llm_config.model,
+                "prompt": prompt,
+                "temperature": 0.3,
+                "max_tokens": 4000
+            }
+        
+        # API-Call
+        response = requests.post(
+            llm_config.api_url,
+            headers=headers,
+            json=body,
+            timeout=60
+        )
+        response.raise_for_status()
+        
+        # Response parsen
+        data = response.json()
+        
+        # Response je nach Provider extrahieren
+        if llm_config.provider == 'openai':
+            content = data['choices'][0]['message']['content']
+        elif llm_config.provider == 'anthropic':
+            content = data['content'][0]['text']
+        else:
+            # Custom API - versuche verschiedene Formate
+            content = data.get('response') or data.get('text') or data.get('content') or str(data)
+        
+        # JSON aus Response extrahieren (falls es in Markdown-Code-Blöcken ist)
+        content = content.strip()
+        if '```json' in content:
+            content = content.split('```json')[1].split('```')[0].strip()
+        elif '```' in content:
+            content = content.split('```')[1].split('```')[0].strip()
+        
+        # JSON parsen
+        result = json.loads(content)
+        return result.get('questions', [])
+        
+    except Exception as e:
+        raise Exception(f"LLM-API Fehler: {str(e)}")
+
+
+def import_from_word_with_llm(filepath, llm_config_id):
+    """Word-Dokument mit LLM analysieren und Fragen extrahieren"""
+    llm_config = LLMConfig.query.get_or_404(llm_config_id)
+    
+    # Text aus Word extrahieren
+    text_content = extract_text_from_word(filepath)
+    
+    if not text_content.strip():
+        raise Exception("Das Word-Dokument enthält keinen Text")
+    
+    # LLM aufrufen
+    category = request.form.get('category', 'Allgemein')
+    questions_data = call_llm_api(llm_config, text_content, category)
+    
+    # Fragen in Datenbank speichern
+    count = 0
+    for q_data in questions_data:
+        question = Question(
+            content=q_data.get('content', '').strip(),
+            answer=q_data.get('answer', '').strip(),
+            category=q_data.get('category', category),
+            tags=q_data.get('tags', ''),
+            difficulty=q_data.get('difficulty', 3),
+            active=True
+        )
+        if question.content and question.answer:
+            db.session.add(question)
+            count += 1
+    
+    db.session.commit()
+    return count
+
+
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    """Einstellungsseite für LLM-APIs"""
+    if request.method == 'GET':
+        configs = LLMConfig.query.order_by(LLMConfig.date_created.desc()).all()
+        return render_template('settings.html', configs=configs)
+    
+    # POST: Neue Konfiguration speichern
+    action = request.form.get('action')
+    
+    if action == 'create':
+        config = LLMConfig(
+            name=request.form.get('name'),
+            api_url=request.form.get('api_url'),
+            api_key=request.form.get('api_key', ''),
+            model=request.form.get('model', ''),
+            provider=request.form.get('provider', 'custom'),
+            headers=request.form.get('headers', ''),
+            prompt_template=request.form.get('prompt_template', ''),
+            active=request.form.get('active') == 'on'
+        )
+        db.session.add(config)
+        db.session.commit()
+        flash('LLM-Konfiguration erfolgreich erstellt!', 'success')
+    
+    elif action == 'update':
+        config_id = request.form.get('config_id', type=int)
+        config = LLMConfig.query.get_or_404(config_id)
+        config.name = request.form.get('name')
+        config.api_url = request.form.get('api_url')
+        config.api_key = request.form.get('api_key', '')
+        config.model = request.form.get('model', '')
+        config.provider = request.form.get('provider', 'custom')
+        config.headers = request.form.get('headers', '')
+        config.prompt_template = request.form.get('prompt_template', '')
+        config.active = request.form.get('active') == 'on'
+        db.session.commit()
+        flash('LLM-Konfiguration erfolgreich aktualisiert!', 'success')
+    
+    elif action == 'delete':
+        config_id = request.form.get('config_id', type=int)
+        config = LLMConfig.query.get_or_404(config_id)
+        db.session.delete(config)
+        db.session.commit()
+        flash('LLM-Konfiguration gelöscht!', 'success')
+    
+    return redirect(url_for('settings'))
+
+
+@app.route('/settings/api/<int:config_id>')
+def get_api_config(config_id):
+    """API: Einzelne Konfiguration abrufen"""
+    config = LLMConfig.query.get_or_404(config_id)
+    return jsonify({
+        'id': config.id,
+        'name': config.name,
+        'api_url': config.api_url,
+        'api_key': config.api_key,
+        'model': config.model,
+        'provider': config.provider,
+        'headers': config.headers,
+        'prompt_template': config.prompt_template,
+        'active': config.active
+    })
 
 
 @app.route('/export/<int:exam_id>')

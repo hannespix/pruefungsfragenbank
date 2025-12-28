@@ -3,12 +3,19 @@
 {% block title %}Prüfungen - HortiExam{% endblock %}
 
 {% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="mb-0">🌱 HortiExam</h1>
+        <p class="text-muted">Prüfungsfragen verwalten und Klausuren erstellen</p>
+    </div>
+</div>
+
 <div class="row">
     <!-- Linke Seite: Fragen-Pool -->
     <div class="col-md-6">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Fragen-Pool</h5>
+                <h5 class="mb-0">📚 Fragen-Pool</h5>
                 <div>
                     <select id="categoryFilter" class="form-select form-select-sm d-inline-block" style="width: auto;">
                         <option value="">Alle Kategorien</option>
@@ -37,16 +44,21 @@
     <div class="col-md-6">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Aktuelle Prüfung</h5>
+                <h5 class="mb-0">📝 Aktuelle Prüfung</h5>
                 <div>
-                    <button class="btn btn-sm btn-primary" onclick="createNewExam()">Neue Prüfung</button>
+                    <button class="btn btn-sm btn-primary" onclick="createNewExam()">
+                        <span>✨</span> Neue Prüfung
+                    </button>
                 </div>
             </div>
             <div class="card-body">
                 <div id="currentExam">
-                    <div class="text-center text-muted">
-                        <p>Keine Prüfung ausgewählt</p>
-                        <button class="btn btn-primary" onclick="createNewExam()">Neue Prüfung erstellen</button>
+                    <div class="text-center text-muted py-4">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📋</div>
+                        <p class="mb-3">Keine Prüfung ausgewählt</p>
+                        <button class="btn btn-primary btn-lg" onclick="createNewExam()">
+                            ✨ Neue Prüfung erstellen
+                        </button>
                     </div>
                 </div>
             </div>
@@ -59,7 +71,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Neue Prüfung erstellen</h5>
+                <h5 class="modal-title">✨ Neue Prüfung erstellen</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -100,19 +112,19 @@ function loadQuestions() {
             }
             
             container.innerHTML = data.map(q => `
-                <div class="card question-card mb-2" onclick="addQuestionToExam(${q.id})">
+                <div class="card question-card mb-3" onclick="addQuestionToExam(${q.id})">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="flex-grow-1">
-                                <div class="mb-2">${q.content}</div>
+                                <div class="mb-3" style="font-size: 1.05rem; line-height: 1.6;">${q.content}</div>
                                 <div>
-                                    ${q.category ? `<span class="badge bg-secondary tag-badge">${q.category}</span>` : ''}
+                                    ${q.category ? `<span class="badge bg-secondary tag-badge">🏷️ ${q.category}</span>` : ''}
                                     ${q.tags.map(tag => `<span class="badge bg-info tag-badge">${tag}</span>`).join('')}
-                                    <span class="badge bg-warning tag-badge">Schwierigkeit: ${q.difficulty}</span>
+                                    <span class="badge bg-warning tag-badge">⭐ ${'★'.repeat(q.difficulty)}${'☆'.repeat(5-q.difficulty)}</span>
                                 </div>
                             </div>
-                            <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); addQuestionToExam(${q.id})">
-                                + Hinzufügen
+                            <button class="btn btn-sm btn-success ms-3" onclick="event.stopPropagation(); addQuestionToExam(${q.id})">
+                                ➕ Hinzufügen
                             </button>
                         </div>
                     </div>
@@ -181,31 +193,41 @@ function loadExamItems() {
             const container = document.getElementById('currentExam');
             if (data.length === 0) {
                 container.innerHTML = `
-                    <div class="text-center text-muted mb-3">
-                        <p>Keine Fragen in dieser Prüfung</p>
+                    <div class="text-center text-muted py-4">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📝</div>
+                        <p class="mb-3">Keine Fragen in dieser Prüfung</p>
                     </div>
-                    <div class="text-center">
-                        <a href="/exam/${currentExamId}" class="btn btn-primary me-2">Prüfung öffnen</a>
-                        <a href="/export/${currentExamId}" class="btn btn-success">Als Word exportieren</a>
+                    <div class="text-center d-flex gap-2 justify-content-center">
+                        <a href="/exam/${currentExamId}" class="btn btn-primary">👁️ Prüfung öffnen</a>
+                        <a href="/export/${currentExamId}" class="btn btn-success">📄 Als Word exportieren</a>
                     </div>
                 `;
                 return;
             }
             
             container.innerHTML = `
-                <div class="mb-3">
-                    <a href="/exam/${currentExamId}" class="btn btn-primary me-2">Prüfung öffnen</a>
-                    <a href="/export/${currentExamId}" class="btn btn-success">Als Word exportieren</a>
+                <div class="mb-4 d-flex gap-2">
+                    <a href="/exam/${currentExamId}" class="btn btn-primary">
+                        👁️ Prüfung öffnen
+                    </a>
+                    <a href="/export/${currentExamId}" class="btn btn-success">
+                        📄 Als Word exportieren
+                    </a>
                 </div>
                 <div id="examItemsList">
-                    ${data.map(item => `
+                    ${data.map((item, idx) => `
                         <div class="exam-item">
-                            <div class="d-flex justify-content-between">
+                            <div class="d-flex justify-content-between align-items-start">
                                 <div class="flex-grow-1">
-                                    <div>${item.content}</div>
-                                    <small class="text-muted">${item.points} Punkte</small>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="badge bg-primary me-2">#${idx + 1}</span>
+                                        <span class="badge bg-success">${item.points} ${item.points === 1 ? 'Punkt' : 'Punkte'}</span>
+                                    </div>
+                                    <div style="font-size: 1.05rem; line-height: 1.6;">${item.content}</div>
                                 </div>
-                                <button class="btn btn-sm btn-danger" onclick="removeItem(${item.id})">×</button>
+                                <button class="btn btn-sm btn-danger ms-3" onclick="removeItem(${item.id})" title="Entfernen">
+                                    🗑️
+                                </button>
                             </div>
                         </div>
                     `).join('')}

@@ -7,7 +7,7 @@
     <div class="col-md-8 offset-md-2">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">Fragen aus Word-Dokument importieren</h5>
+                <h5 class="mb-0">📥 Fragen aus Word-Dokument importieren</h5>
             </div>
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data">
@@ -15,13 +15,44 @@
                         <label for="file" class="form-label">Word-Datei (.docx)</label>
                         <input type="file" class="form-control" id="file" name="file" accept=".docx" required>
                         <div class="form-text">
-                            Die Datei sollte Fragen im Format "Frage: ..." und "Lösung: ..." enthalten.
+                            Beliebige Word-Datei. Wähle unten die Import-Methode.
                         </div>
                     </div>
                     
                     <div class="mb-3">
                         <label for="category" class="form-label">Kategorie</label>
                         <input type="text" class="form-control" id="category" name="category" value="Allgemein" placeholder="z.B. GaLaBau, Zierpflanzen">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="use_llm" name="use_llm" onchange="toggleLLMConfig()">
+                            <label class="form-check-label" for="use_llm">
+                                <strong>LLM-basierte Analyse verwenden</strong> (für beliebige Word-Dateien)
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">
+                            Wenn aktiviert, wird der Text an eine LLM-API gesendet, um Fragen automatisch zu extrahieren.
+                            Funktioniert mit beliebigen Word-Dateien, nicht nur strukturierten Formaten.
+                        </small>
+                    </div>
+                    
+                    <div class="mb-3" id="llmConfigDiv" style="display: none;">
+                        <label for="llm_config_id" class="form-label">LLM-Konfiguration</label>
+                        <select class="form-select" id="llm_config_id" name="llm_config_id">
+                            <option value="">-- Bitte wählen --</option>
+                            {% for config in llm_configs %}
+                            <option value="{{ config.id }}">{{ config.name }} ({{ config.provider }})</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">
+                            {% if llm_configs %}
+                                Wähle eine konfigurierte LLM-API aus. 
+                                <a href="{{ url_for('settings') }}">Neue Konfiguration erstellen</a>
+                            {% else %}
+                                <a href="{{ url_for('settings') }}">Erstelle zuerst eine LLM-Konfiguration</a>
+                            {% endif %}
+                        </small>
                     </div>
                     
                     <button type="submit" class="btn btn-primary">Importieren</button>
@@ -32,9 +63,10 @@
         
         <div class="card mt-4">
             <div class="card-header">
-                <h6 class="mb-0">Hinweise zum Import</h6>
+                <h6 class="mb-0">📖 Import-Methoden</h6>
             </div>
             <div class="card-body">
+                <h6>📋 1. Klassischer Import (ohne LLM)</h6>
                 <p>Das Word-Dokument sollte folgendes Format haben:</p>
                 <pre class="bg-light p-3">
 Frage: Was ist Photosynthese?
@@ -43,12 +75,45 @@ Lösung: Photosynthese ist der Prozess, bei dem Pflanzen...
 Frage: Nennen Sie drei wichtige Nährstoffe für Pflanzen.
 Lösung: Stickstoff, Phosphor und Kalium sind...
                 </pre>
-                <p class="text-muted mt-2">
+                <p class="text-muted">
                     Jede Frage beginnt mit "Frage:" und die zugehörige Lösung mit "Lösung:".
-                    Mehrzeilige Fragen und Lösungen werden automatisch erkannt.
+                </p>
+                
+                <hr>
+                
+                <h6>🤖 2. LLM-basierter Import (empfohlen)</h6>
+                <p>
+                    Mit einer konfigurierten LLM-API können <strong>beliebige Word-Dateien</strong> importiert werden.
+                    Das LLM analysiert den Text automatisch und extrahiert Fragen und Lösungen, auch wenn sie
+                    nicht in einem speziellen Format vorliegen.
+                </p>
+                <p class="text-muted">
+                    <strong>Vorteile:</strong> Funktioniert mit jedem Word-Dokument, erkennt Fragen automatisch,
+                    kann auch aus Fließtext Fragen generieren.
+                </p>
+                <p>
+                    <a href="{{ url_for('settings') }}" class="btn btn-sm btn-outline-primary">LLM-API konfigurieren</a>
                 </p>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleLLMConfig() {
+    const useLLM = document.getElementById('use_llm').checked;
+    const configDiv = document.getElementById('llmConfigDiv');
+    const configSelect = document.getElementById('llm_config_id');
+    
+    if (useLLM) {
+        configDiv.style.display = 'block';
+        configSelect.required = true;
+    } else {
+        configDiv.style.display = 'none';
+        configSelect.required = false;
+    }
+}
+</script>
 {% endblock %}
