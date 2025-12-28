@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Import - HortiExam{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Fragen aus Word-Dokument importieren</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Word-Datei (.docx)</label>
+                        <input type="file" class="form-control" id="file" name="file" accept=".docx" required>
+                        <div class="form-text">
+                            Die Datei sollte Fragen im Format "Frage: ..." und "Lösung: ..." enthalten.
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Kategorie</label>
+                        <input type="text" class="form-control" id="category" name="category" value="Allgemein" placeholder="z.B. GaLaBau, Zierpflanzen">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Importieren</button>
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">Abbrechen</a>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0">Hinweise zum Import</h6>
+            </div>
+            <div class="card-body">
+                <p>Das Word-Dokument sollte folgendes Format haben:</p>
+                <pre class="bg-light p-3">
+Frage: Was ist Photosynthese?
+Lösung: Photosynthese ist der Prozess, bei dem Pflanzen...
+
+Frage: Nennen Sie drei wichtige Nährstoffe für Pflanzen.
+Lösung: Stickstoff, Phosphor und Kalium sind...
+                </pre>
+                <p class="text-muted mt-2">
+                    Jede Frage beginnt mit "Frage:" und die zugehörige Lösung mit "Lösung:".
+                    Mehrzeilige Fragen und Lösungen werden automatisch erkannt.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

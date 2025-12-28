@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}{{ exam.title }} - HortiExam{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>{{ exam.title }}</h1>
+            <div>
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">Zurück</a>
+                <a href="{{ url_for('export_exam', exam_id=exam.id) }}" class="btn btn-success">Als Word exportieren</a>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Prüfungsfragen</h5>
+            </div>
+            <div class="card-body" id="examItemsContainer">
+                <div class="text-center text-muted">
+                    <p>Lade Fragen...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const examId = {{ exam.id }};
+
+function loadExamItems() {
+    fetch(`/exam/${examId}/items`)
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('examItemsContainer');
+            if (data.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted"><p>Keine Fragen in dieser Prüfung</p></div>';
+                return;
+            }
+            
+            container.innerHTML = data.map((item, idx) => `
+                <div class="exam-item mb-4">
+                    <h5>Frage ${idx + 1} <span class="badge bg-primary">${item.points} Punkte</span></h5>
+                    <div class="mb-3">${item.content}</div>
+                    <div class="collapse" id="answer${item.id}">
+                        <div class="card card-body bg-light">
+                            <strong>Lösung:</strong>
+                            <div>${item.answer}</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#answer${item.id}">
+                        Lösung anzeigen
+                    </button>
+                </div>
+            `).join('');
+        });
+}
+
+document.addEventListener('DOMContentLoaded', loadExamItems);
+</script>
+{% endblock %}

@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}Prüfungen - HortiExam{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Linke Seite: Fragen-Pool -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Fragen-Pool</h5>
+                <div>
+                    <select id="categoryFilter" class="form-select form-select-sm d-inline-block" style="width: auto;">
+                        <option value="">Alle Kategorien</option>
+                    </select>
+                    <select id="difficultyFilter" class="form-select form-select-sm d-inline-block ms-2" style="width: auto;">
+                        <option value="">Alle Schwierigkeiten</option>
+                        <option value="1">1 - Sehr leicht</option>
+                        <option value="2">2 - Leicht</option>
+                        <option value="3">3 - Mittel</option>
+                        <option value="4">4 - Schwer</option>
+                        <option value="5">5 - Sehr schwer</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="questionsList">
+                    <div class="text-center text-muted">
+                        <p>Lade Fragen...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rechte Seite: Aktuelle Prüfung -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Aktuelle Prüfung</h5>
+                <div>
+                    <button class="btn btn-sm btn-primary" onclick="createNewExam()">Neue Prüfung</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="currentExam">
+                    <div class="text-center text-muted">
+                        <p>Keine Prüfung ausgewählt</p>
+                        <button class="btn btn-primary" onclick="createNewExam()">Neue Prüfung erstellen</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal für neue Prüfung -->
+<div class="modal fade" id="newExamModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Neue Prüfung erstellen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="examTitle" class="form-label">Titel</label>
+                    <input type="text" class="form-control" id="examTitle" placeholder="z.B. Abschlussprüfung Sommer 2025">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="confirmNewExam()">Erstellen</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentExamId = null;
+
+// Fragen laden
+function loadQuestions() {
+    const category = document.getElementById('categoryFilter').value;
+    const difficulty = document.getElementById('difficultyFilter').value;
+    
+    let url = '/questions?active_only=true';
+    if (category) url += '&category=' + encodeURIComponent(category);
+    if (difficulty) url += '&difficulty=' + difficulty;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('questionsList');
+            if (data.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted"><p>Keine Fragen gefunden</p></div>';
+                return;
+            }
+            
+            container.innerHTML = data.map(q => `
+                <div class="card question-card mb-2" onclick="addQuestionToExam(${q.id})">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="mb-2">${q.content}</div>
+                                <div>
+                                    ${q.category ? `<span class="badge bg-secondary tag-badge">${q.category}</span>` : ''}
+                                    ${q.tags.map(tag => `<span class="badge bg-info tag-badge">${tag}</span>`).join('')}
+                                    <span class="badge bg-warning tag-badge">Schwierigkeit: ${q.difficulty}</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); addQuestionToExam(${q.id})">
+                                + Hinzufügen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        });
+}
+
+// Frage zur Prüfung hinzufügen
+function addQuestionToExam(questionId) {
+    if (!currentExamId) {
+        alert('Bitte erstelle zuerst eine Prüfung');
+        return;
+    }
+    
+    fetch(`/exam/${currentExamId}/add_question`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({question_id: questionId, points: 1})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadExamItems();
+        }
+    });
+}
+
+// Neue Prüfung erstellen
+function createNewExam() {
+    const modal = new bootstrap.Modal(document.getElementById('newExamModal'));
+    modal.show();
+}
+
+function confirmNewExam() {
+    const title = document.getElementById('examTitle').value || 'Neue Prüfung';
+    
+    fetch('/exam/new', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({title: title})
+    })
+    .then(response => response.json())
+    .then(data => {
+        currentExamId = data.id;
+        document.getElementById('newExamModal').querySelector('.btn-close').click();
+        loadExamItems();
+    });
+}
+
+// Prüfungs-Items laden
+function loadExamItems() {
+    if (!currentExamId) {
+        document.getElementById('currentExam').innerHTML = `
+            <div class="text-center text-muted">
+                <p>Keine Prüfung ausgewählt</p>
+                <button class="btn btn-primary" onclick="createNewExam()">Neue Prüfung erstellen</button>
+            </div>
+        `;
+        return;
+    }
+    
+    fetch(`/exam/${currentExamId}/items`)
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('currentExam');
+            if (data.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-muted mb-3">
+                        <p>Keine Fragen in dieser Prüfung</p>
+                    </div>
+                    <div class="text-center">
+                        <a href="/exam/${currentExamId}" class="btn btn-primary me-2">Prüfung öffnen</a>
+                        <a href="/export/${currentExamId}" class="btn btn-success">Als Word exportieren</a>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = `
+                <div class="mb-3">
+                    <a href="/exam/${currentExamId}" class="btn btn-primary me-2">Prüfung öffnen</a>
+                    <a href="/export/${currentExamId}" class="btn btn-success">Als Word exportieren</a>
+                </div>
+                <div id="examItemsList">
+                    ${data.map(item => `
+                        <div class="exam-item">
+                            <div class="d-flex justify-content-between">
+                                <div class="flex-grow-1">
+                                    <div>${item.content}</div>
+                                    <small class="text-muted">${item.points} Punkte</small>
+                                </div>
+                                <button class="btn btn-sm btn-danger" onclick="removeItem(${item.id})">×</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        });
+}
+
+// Item entfernen
+function removeItem(itemId) {
+    if (!confirm('Frage wirklich entfernen?')) return;
+    
+    fetch(`/exam/${currentExamId}/remove_item/${itemId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadExamItems();
+        }
+    });
+}
+
+// Initialisierung
+document.addEventListener('DOMContentLoaded', function() {
+    loadQuestions();
+    
+    // Filter-Event-Listener
+    document.getElementById('categoryFilter').addEventListener('change', loadQuestions);
+    document.getElementById('difficultyFilter').addEventListener('change', loadQuestions);
+});
+</script>
+{% endblock %}
