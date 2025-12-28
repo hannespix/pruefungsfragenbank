@@ -154,7 +154,12 @@ function newConfig() {
 
 function editConfig(configId) {
     fetch(`/settings/api/${configId}`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Fehler beim Laden der Konfiguration');
+            }
+            return response.json();
+        })
         .then(config => {
             document.getElementById('configModalTitle').textContent = 'Konfiguration bearbeiten';
             document.getElementById('formAction').value = 'update';
@@ -172,6 +177,10 @@ function editConfig(configId) {
             
             const modal = new bootstrap.Modal(document.getElementById('configModal'));
             modal.show();
+        })
+        .catch(error => {
+            console.error('Fehler:', error);
+            alert('Fehler beim Laden der Konfiguration: ' + error.message);
         });
 }
 

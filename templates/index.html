@@ -103,7 +103,12 @@ function loadQuestions() {
     if (difficulty) url += '&difficulty=' + difficulty;
     
     fetch(url)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Fehler beim Laden der Fragen');
+            }
+            return response.json();
+        })
         .then(data => {
             const container = document.getElementById('questionsList');
             if (data.length === 0) {
@@ -130,6 +135,11 @@ function loadQuestions() {
                     </div>
                 </div>
             `).join('');
+        })
+        .catch(error => {
+            console.error('Fehler beim Laden der Fragen:', error);
+            document.getElementById('questionsList').innerHTML = 
+                '<div class="alert alert-danger">Fehler beim Laden der Fragen. Bitte Seite neu laden.</div>';
         });
 }
 
@@ -145,11 +155,21 @@ function addQuestionToExam(questionId) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({question_id: questionId, points: 1})
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Fehler beim Hinzufügen der Frage');
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             loadExamItems();
+            loadQuestions(); // Aktualisiere Fragenliste (könnte deaktiviert werden)
         }
+    })
+    .catch(error => {
+        console.error('Fehler:', error);
+        alert('Fehler beim Hinzufügen der Frage: ' + error.message);
     });
 }
 
@@ -167,11 +187,21 @@ function confirmNewExam() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({title: title})
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Fehler beim Erstellen der Prüfung');
+        }
+        return response.json();
+    })
     .then(data => {
         currentExamId = data.id;
         document.getElementById('newExamModal').querySelector('.btn-close').click();
+        document.getElementById('examTitle').value = ''; // Formular zurücksetzen
         loadExamItems();
+    })
+    .catch(error => {
+        console.error('Fehler:', error);
+        alert('Fehler beim Erstellen der Prüfung: ' + error.message);
     });
 }
 
@@ -188,7 +218,12 @@ function loadExamItems() {
     }
     
     fetch(`/exam/${currentExamId}/items`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Fehler beim Laden der Prüfungsitems');
+            }
+            return response.json();
+        })
         .then(data => {
             const container = document.getElementById('currentExam');
             if (data.length === 0) {
@@ -233,6 +268,11 @@ function loadExamItems() {
                     `).join('')}
                 </div>
             `;
+        })
+        .catch(error => {
+            console.error('Fehler beim Laden der Prüfungsitems:', error);
+            document.getElementById('currentExam').innerHTML = 
+                '<div class="alert alert-danger">Fehler beim Laden der Prüfung. Bitte Seite neu laden.</div>';
         });
 }
 
@@ -243,11 +283,20 @@ function removeItem(itemId) {
     fetch(`/exam/${currentExamId}/remove_item/${itemId}`, {
         method: 'DELETE'
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Fehler beim Entfernen der Frage');
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             loadExamItems();
         }
+    })
+    .catch(error => {
+        console.error('Fehler:', error);
+        alert('Fehler beim Entfernen der Frage: ' + error.message);
     });
 }
 

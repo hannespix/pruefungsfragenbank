@@ -47,5 +47,9 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
+# Python cache
+*.pyc
+__pycache__/
+
 # Uploads
 uploads/

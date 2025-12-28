@@ -12,6 +12,7 @@ Ein lokales Web-Tool zur Verwaltung von Prüfungsfragen und Erstellung von Klaus
 - ✅ **Word-Export**: Generierung von sauberen Prüfungsdokumenten
 - ✅ **LAN-Zugriff**: Erreichbar für alle Kollegen im lokalen Netzwerk
 - ✅ **Standalone**: Läuft als einzelne .exe-Datei ohne Installation
+- ✅ **Premium Design**: Catppuccin Farbschema mit Glassmorphism-Effekten
 
 ## Tech-Stack
 
@@ -20,6 +21,7 @@ Ein lokales Web-Tool zur Verwaltung von Prüfungsfragen und Erstellung von Klaus
 - **Bootstrap 5** (lokal eingebunden, kein CDN)
 - **python-docx** für Word-Import/Export
 - **PyInstaller** für .exe-Erstellung
+- **requests** für LLM-API-Integration
 
 ## Installation & Entwicklung
 
@@ -31,8 +33,14 @@ pip install -r requirements.txt
 
 ### Entwicklung starten
 
+**Mit Auto-Reload (empfohlen für Entwicklung):**
 ```bash
 python app.py
+```
+
+Oder mit dem Start-Skript:
+```bash
+./run.sh
 ```
 
 Die Anwendung läuft dann auf:
@@ -40,6 +48,8 @@ Die Anwendung läuft dann auf:
 - **LAN**: http://[DEINE-IP]:5000
 
 Die lokale IP-Adresse wird beim Start angezeigt.
+
+**Hinweis**: Im Debug-Modus (Standard) lädt die App automatisch neu, wenn Dateien geändert werden. Kein manueller Neustart nötig!
 
 ## Build für Windows (.exe)
 
@@ -95,6 +105,17 @@ Die fertige .exe-Datei befindet sich in `dist/HortiExam.exe`.
 
 **Wichtig**: Das Snapshot-Pattern stellt sicher, dass Änderungen an Originalfragen bestehende Prüfungen nicht beeinflussen!
 
+### LLMConfig (LLM-API Konfiguration)
+- `id`: Eindeutige ID
+- `name`: Name der Konfiguration
+- `api_url`: API-Endpoint URL
+- `api_key`: API-Key (optional)
+- `model`: Modell-Name
+- `provider`: "openai", "anthropic", oder "custom"
+- `headers`: Zusätzliche Headers (JSON)
+- `prompt_template`: Custom Prompt Template
+- `active`: Aktive Konfiguration
+
 ## Word-Import
 
 ### Methode 1: Klassischer Import (strukturiertes Format)
@@ -146,6 +167,18 @@ Mit einer konfigurierten LLM-API können **beliebige Word-Dateien** importiert w
 ## Datenbank
 
 Die SQLite-Datenbank wird automatisch im `instance/` Ordner erstellt. Bei der .exe-Version wird sie im gleichen Verzeichnis wie die .exe-Datei erstellt.
+
+## Entwicklung
+
+### Auto-Reload
+
+Die App läuft standardmäßig im Debug-Modus mit Auto-Reload. Änderungen an Python-Dateien, Templates oder CSS werden automatisch erkannt und die App startet neu. Kein manueller Neustart nötig!
+
+### Datei-Änderungen werden automatisch erkannt:
+- ✅ Python-Dateien (.py)
+- ✅ Templates (.html)
+- ✅ CSS-Dateien (.css)
+- ✅ JavaScript-Dateien (.js)
 
 ## Lizenz
 

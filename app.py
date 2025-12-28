@@ -81,33 +81,36 @@ def index():
 @app.route('/questions')
 def questions():
     """API: Liste aller Fragen (filterbar)"""
-    category = request.args.get('category', '')
-    tag = request.args.get('tag', '')
-    difficulty = request.args.get('difficulty', type=int)
-    active_only = request.args.get('active_only', 'true') == 'true'
-    
-    query = Question.query
-    
-    if active_only:
-        query = query.filter(Question.active == True)
-    if category:
-        query = query.filter(Question.category == category)
-    if tag:
-        query = query.filter(Question.tags.contains(tag))
-    if difficulty:
-        query = query.filter(Question.difficulty == difficulty)
-    
-    questions = query.order_by(Question.date_created.desc()).all()
-    
-    return jsonify([{
-        'id': q.id,
-        'content': q.content,
-        'answer': q.answer,
-        'category': q.category,
-        'tags': q.tags.split(',') if q.tags else [],
-        'difficulty': q.difficulty,
-        'active': q.active
-    } for q in questions])
+    try:
+        category = request.args.get('category', '')
+        tag = request.args.get('tag', '')
+        difficulty = request.args.get('difficulty', type=int)
+        active_only = request.args.get('active_only', 'true') == 'true'
+        
+        query = Question.query
+        
+        if active_only:
+            query = query.filter(Question.active == True)
+        if category:
+            query = query.filter(Question.category == category)
+        if tag:
+            query = query.filter(Question.tags.contains(tag))
+        if difficulty:
+            query = query.filter(Question.difficulty == difficulty)
+        
+        questions = query.order_by(Question.date_created.desc()).all()
+        
+        return jsonify([{
+            'id': q.id,
+            'content': q.content or '',
+            'answer': q.answer or '',
+            'category': q.category or '',
+            'tags': [t.strip() for t in q.tags.split(',')] if q.tags and q.tags.strip() else [],
+            'difficulty': q.difficulty,
+            'active': q.active
+        } for q in questions])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/exam/<int:exam_id>')
@@ -120,74 +123,116 @@ def exam_view(exam_id):
 @app.route('/exam/<int:exam_id>/items')
 def exam_items(exam_id):
     """API: Items einer Prüfung"""
-    exam = Exam.query.get_or_404(exam_id)
-    items = ExamItem.query.filter_by(exam_id=exam_id).order_by(ExamItem.position).all()
-    
-    return jsonify([{
-        'id': item.id,
-        'content': item.snapshot_content,
-        'answer': item.snapshot_answer,
-        'points': item.points,
-        'position': item.position,
-        'original_question_id': item.original_question_id
-    } for item in items])
+    try:
+        exam = Exam.query.get_or_404(exam_id)
+        items = ExamItem.query.filter_by(exam_id=exam_id).order_by(ExamItem.position).all()
+        
+        return jsonify([{
+            'id': item.id,
+            'content': item.snapshot_content or '',
+            'answer': item.snapshot_answer or '',
+            'points': item.points,
+            'position': item.position,
+            'original_question_id': item.original_question_id
+        } for item in items])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/exam/new', methods=['POST'])
 def exam_new():
     """Neue Prüfung erstellen"""
-    title = request.json.get('title', 'Neue Prüfung')
-    exam = Exam(title=title, status='Draft')
-    db.session.add(exam)
-    db.session.commit()
-    return jsonify({'id': exam.id, 'title': exam.title})
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type muss application/json sein'}), 400
+        
+        title = request.json.get('title', 'Neue Prüfung')
+        if not title or not title.strip():
+            title = 'Neue Prüfung'
+        
+        exam = Exam(title=title.strip(), status='Draft')
+        db.session.add(exam)
+        db.session.commit()
+        return jsonify({'id': exam.id, 'title': exam.title})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/exam/<int:exam_id>/add_question', methods=['POST'])
 def exam_add_question(exam_id):
     """Frage zur Prüfung hinzufügen (Snapshot-Pattern!)"""
-    exam = Exam.query.get_or_404(exam_id)
-    question_id = request.json.get('question_id')
-    
-    question = Question.query.get_or_404(question_id)
-    
-    # Snapshot erstellen: Content und Answer kopieren
-    max_position = db.session.query(db.func.max(ExamItem.position)).filter_by(exam_id=exam_id).scalar() or -1
-    
-    exam_item = ExamItem(
-        exam_id=exam_id,
-        original_question_id=question_id,
-        snapshot_content=question.content,  # SNAPSHOT!
-        snapshot_answer=question.answer,    # SNAPSHOT!
-        points=request.json.get('points', 1),
-        position=max_position + 1
-    )
-    
-    db.session.add(exam_item)
-    db.session.commit()
-    
-    return jsonify({'success': True, 'item_id': exam_item.id})
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type muss application/json sein'}), 400
+        
+        exam = Exam.query.get_or_404(exam_id)
+        question_id = request.json.get('question_id')
+        
+        if not question_id:
+            return jsonify({'error': 'question_id fehlt'}), 400
+        
+        question = Question.query.get_or_404(question_id)
+        
+        # Prüfe ob Frage bereits in Prüfung ist
+        existing = ExamItem.query.filter_by(exam_id=exam_id, original_question_id=question_id).first()
+        if existing:
+            return jsonify({'success': False, 'error': 'Frage ist bereits in dieser Prüfung'}), 400
+        
+        # Snapshot erstellen: Content und Answer kopieren
+        max_position = db.session.query(db.func.max(ExamItem.position)).filter_by(exam_id=exam_id).scalar() or -1
+        
+        exam_item = ExamItem(
+            exam_id=exam_id,
+            original_question_id=question_id,
+            snapshot_content=question.content or '',  # SNAPSHOT!
+            snapshot_answer=question.answer or '',    # SNAPSHOT!
+            points=max(1, request.json.get('points', 1)),  # Mindestens 1 Punkt
+            position=max_position + 1
+        )
+        
+        db.session.add(exam_item)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'item_id': exam_item.id})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/exam/<int:exam_id>/remove_item/<int:item_id>', methods=['DELETE'])
 def exam_remove_item(exam_id, item_id):
     """Item aus Prüfung entfernen"""
-    item = ExamItem.query.filter_by(id=item_id, exam_id=exam_id).first_or_404()
-    db.session.delete(item)
-    db.session.commit()
-    return jsonify({'success': True})
+    try:
+        item = ExamItem.query.filter_by(id=item_id, exam_id=exam_id).first_or_404()
+        db.session.delete(item)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/exam/<int:exam_id>/reorder', methods=['POST'])
 def exam_reorder(exam_id):
     """Reihenfolge der Items ändern"""
-    item_ids = request.json.get('item_ids', [])
-    for position, item_id in enumerate(item_ids):
-        item = ExamItem.query.filter_by(id=item_id, exam_id=exam_id).first()
-        if item:
-            item.position = position
-    db.session.commit()
-    return jsonify({'success': True})
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type muss application/json sein'}), 400
+        
+        item_ids = request.json.get('item_ids', [])
+        if not isinstance(item_ids, list):
+            return jsonify({'error': 'item_ids muss eine Liste sein'}), 400
+        
+        for position, item_id in enumerate(item_ids):
+            item = ExamItem.query.filter_by(id=item_id, exam_id=exam_id).first()
+            if item:
+                item.position = position
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/import', methods=['GET', 'POST'])
@@ -209,9 +254,15 @@ def import_questions():
     if file and file.filename.endswith('.docx'):
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
         
         try:
+            file.save(filepath)
+            
+            # Prüfe ob Datei wirklich gespeichert wurde
+            if not os.path.exists(filepath):
+                flash('Fehler beim Speichern der Datei', 'error')
+                return redirect(url_for('import_questions'))
+            
             use_llm = request.form.get('use_llm') == 'on'
             llm_config_id = request.form.get('llm_config_id', type=int)
             
@@ -222,78 +273,89 @@ def import_questions():
                 # Klassischer Import
                 count = import_from_word(filepath)
             
-            flash(f'{count} Fragen erfolgreich importiert!', 'success')
+            if count > 0:
+                flash(f'{count} Fragen erfolgreich importiert!', 'success')
+            else:
+                flash('Keine Fragen gefunden. Bitte überprüfe das Format der Word-Datei.', 'error')
         except Exception as e:
             flash(f'Fehler beim Import: {str(e)}', 'error')
         finally:
-            if os.path.exists(filepath):
-                os.remove(filepath)
+            # Datei löschen
+            try:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+            except:
+                pass
     
     return redirect(url_for('import_questions'))
 
 
 def import_from_word(filepath):
     """Word-Dokument einlesen und Fragen extrahieren"""
-    doc = Document(filepath)
-    count = 0
-    current_question = None
-    current_answer = None
-    current_category = request.form.get('category', 'Allgemein')
-    
-    for paragraph in doc.paragraphs:
-        text = paragraph.text.strip()
+    try:
+        doc = Document(filepath)
+        count = 0
+        current_question = None
+        current_answer = None
+        current_category = request.form.get('category', 'Allgemein') or 'Allgemein'
         
-        # Ignoriere leere Zeilen
-        if not text:
-            continue
-        
-        # Frage erkennen (verschiedene Formate)
-        if text.lower().startswith('frage:') or text.startswith('FRAGE:'):
-            # Vorherige Frage speichern
-            if current_question and current_answer:
-                question = Question(
-                    content=current_question.strip(),
-                    answer=current_answer.strip(),
-                    category=current_category,
-                    active=True
-                )
-                db.session.add(question)
-                count += 1
+        for paragraph in doc.paragraphs:
+            text = paragraph.text.strip()
             
-            # Neue Frage beginnen
-            current_question = text.replace('Frage:', '').replace('FRAGE:', '').replace('frage:', '').strip()
-            current_answer = None
-        
-        # Lösung erkennen (verschiedene Formate)
-        elif text.lower().startswith('lösung:') or text.startswith('LÖSUNG:') or text.lower().startswith('loesung:'):
-            if current_question:
-                current_answer = text.replace('Lösung:', '').replace('LÖSUNG:', '').replace('lösung:', '').replace('Loesung:', '').strip()
-            else:
-                # Lösung ohne vorherige Frage - überspringen
+            # Ignoriere leere Zeilen
+            if not text:
                 continue
+            
+            # Frage erkennen (verschiedene Formate)
+            if text.lower().startswith('frage:') or text.startswith('FRAGE:'):
+                # Vorherige Frage speichern
+                if current_question and current_answer:
+                    question = Question(
+                        content=current_question.strip(),
+                        answer=current_answer.strip(),
+                        category=current_category,
+                        active=True
+                    )
+                    db.session.add(question)
+                    count += 1
+                
+                # Neue Frage beginnen
+                current_question = text.replace('Frage:', '').replace('FRAGE:', '').replace('frage:', '').strip()
+                current_answer = None
+            
+            # Lösung erkennen (verschiedene Formate)
+            elif text.lower().startswith('lösung:') or text.startswith('LÖSUNG:') or text.lower().startswith('loesung:'):
+                if current_question:
+                    current_answer = text.replace('Lösung:', '').replace('LÖSUNG:', '').replace('lösung:', '').replace('Loesung:', '').strip()
+                else:
+                    # Lösung ohne vorherige Frage - überspringen
+                    continue
+            
+            # Weiterer Text zur Frage oder Lösung
+            elif current_question and not current_answer:
+                # Weiterer Text zur Frage
+                if current_question:
+                    current_question += '<br>' + text
+            elif current_answer:
+                # Weiterer Text zur Lösung
+                current_answer += '<br>' + text
         
-        # Weiterer Text zur Frage oder Lösung
-        elif current_question and not current_answer:
-            # Weiterer Text zur Frage
-            if current_question:
-                current_question += '<br>' + text
-        elif current_answer:
-            # Weiterer Text zur Lösung
-            current_answer += '<br>' + text
-    
-    # Letzte Frage speichern
-    if current_question and current_answer:
-        question = Question(
-            content=current_question.strip(),
-            answer=current_answer.strip(),
-            category=current_category,
-            active=True
-        )
-        db.session.add(question)
-        count += 1
-    
-    db.session.commit()
-    return count
+        # Letzte Frage speichern
+        if current_question and current_answer:
+            question = Question(
+                content=current_question.strip(),
+                answer=current_answer.strip(),
+                category=current_category,
+                active=True
+            )
+            db.session.add(question)
+            count += 1
+        
+        db.session.commit()
+        return count
+    except Exception as e:
+        db.session.rollback()
+        raise Exception(f"Fehler beim Import: {str(e)}")
 
 
 def extract_text_from_word(filepath):
@@ -409,9 +471,26 @@ Nur JSON zurückgeben, keine zusätzlichen Erklärungen."""
         elif '```' in content:
             content = content.split('```')[1].split('```')[0].strip()
         
-        # JSON parsen
-        result = json.loads(content)
-        return result.get('questions', [])
+        # JSON parsen mit besserer Fehlerbehandlung
+        try:
+            result = json.loads(content)
+        except json.JSONDecodeError as e:
+            # Versuche, JSON-Objekt zu finden falls es in Text eingebettet ist
+            import re
+            json_match = re.search(r'\{[^{}]*"questions"[^{}]*\[.*?\]', content, re.DOTALL)
+            if json_match:
+                try:
+                    result = json.loads(json_match.group(0))
+                except:
+                    raise Exception(f"LLM-API Fehler: Konnte JSON nicht parsen. Response: {content[:200]}")
+            else:
+                raise Exception(f"LLM-API Fehler: Konnte JSON nicht parsen. Response: {content[:200]}")
+        
+        questions = result.get('questions', [])
+        if not isinstance(questions, list):
+            raise Exception("LLM-API Fehler: 'questions' ist keine Liste")
+        
+        return questions
         
     except Exception as e:
         raise Exception(f"LLM-API Fehler: {str(e)}")
@@ -454,66 +533,100 @@ def import_from_word_with_llm(filepath, llm_config_id):
 def settings():
     """Einstellungsseite für LLM-APIs"""
     if request.method == 'GET':
-        configs = LLMConfig.query.order_by(LLMConfig.date_created.desc()).all()
-        return render_template('settings.html', configs=configs)
+        try:
+            configs = LLMConfig.query.order_by(LLMConfig.date_created.desc()).all()
+            return render_template('settings.html', configs=configs)
+        except Exception as e:
+            flash(f'Fehler beim Laden der Konfigurationen: {str(e)}', 'error')
+            return render_template('settings.html', configs=[])
     
     # POST: Neue Konfiguration speichern
-    action = request.form.get('action')
-    
-    if action == 'create':
-        config = LLMConfig(
-            name=request.form.get('name'),
-            api_url=request.form.get('api_url'),
-            api_key=request.form.get('api_key', ''),
-            model=request.form.get('model', ''),
-            provider=request.form.get('provider', 'custom'),
-            headers=request.form.get('headers', ''),
-            prompt_template=request.form.get('prompt_template', ''),
-            active=request.form.get('active') == 'on'
-        )
-        db.session.add(config)
-        db.session.commit()
-        flash('LLM-Konfiguration erfolgreich erstellt!', 'success')
-    
-    elif action == 'update':
-        config_id = request.form.get('config_id', type=int)
-        config = LLMConfig.query.get_or_404(config_id)
-        config.name = request.form.get('name')
-        config.api_url = request.form.get('api_url')
-        config.api_key = request.form.get('api_key', '')
-        config.model = request.form.get('model', '')
-        config.provider = request.form.get('provider', 'custom')
-        config.headers = request.form.get('headers', '')
-        config.prompt_template = request.form.get('prompt_template', '')
-        config.active = request.form.get('active') == 'on'
-        db.session.commit()
-        flash('LLM-Konfiguration erfolgreich aktualisiert!', 'success')
-    
-    elif action == 'delete':
-        config_id = request.form.get('config_id', type=int)
-        config = LLMConfig.query.get_or_404(config_id)
-        db.session.delete(config)
-        db.session.commit()
-        flash('LLM-Konfiguration gelöscht!', 'success')
-    
-    return redirect(url_for('settings'))
+    try:
+        action = request.form.get('action')
+        
+        if action == 'create':
+            name = request.form.get('name', '').strip()
+            api_url = request.form.get('api_url', '').strip()
+            
+            if not name or not api_url:
+                flash('Name und API URL sind erforderlich!', 'error')
+                return redirect(url_for('settings'))
+            
+            config = LLMConfig(
+                name=name,
+                api_url=api_url,
+                api_key=request.form.get('api_key', '').strip(),
+                model=request.form.get('model', '').strip(),
+                provider=request.form.get('provider', 'custom'),
+                headers=request.form.get('headers', '').strip(),
+                prompt_template=request.form.get('prompt_template', '').strip(),
+                active=request.form.get('active') == 'on'
+            )
+            db.session.add(config)
+            db.session.commit()
+            flash('LLM-Konfiguration erfolgreich erstellt!', 'success')
+        
+        elif action == 'update':
+            config_id = request.form.get('config_id', type=int)
+            if not config_id:
+                flash('Konfigurations-ID fehlt', 'error')
+                return redirect(url_for('settings'))
+            
+            config = LLMConfig.query.get_or_404(config_id)
+            name = request.form.get('name', '').strip()
+            api_url = request.form.get('api_url', '').strip()
+            
+            if not name or not api_url:
+                flash('Name und API URL sind erforderlich!', 'error')
+                return redirect(url_for('settings'))
+            
+            config.name = name
+            config.api_url = api_url
+            config.api_key = request.form.get('api_key', '').strip()
+            config.model = request.form.get('model', '').strip()
+            config.provider = request.form.get('provider', 'custom')
+            config.headers = request.form.get('headers', '').strip()
+            config.prompt_template = request.form.get('prompt_template', '').strip()
+            config.active = request.form.get('active') == 'on'
+            db.session.commit()
+            flash('LLM-Konfiguration erfolgreich aktualisiert!', 'success')
+        
+        elif action == 'delete':
+            config_id = request.form.get('config_id', type=int)
+            if not config_id:
+                flash('Konfigurations-ID fehlt', 'error')
+                return redirect(url_for('settings'))
+            
+            config = LLMConfig.query.get_or_404(config_id)
+            db.session.delete(config)
+            db.session.commit()
+            flash('LLM-Konfiguration gelöscht!', 'success')
+        
+        return redirect(url_for('settings'))
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Fehler: {str(e)}', 'error')
+        return redirect(url_for('settings'))
 
 
 @app.route('/settings/api/<int:config_id>')
 def get_api_config(config_id):
     """API: Einzelne Konfiguration abrufen"""
-    config = LLMConfig.query.get_or_404(config_id)
-    return jsonify({
-        'id': config.id,
-        'name': config.name,
-        'api_url': config.api_url,
-        'api_key': config.api_key,
-        'model': config.model,
-        'provider': config.provider,
-        'headers': config.headers,
-        'prompt_template': config.prompt_template,
-        'active': config.active
-    })
+    try:
+        config = LLMConfig.query.get_or_404(config_id)
+        return jsonify({
+            'id': config.id,
+            'name': config.name or '',
+            'api_url': config.api_url or '',
+            'api_key': config.api_key or '',
+            'model': config.model or '',
+            'provider': config.provider or 'custom',
+            'headers': config.headers or '',
+            'prompt_template': config.prompt_template or '',
+            'active': config.active
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/export/<int:exam_id>')
@@ -521,6 +634,10 @@ def export_exam(exam_id):
     """Prüfung als Word-Dokument exportieren"""
     exam = Exam.query.get_or_404(exam_id)
     items = ExamItem.query.filter_by(exam_id=exam_id).order_by(ExamItem.position).all()
+    
+    if not items:
+        flash('Die Prüfung enthält keine Fragen. Bitte fügen Sie zuerst Fragen hinzu.', 'error')
+        return redirect(url_for('exam_view', exam_id=exam_id))
     
     # Word-Dokument erstellen
     doc = Document()
@@ -569,7 +686,8 @@ def export_exam(exam_id):
         doc.add_paragraph()
     
     # Speichern
-    filename = f'exam_{exam_id}_{exam.title.replace(" ", "_")}.docx'
+    safe_title = re.sub(r'[^\w\s-]', '', exam.title).strip().replace(' ', '_')
+    filename = f'exam_{exam_id}_{safe_title}.docx'
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     doc.save(filepath)
     
@@ -587,4 +705,5 @@ if __name__ == '__main__':
     print(f"  LAN:      http://{local_ip}:{port}")
     print(f"{'='*60}\n")
     
-    app.run(host='0.0.0.0', port=port, debug=False)
+    # Auto-Reload aktiviert für automatische Neustarts bei Dateiänderungen
+    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=True)

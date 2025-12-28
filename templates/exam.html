@@ -33,7 +33,12 @@ const examId = {{ exam.id }};
 
 function loadExamItems() {
     fetch(`/exam/${examId}/items`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Fehler beim Laden der Prüfungsitems');
+            }
+            return response.json();
+        })
         .then(data => {
             const container = document.getElementById('examItemsContainer');
             if (data.length === 0) {
@@ -59,6 +64,11 @@ function loadExamItems() {
                     </button>
                 </div>
             `).join('');
+        })
+        .catch(error => {
+            console.error('Fehler:', error);
+            document.getElementById('examItemsContainer').innerHTML = 
+                '<div class="alert alert-danger">Fehler beim Laden der Prüfung. Bitte Seite neu laden.</div>';
         });
 }
 
