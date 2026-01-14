@@ -7,15 +7,15 @@
     <div class="col-md-8 offset-md-2">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">📥 Fragen aus Word-Dokument importieren</h5>
+                <h5 class="mb-0">📥 Fragen aus Dokument importieren (Word/PDF)</h5>
             </div>
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <label for="file" class="form-label">Word-Datei (.docx)</label>
-                        <input type="file" class="form-control" id="file" name="file" accept=".docx" required>
+                        <label for="file" class="form-label">Dokument(e) (.docx oder .pdf)</label>
+                        <input type="file" class="form-control" id="file" name="file" accept=".docx,.pdf" multiple required>
                         <div class="form-text">
-                            Beliebige Word-Datei. Wähle unten die Import-Methode.
+                            Du kannst mehrere Word- oder PDF-Dateien auf einmal auswählen. Wähle unten die Import-Methode.
                         </div>
                     </div>
                     
@@ -28,7 +28,7 @@
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="use_llm" name="use_llm" onchange="toggleLLMConfig()">
                             <label class="form-check-label" for="use_llm">
-                                <strong>LLM-basierte Analyse verwenden</strong> (für beliebige Word-Dateien)
+                            <strong>LLM-basierte Analyse verwenden</strong> (für beliebige Word- & PDF-Dateien)
                             </label>
                         </div>
                         <small class="form-text text-muted">
@@ -42,7 +42,7 @@
                         <select class="form-select" id="llm_config_id" name="llm_config_id">
                             <option value="">-- Bitte wählen --</option>
                             {% for config in llm_configs %}
-                            <option value="{{ config.id }}">{{ config.name }} ({{ config.provider }})</option>
+                            <option value="{{ config.id }}" {% if default_llm_config_id and default_llm_config_id == config.id %}selected{% endif %}>{{ config.name }} ({{ config.provider }})</option>
                             {% endfor %}
                         </select>
                         <small class="form-text text-muted">
@@ -67,7 +67,7 @@
             </div>
             <div class="card-body">
                 <h6>📋 1. Klassischer Import (ohne LLM)</h6>
-                <p>Das Word-Dokument sollte folgendes Format haben:</p>
+                <p>Das Dokument sollte folgendes Format haben (gilt auch, wenn der Text aus PDF extrahiert wird):</p>
                 <pre class="bg-light p-3">
 Frage: Was ist Photosynthese?
 Lösung: Photosynthese ist der Prozess, bei dem Pflanzen...
@@ -83,7 +83,7 @@ Lösung: Stickstoff, Phosphor und Kalium sind...
                 
                 <h6>🤖 2. LLM-basierter Import (empfohlen)</h6>
                 <p>
-                    Mit einer konfigurierten LLM-API können <strong>beliebige Word-Dateien</strong> importiert werden.
+                    Mit einer konfigurierten LLM-API können <strong>beliebige Word- und PDF-Dateien</strong> importiert werden.
                     Das LLM analysiert den Text automatisch und extrahiert Fragen und Lösungen, auch wenn sie
                     nicht in einem speziellen Format vorliegen.
                 </p>
@@ -115,5 +115,18 @@ function toggleLLMConfig() {
         configSelect.required = false;
     }
 }
+
+// Letzte Auswahl merken (und beim nächsten Mal vorauswählen)
+document.addEventListener('DOMContentLoaded', () => {
+    const sel = document.getElementById('llm_config_id');
+    if (!sel) return;
+    const last = localStorage.getItem('hortiexam:lastLlmConfigId');
+    if (last && Array.from(sel.options).some(o => o.value === last)) {
+        sel.value = last;
+    }
+    sel.addEventListener('change', () => {
+        if (sel.value) localStorage.setItem('hortiexam:lastLlmConfigId', sel.value);
+    });
+});
 </script>
 {% endblock %}

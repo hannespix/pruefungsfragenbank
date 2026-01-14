@@ -13,8 +13,10 @@ class Question(db.Model):
     id = Column(Integer, primary_key=True)
     content = Column(Text, nullable=False)  # HTML erlaubt
     answer = Column(Text, nullable=False)  # Lösungshorizont
-    category = Column(String(100))  # z.B. "GaLaBau", "Zierpflanzen"
-    tags = Column(String(500))  # Kommagetrennt, z.B. "Botanik, Bodenkunde"
+    category = Column(String(100))  # Fachrichtung (BW) - Klartext (z.B. "Garten- und Landschaftsbau")
+    category_code = Column(Integer)  # Kennziffer (falls vorhanden, z.B. 30-36)
+    subcategory = Column(String(100))  # Unterkategorie / Themenbereich (z.B. "Botanik")
+    tags = Column(String(500))  # Kommagetrennt
     difficulty = Column(Integer, default=3)  # 1-5
     active = Column(Boolean, default=True)  # Nur aktive Fragen werden vorgeschlagen
     date_created = Column(DateTime, default=datetime.utcnow)
@@ -49,6 +51,10 @@ class ExamItem(db.Model):
     original_question_id = Column(Integer, ForeignKey('questions.id'), nullable=True)  # Verweis auf Ursprung
     snapshot_content = Column(Text, nullable=False)  # Kopie des Inhalts zum Zeitpunkt der Erstellung
     snapshot_answer = Column(Text, nullable=False)  # Kopie der Lösung
+    snapshot_category = Column(String(100))  # Fachrichtung Snapshot
+    snapshot_subcategory = Column(String(100))  # Unterkategorie Snapshot
+    snapshot_tags = Column(String(500))  # Tags Snapshot (kommagetrennt)
+    snapshot_difficulty = Column(Integer, default=3)  # Schwierigkeit Snapshot (1-5)
     points = Column(Integer, default=1)  # Punkte für diese spezifische Prüfung
     position = Column(Integer, default=0)  # Reihenfolge in der Prüfung
     
@@ -70,4 +76,5 @@ class LLMConfig(db.Model):
     headers = Column(Text)  # JSON-String für zusätzliche Headers
     prompt_template = Column(Text)  # Template für den Prompt
     active = Column(Boolean, default=True)  # Aktive Konfiguration
+    is_default = Column(Boolean, default=False)  # Standard-Konfiguration für Vorauswahl
     date_created = Column(DateTime, default=datetime.utcnow)

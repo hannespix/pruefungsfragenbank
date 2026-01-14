@@ -14,13 +14,18 @@
     <!-- Linke Seite: Fragen-Pool -->
     <div class="col-md-6">
         <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 class="mb-0">📚 Fragen-Pool</h5>
-                <div>
-                    <select id="categoryFilter" class="form-select form-select-sm d-inline-block" style="width: auto;">
-                        <option value="">Alle Kategorien</option>
+                <div class="d-flex gap-2 flex-wrap">
+                    <input id="searchInput" class="form-control form-control-sm" style="width: 240px;" placeholder="Suche (Frage, Lösung, Tags, Klausur...)">
+                    <input id="tagsFilter" class="form-control form-control-sm" style="width: 180px;" placeholder="Tags (Komma)">
+                    <select id="categoryFilter" class="form-select form-select-sm" style="width: auto; min-width: 150px;">
+                        <option value="">Alle Fachrichtungen</option>
                     </select>
-                    <select id="difficultyFilter" class="form-select form-select-sm d-inline-block ms-2" style="width: auto;">
+                    <select id="subcategoryFilter" class="form-select form-select-sm" style="width: auto; min-width: 150px;">
+                        <option value="">Alle Themenbereiche</option>
+                    </select>
+                    <select id="difficultyFilter" class="form-select form-select-sm" style="width: auto;">
                         <option value="">Alle Schwierigkeiten</option>
                         <option value="1">1 - Sehr leicht</option>
                         <option value="2">2 - Leicht</option>
@@ -28,6 +33,18 @@
                         <option value="4">4 - Schwer</option>
                         <option value="5">5 - Sehr schwer</option>
                     </select>
+                    <select id="activeFilter" class="form-select form-select-sm" style="width: auto;">
+                        <option value="">Aktiv + Inaktiv</option>
+                        <option value="true">Nur aktiv</option>
+                        <option value="false">Nur inaktiv</option>
+                    </select>
+                    <select id="usedStatusFilter" class="form-select form-select-sm" style="width: auto;">
+                        <option value="">Verwendung: egal</option>
+                        <option value="ever">Nur verwendet</option>
+                        <option value="never">Nie verwendet</option>
+                    </select>
+                    <input id="usedAfter" type="date" class="form-control form-control-sm" style="width: 160px;" title="Zuletzt verwendet ab">
+                    <input id="usedBefore" type="date" class="form-control form-control-sm" style="width: 160px;" title="Zuletzt verwendet bis">
                 </div>
             </div>
             <div class="card-body">
@@ -46,6 +63,9 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">📝 Aktuelle Prüfung</h5>
                 <div>
+                    <select id="examSelect" class="form-select form-select-sm d-inline-block me-2" style="width: auto; min-width: 220px;" onchange="selectExamFromDropdown()">
+                        <option value="">-- Prüfung auswählen --</option>
+                    </select>
                     <button class="btn btn-sm btn-primary" onclick="createNewExam()">
                         <span>✨</span> Neue Prüfung
                     </button>
@@ -65,7 +85,9 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block modals %}
 <!-- Modal für neue Prüfung -->
 <div class="modal fade" id="newExamModal" tabindex="-1">
     <div class="modal-dialog">
@@ -87,20 +109,242 @@
         </div>
     </div>
 </div>
+
+<!-- Modal für Frage Bearbeiten -->
+<div class="modal fade" id="editQuestionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">✏️ Frage bearbeiten</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editQuestionId">
+                
+                <div class="mb-3">
+                    <label class="form-label">Frage</label>
+                    <div class="wysiwyg-toolbar mb-2" data-editor="editContentEditor">
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="bold"><strong>B</strong></button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="italic"><em>I</em></button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="underline"><u>U</u></button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="insertUnorderedList">• Liste</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="insertOrderedList">1. Liste</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="createLink">Link</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="removeFormat">Format löschen</button>
+                    </div>
+                    <div id="editContentEditor" class="form-control wysiwyg-editor" contenteditable="true" data-paste-plain="true" style="min-height: 120px;"></div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Lösung</label>
+                    <div class="wysiwyg-toolbar mb-2" data-editor="editAnswerEditor">
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="bold"><strong>B</strong></button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="italic"><em>I</em></button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="underline"><u>U</u></button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="insertUnorderedList">• Liste</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="insertOrderedList">1. Liste</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="createLink">Link</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="removeFormat">Format löschen</button>
+                    </div>
+                    <div id="editAnswerEditor" class="form-control wysiwyg-editor" contenteditable="true" data-paste-plain="true" style="min-height: 120px;"></div>
+                    <small class="form-text text-muted" id="aiTokenHint" style="display:none;">
+                        Diese Lösung ist als <code>[KI-generiert]</code> markiert. Sobald du den Text bearbeitest, wird die Markierung entfernt.
+                    </small>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-8 mb-3">
+                        <label class="form-label">Fachrichtung (BW)</label>
+                        <input type="text" class="form-control" id="editCategory" list="categories" placeholder="z.B. Garten-, Landschafts- und Sportplatzbau">
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Unterkategorie (Themenbereich)</label>
+                        <input type="text" class="form-control" id="editSubcategory" list="subcategories" placeholder="z.B. Botanik">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-8 mb-3">
+                        <label class="form-label">Tags</label>
+                        <input type="text" class="form-control" id="editTags" placeholder="Stauden, Gehölze">
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Schwierigkeit</label>
+                        <select class="form-select" id="editDifficulty">
+                            <option value="1">1 - Sehr leicht</option>
+                            <option value="2">2 - Leicht</option>
+                            <option value="3">3 - Mittel</option>
+                            <option value="4">4 - Schwer</option>
+                            <option value="5">5 - Sehr schwer</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="editActive">
+                    <label class="form-check-label" for="editActive">
+                        Aktiv (in Auswahl anzeigen)
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <button type="button" class="btn btn-danger" onclick="deleteQuestion()">🗑️ Löschen</button>
+                <div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="button" class="btn btn-primary" onclick="saveQuestion()">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<datalist id="categories"></datalist>
+<datalist id="subcategories"></datalist>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 let currentExamId = null;
+let examsCache = [];
+
+function loadExams() {
+    fetch('/exams')
+        .then(r => r.json())
+        .then(exams => {
+            examsCache = exams || [];
+            const sel = document.getElementById('examSelect');
+            if (!sel) return;
+
+            // reset
+            sel.innerHTML = '<option value="">-- Prüfung auswählen --</option>';
+            examsCache.forEach(e => {
+                const opt = document.createElement('option');
+                opt.value = String(e.id);
+                opt.textContent = `${e.title} (${e.date_created})`;
+                sel.appendChild(opt);
+            });
+
+            // restore last exam
+            const last = localStorage.getItem('hortiexam:lastExamId');
+            if (last && examsCache.some(e => String(e.id) === String(last))) {
+                sel.value = String(last);
+                currentExamId = parseInt(last);
+                loadExamItems();
+            } else if (currentExamId) {
+                sel.value = String(currentExamId);
+            }
+        })
+        .catch(err => console.error('Fehler beim Laden der Prüfungen:', err));
+}
+
+function selectExamFromDropdown() {
+    const sel = document.getElementById('examSelect');
+    const val = sel.value;
+    if (!val) {
+        currentExamId = null;
+        localStorage.removeItem('hortiexam:lastExamId');
+        loadExamItems();
+        return;
+    }
+    currentExamId = parseInt(val);
+    localStorage.setItem('hortiexam:lastExamId', String(currentExamId));
+    loadExamItems();
+}
+
+// Filter laden
+function loadFilters() {
+    fetch('/api/filters')
+        .then(res => res.json())
+        .then(data => {
+            // Kategorien Dropdown
+            const catSelect = document.getElementById('categoryFilter');
+            const catList = document.getElementById('categories');
+            
+            // Bestehende Optionen außer "Alle" entfernen
+            while (catSelect.options.length > 1) catSelect.remove(1);
+            catList.innerHTML = '';
+            
+            data.categories.forEach(c => {
+                // Für Filter
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                catSelect.appendChild(opt);
+                
+                // Für Datalist (Autocomplete)
+                const listOpt = document.createElement('option');
+                listOpt.value = c;
+                catList.appendChild(listOpt);
+            });
+            
+            // Subkategorien Dropdown
+            const subSelect = document.getElementById('subcategoryFilter');
+            const subList = document.getElementById('subcategories');
+            
+            while (subSelect.options.length > 1) subSelect.remove(1);
+            subList.innerHTML = '';
+            
+            data.subcategories.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s;
+                opt.textContent = s;
+                subSelect.appendChild(opt);
+                
+                const listOpt = document.createElement('option');
+                listOpt.value = s;
+                subList.appendChild(listOpt);
+            });
+        })
+        .catch(err => console.error('Fehler beim Laden der Filter:', err));
+}
+
+function loadFachrichtungen() {
+    fetch('/api/fachrichtungen')
+        .then(res => res.json())
+        .then(data => {
+            const catSelect = document.getElementById('categoryFilter');
+            while (catSelect.options.length > 1) catSelect.remove(1);
+
+            data.fachrichtungen.forEach(fr => {
+                const opt = document.createElement('option');
+                opt.value = fr.code ? String(fr.code) : fr.name;
+                opt.textContent = fr.code ? `${fr.code} – ${fr.name}` : fr.name;
+                catSelect.appendChild(opt);
+            });
+        })
+        .catch(err => console.error('Fehler beim Laden der Fachrichtungen:', err));
+}
 
 // Fragen laden
 function loadQuestions() {
-    const category = document.getElementById('categoryFilter').value;
+    const categoryValue = document.getElementById('categoryFilter').value;
+    const subcategory = document.getElementById('subcategoryFilter').value;
     const difficulty = document.getElementById('difficultyFilter').value;
+    const active = document.getElementById('activeFilter')?.value || '';
+    const usedStatus = document.getElementById('usedStatusFilter')?.value || '';
+    const usedAfter = document.getElementById('usedAfter')?.value || '';
+    const usedBefore = document.getElementById('usedBefore')?.value || '';
+    const tagsAny = document.getElementById('tagsFilter')?.value || '';
+    const qtext = document.getElementById('searchInput')?.value || '';
     
-    let url = '/questions?active_only=true';
-    if (category) url += '&category=' + encodeURIComponent(category);
+    let url = '/questions?';
+    if (categoryValue) {
+        if (/^\\d+$/.test(categoryValue)) {
+            url += '&category_code=' + encodeURIComponent(categoryValue);
+        } else {
+            url += '&category=' + encodeURIComponent(categoryValue);
+        }
+    }
+    if (subcategory) url += '&subcategory=' + encodeURIComponent(subcategory);
     if (difficulty) url += '&difficulty=' + difficulty;
+    if (active) url += '&active=' + encodeURIComponent(active);
+    if (usedStatus) url += '&used_status=' + encodeURIComponent(usedStatus);
+    if (usedAfter) url += '&used_after=' + encodeURIComponent(usedAfter);
+    if (usedBefore) url += '&used_before=' + encodeURIComponent(usedBefore);
+    if (tagsAny) url += '&tags_any=' + encodeURIComponent(tagsAny);
+    if (qtext) url += '&q=' + encodeURIComponent(qtext);
     
     fetch(url)
         .then(response => {
@@ -110,6 +354,7 @@ function loadQuestions() {
             return response.json();
         })
         .then(data => {
+            allQuestionsCache = data; // Cache aktualisieren für Edit
             const container = document.getElementById('questionsList');
             if (data.length === 0) {
                 container.innerHTML = '<div class="text-center text-muted"><p>Keine Fragen gefunden</p></div>';
@@ -122,15 +367,24 @@ function loadQuestions() {
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="flex-grow-1">
                                 <div class="mb-3" style="font-size: 1.05rem; line-height: 1.6;">${q.content}</div>
-                                <div>
+                                <div class="mb-2">
                                     ${q.category ? `<span class="badge bg-secondary tag-badge">🏷️ ${q.category}</span>` : ''}
+                                    ${q.subcategory ? `<span class="badge bg-primary tag-badge">📂 ${q.subcategory}</span>` : ''}
                                     ${q.tags.map(tag => `<span class="badge bg-info tag-badge">${tag}</span>`).join('')}
                                     <span class="badge bg-warning tag-badge">⭐ ${'★'.repeat(q.difficulty)}${'☆'.repeat(5-q.difficulty)}</span>
                                 </div>
+                                ${q.last_used_date ? 
+                                    `<small class="text-muted d-block"><i class="bi bi-clock-history"></i> Zuletzt: ${q.last_used_date} (${q.last_used_exam})</small>` 
+                                    : ''}
                             </div>
-                            <button class="btn btn-sm btn-success ms-3" onclick="event.stopPropagation(); addQuestionToExam(${q.id})">
-                                ➕ Hinzufügen
-                            </button>
+                            <div class="d-flex flex-column gap-2 ms-3">
+                                <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); addQuestionToExam(${q.id})">
+                                    ➕
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); editQuestion(${q.id})">
+                                    ✏️
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -195,8 +449,10 @@ function confirmNewExam() {
     })
     .then(data => {
         currentExamId = data.id;
+        localStorage.setItem('hortiexam:lastExamId', String(currentExamId));
         document.getElementById('newExamModal').querySelector('.btn-close').click();
         document.getElementById('examTitle').value = ''; // Formular zurücksetzen
+        loadExams(); // Dropdown aktualisieren
         loadExamItems();
     })
     .catch(error => {
@@ -235,6 +491,8 @@ function loadExamItems() {
                     <div class="text-center d-flex gap-2 justify-content-center">
                         <a href="/exam/${currentExamId}" class="btn btn-primary">👁️ Prüfung öffnen</a>
                         <a href="/export/${currentExamId}" class="btn btn-success">📄 Als Word exportieren</a>
+                        <button class="btn btn-secondary" onclick="renameExam()">✏️ Umbenennen</button>
+                        <button class="btn btn-danger" onclick="deleteExam()">🗑️ Löschen</button>
                     </div>
                 `;
                 return;
@@ -248,6 +506,8 @@ function loadExamItems() {
                     <a href="/export/${currentExamId}" class="btn btn-success">
                         📄 Als Word exportieren
                     </a>
+                    <button class="btn btn-secondary" onclick="renameExam()">✏️ Umbenennen</button>
+                    <button class="btn btn-danger" onclick="deleteExam()">🗑️ Löschen</button>
                 </div>
                 <div id="examItemsList">
                     ${data.map((item, idx) => `
@@ -276,6 +536,45 @@ function loadExamItems() {
         });
 }
 
+function renameExam() {
+    if (!currentExamId) return;
+    const current = examsCache.find(e => e.id === currentExamId);
+    const newTitle = prompt('Neuer Titel:', current ? current.title : '');
+    if (!newTitle) return;
+    fetch(`/exam/${currentExamId}/rename`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ title: newTitle })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadExams();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    })
+    .catch(err => alert('Fehler: ' + err));
+}
+
+function deleteExam() {
+    if (!currentExamId) return;
+    if (!confirm('Prüfung wirklich löschen?')) return;
+    fetch(`/exam/${currentExamId}/delete`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            currentExamId = null;
+            localStorage.removeItem('hortiexam:lastExamId');
+            loadExams();
+            loadExamItems();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    })
+    .catch(err => alert('Fehler: ' + err));
+}
+
 // Item entfernen
 function removeItem(itemId) {
     if (!confirm('Frage wirklich entfernen?')) return;
@@ -302,11 +601,136 @@ function removeItem(itemId) {
 
 // Initialisierung
 document.addEventListener('DOMContentLoaded', function() {
+    loadFilters();
+    loadFachrichtungen();
+    loadExams();
     loadQuestions();
     
     // Filter-Event-Listener
     document.getElementById('categoryFilter').addEventListener('change', loadQuestions);
+    document.getElementById('subcategoryFilter').addEventListener('change', loadQuestions);
     document.getElementById('difficultyFilter').addEventListener('change', loadQuestions);
+    document.getElementById('activeFilter').addEventListener('change', loadQuestions);
+    document.getElementById('usedStatusFilter').addEventListener('change', loadQuestions);
+    document.getElementById('usedAfter').addEventListener('change', loadQuestions);
+    document.getElementById('usedBefore').addEventListener('change', loadQuestions);
+    document.getElementById('tagsFilter').addEventListener('input', debounce(loadQuestions, 250));
+    document.getElementById('searchInput').addEventListener('input', debounce(loadQuestions, 250));
 });
+
+function debounce(fn, ms) {
+    let t;
+    return function(...args) {
+        clearTimeout(t);
+        t = setTimeout(() => fn.apply(this, args), ms);
+    };
+}
+
+// Frage bearbeiten
+let allQuestionsCache = []; // Wird beim Laden gefüllt
+
+function editQuestion(id) {
+    // Suche Frage im Cache (wir müssen loadQuestions anpassen, um Daten zu speichern)
+    const question = allQuestionsCache.find(q => q.id === id);
+    if (!question) return;
+
+    document.getElementById('editQuestionId').value = question.id;
+    // WYSIWYG Editor befüllen
+    const contentEd = document.getElementById('editContentEditor');
+    const answerEd = document.getElementById('editAnswerEditor');
+    if (contentEd) contentEd.innerHTML = question.content || '';
+    if (answerEd) answerEd.innerHTML = question.answer || '';
+    document.getElementById('editCategory').value = question.category;
+    document.getElementById('editSubcategory').value = question.subcategory || '';
+    document.getElementById('editTags').value = question.tags.join(', ');
+    document.getElementById('editDifficulty').value = question.difficulty;
+    document.getElementById('editActive').checked = question.active;
+
+    const aiHint = document.getElementById('aiTokenHint');
+    if (aiHint) {
+        aiHint.style.display = (question.answer || '').startsWith('[KI-generiert]') ? 'block' : 'none';
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('editQuestionModal'));
+    modal.show();
+}
+
+function stripAiTokenIfPresent(text) {
+    if (!text) return text;
+    if (text.startsWith('[KI-generiert]')) {
+        const lines = text.split('\\n');
+        lines.shift();
+        return lines.join('\\n').trimStart();
+    }
+    return text;
+}
+
+// Wenn User die Lösung editiert: Token entfernen
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.HortiWysiwyg) window.HortiWysiwyg.bindAll();
+    const ans = document.getElementById('editAnswerEditor');
+    if (ans) {
+        ans.addEventListener('input', () => {
+            const val = (ans.innerText || '');
+            if (val.startsWith('[KI-generiert]')) {
+                ans.textContent = stripAiTokenIfPresent(val);
+                const aiHint = document.getElementById('aiTokenHint');
+                if (aiHint) aiHint.style.display = 'none';
+            }
+        });
+    }
+});
+
+function saveQuestion() {
+    const id = document.getElementById('editQuestionId').value;
+    const contentEd = document.getElementById('editContentEditor');
+    const answerEd = document.getElementById('editAnswerEditor');
+    const contentHtml = contentEd ? (contentEd.innerHTML || '') : '';
+    const answerHtml = answerEd ? (answerEd.innerHTML || '') : '';
+    const safeContent = (window.HortiWysiwyg && window.HortiWysiwyg.sanitizeHtml) ? window.HortiWysiwyg.sanitizeHtml(contentHtml) : contentHtml;
+    const safeAnswer = (window.HortiWysiwyg && window.HortiWysiwyg.sanitizeHtml) ? window.HortiWysiwyg.sanitizeHtml(answerHtml) : answerHtml;
+    const data = {
+        content: safeContent,
+        answer: safeAnswer,
+        category: document.getElementById('editCategory').value,
+        subcategory: document.getElementById('editSubcategory').value,
+        tags: document.getElementById('editTags').value,
+        difficulty: document.getElementById('editDifficulty').value,
+        active: document.getElementById('editActive').checked
+    };
+
+    fetch(`/question/${id}/update`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById('editQuestionModal').querySelector('.btn-close').click();
+            loadQuestions(); // Liste aktualisieren
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    })
+    .catch(err => alert('Fehler: ' + err));
+}
+
+function deleteQuestion() {
+    if(!confirm('Frage wirklich unwiderruflich aus der Datenbank löschen?')) return;
+    
+    const id = document.getElementById('editQuestionId').value;
+    fetch(`/question/${id}/delete`, { method: 'DELETE' })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById('editQuestionModal').querySelector('.btn-close').click();
+            loadQuestions();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    })
+    .catch(err => alert('Fehler: ' + err));
+}
 </script>
 {% endblock %}

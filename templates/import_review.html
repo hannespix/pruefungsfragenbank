@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+
+{% block title %}Import Überprüfen - HortiExam{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>🧐 Import überprüfen</h1>
+            <a href="{{ url_for('import_questions') }}" class="btn btn-secondary">Abbrechen</a>
+        </div>
+        <p class="text-muted">Bitte überprüfe die extrahierten Fragen und ergänze fehlende Informationen, bevor du sie speicherst.</p>
+    </div>
+</div>
+
+<form id="importForm" onsubmit="saveQuestions(event)">
+    <!-- KI-Unterstützung -->
+    {% if llm_configs %}
+    <div class="card mb-4 glow-mauve">
+        <div class="card-header">
+            🤖 Fehlende Lösungen generieren
+        </div>
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label class="form-label">LLM-Konfiguration (für Lösungsgenerierung)</label>
+                    <select class="form-select" id="llm_config_id">
+                        <option value="">-- Bitte wählen --</option>
+                        {% for config in llm_configs %}
+                        <option value="{{ config.id }}" {% if llm_config_id and llm_config_id == config.id %}selected{% elif (not llm_config_id) and default_llm_config_id and default_llm_config_id == config.id %}selected{% endif %}>
+                            {{ config.name }} ({{ config.provider }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">
+                        Generiert Lösungen nur für Fragen ohne Lösung. Ergebnisse werden mit <code>[KI-generiert]</code> markiert.
+                        Sobald du den Antworttext manuell bearbeitest, wird die Markierung entfernt.
+                    </small>
+                </div>
+                <div class="col-md-4 d-flex gap-2 justify-content-end">
+                    <button type="button" class="btn btn-primary" onclick="generateMissingAnswers()">
+                        🧠 Lösungen erzeugen
+                    </button>
+                </div>
+            </div>
+            <div id="importAiStatus" class="small text-muted mt-3" style="min-height: 1.25rem;"></div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% for imp in imports %}
+    <div class="card mb-4 glow-blue import-block" data-import-index="{{ loop.index0 }}" data-prefill-past="{{ 'true' if imp.is_past_exam_prefill else 'false' }}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                📄 Datei: <strong>{{ imp.source_file }}</strong>
+                {% if imp.questions and imp.questions|length > 0 %}
+                    <span class="badge bg-info ms-2">{{ imp.questions|length }} Fragen</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="form-check mb-3">
+                <input class="form-check-input is-past-exam" type="checkbox" id="is_past_exam_{{ loop.index0 }}" onchange="toggleExamFields({{ loop.index0 }})">
+                <label class="form-check-label fw-bold" for="is_past_exam_{{ loop.index0 }}">
+                    Diese Fragen stammen aus einer vergangenen Prüfung (Historie anlegen)
+                </label>
+            </div>
+
+            <div id="exam_fields_{{ loop.index0 }}" style="display:none;" class="row g-3 mb-4">
+                <div class="col-md-8">
+                    <label class="form-label">Name der Prüfung / Klausur</label>
+                    <input type="text" class="form-control exam-title" id="exam_title_{{ loop.index0 }}" placeholder="z.B. Abschlussprüfung Sommer 2024" value="{{ imp.exam_title_prefill or '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Datum der Prüfung</label>
+                    <input type="date" class="form-control exam-date" id="exam_date_{{ loop.index0 }}" value="{{ imp.exam_date_prefill or '' }}">
+                    <small class="form-text text-muted exam-date-hint" id="exam_date_hint_{{ loop.index0 }}" style="display:none;">
+                        Bitte Prüfungsdatum ergänzen (wurde nicht sicher erkannt).
+                    </small>
+                </div>
+            </div>
+
+            <div class="questions-container">
+                {% for q in imp.questions %}
+                <div class="question-card question-item" data-source-file="{{ imp.source_file }}">
+                    <div class="d-flex justify-content-between mb-3">
+                        <h5 class="text-primary">Frage</h5>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeQuestion(this)">
+                            🗑️ Entfernen
+                        </button>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Frage</label>
+                            <textarea class="form-control content-field" rows="2">{{ q.content }}</textarea>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Lösung</label>
+                            <textarea class="form-control answer-field" rows="2">{{ q.answer }}</textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Fachrichtung (BW)</label>
+                            <input type="text" class="form-control category-field" value="{{ q.category }}" list="categories" placeholder="z.B. Garten-, Landschafts- und Sportplatzbau">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Unterkategorie (Themenbereich)</label>
+                            <input type="text" class="form-control subcategory-field" value="{{ q.subcategory }}" list="subcategories" placeholder="z.B. Fachrechnen">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Tags (kommagetrennt)</label>
+                            <input type="text" class="form-control tags-field" value="{{ q.tags }}" placeholder="Botanik, Zierpflanzen">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Schwierigkeit (1-5)</label>
+                            <select class="form-select difficulty-field">
+                                <option value="1" {% if q.difficulty == 1 %}selected{% endif %}>1 - Sehr Einfach</option>
+                                <option value="2" {% if q.difficulty == 2 %}selected{% endif %}>2 - Einfach</option>
+                                <option value="3" {% if q.difficulty == 3 %}selected{% endif %}>3 - Mittel</option>
+                                <option value="4" {% if q.difficulty == 4 %}selected{% endif %}>4 - Schwer</option>
+                                <option value="5" {% if q.difficulty == 5 %}selected{% endif %}>5 - Sehr Schwer</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <datalist id="categories">
+        {% if categories_options %}
+            {% for c in categories_options %}
+            <option value="{{ c }}">
+            {% endfor %}
+        {% else %}
+            <option value="Baumschule">
+            <option value="Friedhofsgärtnerei">
+            <option value="Garten- und Landschaftsbau">
+            <option value="Gemüsebau">
+            <option value="Obstbau">
+            <option value="Staudengärtnerei">
+            <option value="Zierpflanzenbau">
+        {% endif %}
+    </datalist>
+
+    <datalist id="subcategories">
+        {% if subcategories_options %}
+            {% for s in subcategories_options %}
+            <option value="{{ s }}">
+            {% endfor %}
+        {% else %}
+            <option value="Fachrechnen">
+            <option value="Betriebliche Zusammenhänge">
+        {% endif %}
+    </datalist>
+
+    <div class="fixed-bottom p-3 glass d-flex justify-content-end gap-2" style="z-index: 100;">
+        <span class="align-self-center me-3 text-muted" id="count-badge"></span>
+        <button type="submit" class="btn btn-success btn-lg shadow">
+            💾 Alles Speichern & Übernehmen
+        </button>
+    </div>
+</form>
+
+<div style="height: 100px;"></div> <!-- Spacer for fixed bottom -->
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const sel = document.getElementById('llm_config_id');
+    if (!sel) return;
+    const last = localStorage.getItem('hortiexam:lastLlmConfigId');
+    if (last && Array.from(sel.options).some(o => o.value === last)) {
+        sel.value = last;
+    }
+    sel.addEventListener('change', () => {
+        if (sel.value) localStorage.setItem('hortiexam:lastLlmConfigId', sel.value);
+    });
+});
+
+function toggleExamFields(idx) {
+    const check = document.getElementById(`is_past_exam_${idx}`);
+    const fields = document.getElementById(`exam_fields_${idx}`);
+    if (!check || !fields) return;
+    if (check.checked) {
+        fields.style.display = 'flex';
+        const dateEl = document.getElementById(`exam_date_${idx}`);
+        const hint = document.getElementById(`exam_date_hint_${idx}`);
+        if (hint) hint.style.display = dateEl && dateEl.value ? 'none' : 'block';
+    } else {
+        fields.style.display = 'none';
+    }
+}
+
+function removeQuestion(btn) {
+    if(confirm('Frage wirklich entfernen?')) {
+        btn.closest('.question-item').remove();
+        updateCount();
+    }
+}
+
+function updateCount() {
+    const count = document.querySelectorAll('.question-item').length;
+    document.getElementById('count-badge').textContent = count + ' Fragen';
+}
+
+function saveQuestions(e) {
+    e.preventDefault();
+
+    // Pro Datei: Wenn Historie aktiv, Datum abfragen falls fehlt
+    const importBlocks = document.querySelectorAll('.import-block');
+    for (const block of importBlocks) {
+        const idx = block.getAttribute('data-import-index');
+        const isPast = document.getElementById(`is_past_exam_${idx}`)?.checked;
+        if (!isPast) continue;
+        const examTitleEl = document.getElementById(`exam_title_${idx}`);
+        const examDateEl = document.getElementById(`exam_date_${idx}`);
+        if (examTitleEl && !examTitleEl.value.trim()) {
+            alert('Bitte gib einen Namen/Titel für die Prüfung an.');
+            examTitleEl.focus();
+            return;
+        }
+        if (examDateEl && !examDateEl.value) {
+            alert('Bitte gib das Prüfungsdatum an (wurde nicht erkannt).');
+            examDateEl.focus();
+            return;
+        }
+    }
+    
+    const btn = document.querySelector('button[type="submit"]');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Speichere...';
+
+    const imports = [];
+    document.querySelectorAll('.import-block').forEach(block => {
+        const idx = block.getAttribute('data-import-index');
+        const sourceFile = block.querySelector('.card-header strong')?.textContent || '';
+        const questions = [];
+        block.querySelectorAll('.question-item').forEach(item => {
+            questions.push({
+                content: item.querySelector('.content-field').value,
+                answer: item.querySelector('.answer-field').value,
+                category: item.querySelector('.category-field').value,
+                subcategory: item.querySelector('.subcategory-field').value,
+                tags: item.querySelector('.tags-field').value,
+                difficulty: parseInt(item.querySelector('.difficulty-field').value),
+                source_file: item.getAttribute('data-source-file') || sourceFile
+            });
+        });
+        imports.push({
+            source_file: sourceFile,
+            questions: questions,
+            is_past_exam: document.getElementById(`is_past_exam_${idx}`)?.checked || false,
+            exam_title: document.getElementById(`exam_title_${idx}`)?.value || '',
+            exam_date: document.getElementById(`exam_date_${idx}`)?.value || ''
+        });
+    });
+
+    const data = {
+        imports: imports
+    };
+
+    fetch('/import/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            window.location.href = "{{ url_for('index') }}";
+        } else {
+            alert('Fehler: ' + data.error);
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    })
+    .catch(err => {
+        alert('Netzwerkfehler: ' + err);
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+}
+
+function stripAiTokenIfPresent(text) {
+    if (!text) return text;
+    if (text.startsWith('[KI-generiert]')) {
+        // Entferne erste Zeile
+        const lines = text.split('\n');
+        lines.shift();
+        return lines.join('\n').trimStart();
+    }
+    return text;
+}
+
+function attachAiTokenStripper(textarea) {
+    textarea.addEventListener('input', () => {
+        const val = textarea.value || '';
+        // Wenn User editiert und Token vorhanden: entfernen
+        if (val.startsWith('[KI-generiert]')) {
+            textarea.value = stripAiTokenIfPresent(val);
+        }
+    }, { once: false });
+}
+
+// Stripper an alle Answer-Felder hängen
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.answer-field').forEach(ta => attachAiTokenStripper(ta));
+
+    // Count initial
+    updateCount();
+
+    // Prefill pro Importblock
+    document.querySelectorAll('.import-block').forEach(block => {
+        const idx = block.getAttribute('data-import-index');
+        const prefill = block.getAttribute('data-prefill-past') === 'true';
+        if (prefill) {
+            const cb = document.getElementById(`is_past_exam_${idx}`);
+            if (cb) cb.checked = true;
+            toggleExamFields(idx);
+        }
+        const dateEl = document.getElementById(`exam_date_${idx}`);
+        if (dateEl) {
+            dateEl.addEventListener('change', () => {
+                const hint = document.getElementById(`exam_date_hint_${idx}`);
+                if (hint) hint.style.display = dateEl.value ? 'none' : 'block';
+            });
+        }
+    });
+});
+
+function generateMissingAnswers() {
+    const configSelect = document.getElementById('llm_config_id');
+    if (!configSelect) {
+        alert('Keine LLM-Konfiguration verfügbar.');
+        return;
+    }
+    const llmConfigId = parseInt(configSelect.value);
+    if (!llmConfigId) {
+        alert('Bitte wähle eine LLM-Konfiguration aus.');
+        return;
+    }
+
+    const targets = [];
+    const targetTextareas = [];
+    document.querySelectorAll('.question-item').forEach(item => {
+        const answerTa = item.querySelector('.answer-field');
+        if (!answerTa) return;
+        const current = (answerTa.value || '').trim();
+        if (current.length === 0) {
+            targets.push({
+                content: item.querySelector('.content-field')?.value || '',
+                category: item.querySelector('.category-field')?.value || '',
+                subcategory: item.querySelector('.subcategory-field')?.value || ''
+            });
+            targetTextareas.push(answerTa);
+        }
+    });
+
+    if (targets.length === 0) {
+        alert('Es gibt keine fehlenden Lösungen.');
+        return;
+    }
+
+    const btn = document.querySelector('button[onclick="generateMissingAnswers()"]');
+    const originalText = btn ? btn.innerHTML : null;
+    const statusEl = document.getElementById('importAiStatus');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generiere...';
+    }
+    if (statusEl) {
+        statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>KI generiert Lösungen…';
+    }
+
+    fetch('/import/generate_answers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ llm_config_id: llmConfigId, questions: targets })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (!data.success) {
+            alert('Fehler: ' + data.error);
+            return;
+        }
+        const results = data.results || [];
+        results.forEach((r, idx) => {
+            if (targetTextareas[idx]) {
+                targetTextareas[idx].value = r.answer || '';
+            }
+        });
+    })
+    .catch(err => alert('Netzwerkfehler: ' + err))
+    .finally(() => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+        if (statusEl) {
+            statusEl.innerHTML = '';
+        }
+    });
+}
+</script>
+{% endblock %}

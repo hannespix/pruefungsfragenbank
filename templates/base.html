@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -50,6 +51,11 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/wysiwyg.js') }}"></script>
+    
+    <!-- Modal Container -->
+    {% block modals %}{% endblock %}
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

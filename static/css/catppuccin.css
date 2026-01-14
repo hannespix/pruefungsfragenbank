@@ -27,13 +27,13 @@
     /* Text Colors */
     --ctp-text: #4c4f69;
     --ctp-subtext1: #5c5f77;
-    --ctp-subtext0: #6c6f85;
+    --ctp-subtext0: #6c6f85; /* Etwas dunkler für besseren Kontrast auf hellem Hintergrund */
     
     /* Glass Effects */
-    --glass-bg: rgba(255, 255, 255, 0.4);
-    --glass-border: rgba(255, 255, 255, 0.3);
+    --glass-bg: rgba(255, 255, 255, 0.6); /* Weniger transparent für bessere Lesbarkeit */
+    --glass-border: rgba(255, 255, 255, 0.4);
     --glass-shadow: rgba(0, 0, 0, 0.1);
-    --glass-text-bg: rgba(255, 255, 255, 0.6);
+    --glass-text-bg: rgba(255, 255, 255, 0.85); /* Fast deckend für Formulare */
 }
 
 /* Dark Mode Support (Catppuccin Mocha) */
@@ -61,14 +61,14 @@
         --ctp-surface1: #45475a;
         --ctp-surface2: #585b70;
         
-        --ctp-text: #cdd6f4;
-        --ctp-subtext1: #bac2de;
-        --ctp-subtext0: #a6adc8;
+        --ctp-text: #ffffff; /* Reines Weiß für maximalen Kontrast */
+        --ctp-subtext1: #e6e9ef; /* Viel heller als vorher */
+        --ctp-subtext0: #cdd6f4; /* Fast weiß, nur leicht abgedunkelt */
         
-        --glass-bg: rgba(30, 30, 46, 0.6);
-        --glass-border: rgba(255, 255, 255, 0.15);
-        --glass-shadow: rgba(0, 0, 0, 0.3);
-        --glass-text-bg: rgba(30, 30, 46, 0.8);
+        --glass-bg: rgba(30, 30, 46, 0.85); /* Deutlich dunkler und weniger transparent */
+        --glass-border: rgba(255, 255, 255, 0.2);
+        --glass-shadow: rgba(0, 0, 0, 0.5);
+        --glass-text-bg: rgba(24, 24, 37, 0.95); /* Fast schwarz, fast deckend für Eingabefelder */
     }
 }
 
@@ -320,6 +320,26 @@ body::before {
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
+/* WYSIWYG Toolbar Buttons: klein, ohne Schreien */
+.btn-wys {
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    padding: 0.35rem 0.6rem !important;
+    font-size: 0.8rem !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+}
+
+.wysiwyg-editor {
+    padding: 1rem 1.25rem;
+    line-height: 1.6;
+    overflow-y: auto;
+}
+
+.wysiwyg-editor:focus {
+    outline: none;
+}
+
 .btn::before {
     content: '';
     position: absolute;
@@ -347,8 +367,9 @@ body::before {
         var(--ctp-blue) 100%);
     background-size: 300% 300%;
     animation: gradientFlow 3s ease infinite;
-    color: white;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    color: #ffffff !important; /* Weiß erzwingen */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); /* Stärkerer Schatten für Kontrast */
+    font-weight: 800; /* Dickerer Text */
 }
 
 @keyframes gradientFlow {
@@ -372,8 +393,9 @@ body::before {
         var(--ctp-sky) 100%);
     background-size: 200% 200%;
     animation: gradientFlow 4s ease infinite;
-    color: white;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    font-weight: 800;
 }
 
 .btn-success:hover {
@@ -392,8 +414,9 @@ body::before {
         var(--ctp-pink) 100%);
     background-size: 200% 200%;
     animation: gradientFlow 4s ease infinite;
-    color: white;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    font-weight: 800;
 }
 
 .btn-danger:hover {
@@ -519,6 +542,13 @@ body::before {
     overflow: hidden;
 }
 
+/* Reorder Buttons (dezent) */
+.reorder-btn {
+    padding: 0.25rem 0.6rem;
+    line-height: 1;
+    margin: 0;
+}
+
 .exam-item > * {
     color: var(--ctp-text);
     position: relative;
@@ -556,15 +586,37 @@ body::before {
 .badge {
     padding: 0.625rem 1.125rem;
     border-radius: 4px;
-    font-weight: 700;
+    font-weight: 800; /* Dickerer Text */
     font-size: 0.75rem;
     margin: 0.25rem 0.5rem 0.25rem 0;
     box-shadow: 
-        0 4px 15px rgba(0, 0, 0, 0.2),
-        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        0 2px 8px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ffffff !important; /* Weiß auf fast allen Badges erzwingen */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Tag-Pills (müssen auch im Dark Mode gut lesbar sein) */
+.badge.tag-pill {
+    background: var(--glass-bg) !important;
+    border: 1px solid var(--glass-border) !important;
+    color: var(--ctp-text) !important;
+    text-shadow: none;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 700;
+}
+
+/* Bootstrap bg-light Badges: globale .badge-Regel würde sonst weiß auf hell erzwingen */
+.badge.bg-light,
+.badge.text-bg-light {
+    background: var(--glass-bg) !important;
+    border: 1px solid var(--glass-border) !important;
+    color: var(--ctp-text) !important;
+    text-shadow: none;
 }
 
 .bg-primary {
@@ -574,8 +626,9 @@ body::before {
 .bg-secondary {
     background: var(--glass-bg) !important;
     backdrop-filter: blur(10px);
-    color: var(--ctp-text) !important;
+    color: var(--ctp-text) !important; /* Ausnahme: Secondary Badge behält Textfarbe */
     border: 1px solid var(--glass-border);
+    text-shadow: none;
 }
 
 .bg-success {
@@ -584,11 +637,13 @@ body::before {
 
 .bg-info {
     background: linear-gradient(135deg, var(--ctp-sky) 0%, var(--ctp-sapphire) 100%) !important;
+    color: #ffffff !important;
 }
 
 .bg-warning {
     background: linear-gradient(135deg, var(--ctp-yellow) 0%, var(--ctp-peach) 100%) !important;
-    color: var(--ctp-text) !important;
+    color: #ffffff !important; /* Weiß statt Textfarbe auf Orange/Gelb */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .bg-danger {
@@ -624,19 +679,24 @@ body::before {
 
 .form-control::placeholder {
     color: var(--ctp-subtext0);
-    opacity: 0.7;
+    opacity: 0.8; /* Mehr Deckkraft für bessere Lesbarkeit */
 }
 
 .form-control:focus, .form-select:focus {
     background: var(--glass-text-bg);
     border-color: var(--ctp-lavender);
     box-shadow: 
-        0 0 0 4px rgba(136, 57, 239, 0.15),
+        0 0 0 4px rgba(136, 57, 239, 0.25),
         0 4px 20px rgba(136, 57, 239, 0.2),
-        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
     color: var(--ctp-text);
     transform: translateY(-2px);
     outline: none;
+}
+
+.form-select option {
+    background-color: var(--ctp-base);
+    color: var(--ctp-text);
 }
 
 .form-label {
@@ -662,6 +722,31 @@ body::before {
     overflow: hidden;
     border: 1px solid var(--glass-border);
     margin: 2rem 0;
+    /* Bootstrap Table Vars (wichtig für Lesbarkeit) */
+    --bs-table-bg: var(--glass-text-bg);
+    --bs-table-color: var(--ctp-text);
+    --bs-table-border-color: var(--glass-border);
+    --bs-table-striped-bg: rgba(136, 57, 239, 0.12);
+    --bs-table-striped-color: var(--ctp-text);
+    --bs-table-hover-bg: rgba(136, 57, 239, 0.18);
+    --bs-table-hover-color: var(--ctp-text);
+    color: var(--ctp-text) !important;
+}
+
+/* Bootstrap setzt Hintergrund/Farbe pro Zelle -> hier hart überschreiben */
+.table > :not(caption) > * > * {
+    background-color: var(--bs-table-bg) !important;
+    color: var(--bs-table-color) !important;
+}
+
+.table-striped > :not(caption) > tbody > tr:nth-of-type(odd) > * {
+    background-color: var(--bs-table-striped-bg) !important;
+    color: var(--bs-table-striped-color) !important;
+}
+
+.table tbody tr:hover > * {
+    background-color: var(--bs-table-hover-bg) !important;
+    color: var(--bs-table-hover-color) !important;
 }
 
 .table thead {
@@ -716,6 +801,7 @@ body::before {
         0 8px 32px var(--glass-shadow),
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
     border-left: 4px solid;
+    color: var(--ctp-text);
 }
 
 .alert-success {
@@ -726,12 +812,33 @@ body::before {
     border-left-color: var(--ctp-green);
 }
 
+.alert-warning {
+    background: linear-gradient(135deg,
+        rgba(250, 179, 135, 0.18) 0%,
+        rgba(249, 226, 175, 0.18) 100%);
+    color: var(--ctp-text);
+    border-left-color: var(--ctp-yellow);
+}
+
+.alert-info {
+    background: linear-gradient(135deg,
+        rgba(137, 220, 235, 0.18) 0%,
+        rgba(116, 199, 236, 0.18) 100%);
+    color: var(--ctp-text);
+    border-left-color: var(--ctp-sky);
+}
+
 .alert-danger {
     background: linear-gradient(135deg, 
         rgba(210, 15, 57, 0.15) 0%, 
         rgba(230, 69, 83, 0.15) 100%);
     color: var(--ctp-red);
     border-left-color: var(--ctp-red);
+}
+
+.alert a,
+.alert a:hover {
+    color: var(--ctp-lavender);
 }
 
 /* Modals with Premium Glass Effect */
@@ -812,6 +919,51 @@ pre {
     box-shadow: 
         0 4px 20px var(--glass-shadow),
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Dropdowns (z.B. Modell-Auswahl) */
+.dropdown-menu {
+    background: var(--glass-text-bg) !important;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: 0 12px 40px var(--glass-shadow);
+    border-radius: 8px;
+    padding: 0.5rem;
+    color: var(--ctp-text) !important;
+}
+
+.dropdown-item {
+    color: var(--ctp-text) !important;
+    border-radius: 6px;
+    padding: 0.6rem 0.85rem;
+    font-weight: 600;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background: rgba(136, 57, 239, 0.18) !important;
+    color: var(--ctp-text) !important;
+}
+
+.dropdown-item.active,
+.dropdown-item:active {
+    background: rgba(30, 102, 245, 0.25) !important;
+    color: var(--ctp-text) !important;
+}
+
+.dropdown-header {
+    color: var(--ctp-subtext0) !important;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.75rem;
+    padding: 0.5rem 0.85rem;
+}
+
+.dropdown-divider {
+    border-top: 1px solid var(--glass-border) !important;
+    opacity: 1;
 }
 
 code {

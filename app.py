@@ -4,12 +4,14 @@ import socket
 import re
 import json
 import requests
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
 from werkzeug.utils import secure_filename
 from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from models import db, Question, Exam, ExamItem, LLMConfig
+from sqlalchemy import func, or_, text
 
 # PyInstaller Trick: resource_path() Funktion
 def resource_path(relative_path):
@@ -58,6 +60,283 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
+    # Kleine, sichere Migrationen (SQLite)
+    def _ensure_column(table: str, col: str, ddl: str):
+        cols = [r[1] for r in db.session.execute(text(f"PRAGMA table_info({table})")).fetchall()]
+        if col not in cols:
+            db.session.execute(text(ddl))
+            db.session.commit()
+
+    # LLMConfig: Standard-Auswahl
+    _ensure_column('llm_configs', 'is_default', "ALTER TABLE llm_configs ADD COLUMN is_default INTEGER DEFAULT 0")
+
+    # Falls noch keine Default-Konfiguration gesetzt ist, nimm die erste aktive
+    try:
+        has_default = LLMConfig.query.filter_by(is_default=True).first() is not None
+        if not has_default:
+            first_active = LLMConfig.query.filter_by(active=True).order_by(LLMConfig.date_created.desc()).first()
+            if first_active:
+                first_active.is_default = True
+                db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+BW_FACHRICHTUNGEN = [
+    {"name": "Baumschule", "code": None},
+    {"name": "Friedhofsgärtnerei", "code": None},
+    {"name": "Garten- und Landschaftsbau", "code": None},
+    {"name": "Gemüsebau", "code": None},
+    {"name": "Obstbau", "code": None},
+    {"name": "Staudengärtnerei", "code": None},
+    {"name": "Zierpflanzenbau", "code": None},
+]
+
+BW_UNTERKATEGORIEN = [
+    "Fachrechnen",
+    "Betriebliche Zusammenhänge",
+    "Pflanzenkenntnisse",
+    "Pflanzenproduktion",
+    "Bodenkunde",
+    "Pflanzenschutz",
+    "Technik / Maschinen",
+    "Arbeitssicherheit",
+    "Umweltschutz / Nachhaltigkeit",
+    "Kundenberatung / Kommunikation",
+    "Recht / Vorschriften",
+]
+
+AI_GENERATED_TOKEN = "[KI-generiert]"
+
+def normalize_llm_answer_to_plaintext(text: str) -> str:
+    """Entfernt typische Markdown/LaTeX-Artefakte aus KI-Antworten (für Anzeige + Word-Export)."""
+    if not text:
+        return ''
+    s = (text or '').strip()
+    # Code fences entfernen
+    if '```' in s:
+        # Entferne komplette Fence-Blöcke, falls vorhanden, sonst nur Marker
+        s = s.replace('```json', '').replace('```', '')
+
+    # LaTeX-Delimiters entfernen
+    s = s.replace('\\(', '').replace('\\)', '').replace('\\[', '').replace('\\]', '')
+
+    # Häufige LaTeX-Kommandos vereinfachen
+    s = s.replace('\\times', '×').replace('\\cdot', '·')
+    s = re.sub(r'\\text\{([^}]*)\}', r'\1', s)
+    s = s.replace('\\,', ' ')
+
+    # Restliche Backslashes vor Kommandos entfernen (\alpha -> alpha)
+    s = re.sub(r'\\([A-Za-z]+)', r'\1', s)
+
+    # Markdown: Fett/Kursiv/Inline-Code
+    s = re.sub(r'\*\*(.+?)\*\*', r'\1', s)
+    s = re.sub(r'(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)', r'\1', s)
+    s = s.replace('`', '')
+
+    # Aufräumen
+    s = re.sub(r'[ \t]+\n', '\n', s)
+    s = re.sub(r'\n{3,}', '\n\n', s)
+    return s.strip()
+
+def extract_exam_date_heuristic(text: str) -> str | None:
+    """Versucht ein Prüfungsdatum aus dem Dokumenttext zu erkennen. Rückgabe: YYYY-MM-DD oder None."""
+    if not text:
+        return None
+    # 2026-01-14
+    m = re.search(r'\b(20\d{2})-(\d{2})-(\d{2})\b', text)
+    if m:
+        y, mo, d = m.group(1), m.group(2), m.group(3)
+        try:
+            datetime(int(y), int(mo), int(d))
+            return f"{y}-{mo}-{d}"
+        except:
+            pass
+    # 14.01.2026 oder 14/01/2026
+    m = re.search(r'\b(\d{1,2})[./](\d{1,2})[./](20\d{2})\b', text)
+    if m:
+        d, mo, y = m.group(1), m.group(2), m.group(3)
+        try:
+            dt = datetime(int(y), int(mo), int(d))
+            return dt.strftime('%Y-%m-%d')
+        except:
+            pass
+    return None
+
+def extract_exam_title_heuristic(text: str) -> str | None:
+    """Versucht einen Klausur-/Prüfungstitel aus dem Dokumenttext zu erkennen."""
+    if not text:
+        return None
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    if not lines:
+        return None
+    # Suche nach erster Zeile mit Schlüsselwörtern
+    keywords = ("prüfung", "klausur", "abschlussprüfung", "zwischenprüfung", "schriftlich", "mündlich")
+    for line in lines[:20]:
+        if any(k in line.lower() for k in keywords):
+            return line[:200]
+    # Fallback: erste Zeile als Titel
+    return lines[0][:200]
+
+def extract_text_from_pdf(filepath: str) -> str:
+    """Extrahiert Text aus einem PDF. Benötigt pdfplumber."""
+    try:
+        import pdfplumber  # type: ignore
+    except Exception:
+        raise Exception("PDF-Import benötigt das Paket 'pdfplumber'. Bitte `pip install -r requirements.txt` ausführen.")
+
+    text_parts: list[str] = []
+    with pdfplumber.open(filepath) as pdf:
+        for page in pdf.pages:
+            t = page.extract_text() or ""
+            if t.strip():
+                text_parts.append(t.strip())
+    return "\n\n".join(text_parts).strip()
+
+def extract_text_from_upload(filepath: str) -> str:
+    """Extrahiert Text aus .docx oder .pdf anhand der Dateiendung."""
+    ext = os.path.splitext(filepath)[1].lower()
+    if ext == ".docx":
+        return extract_text_from_word(filepath)
+    if ext == ".pdf":
+        return extract_text_from_pdf(filepath)
+    raise Exception(f"Nicht unterstütztes Dateiformat: {ext}")
+
+def preprocess_text_for_llm(text: str) -> str:
+    """Reduziert Tokens: entfernt Duplikatzeilen, Seitenzahlen und normalisiert Whitespace."""
+    if not text:
+        return ""
+    lines = [l.strip() for l in text.splitlines()]
+    cleaned: list[str] = []
+    seen = set()
+    for l in lines:
+        if not l:
+            continue
+        # typische Seitenzahlen/Headers/Footers
+        if re.fullmatch(r'(seite|page)?\s*\d+\s*(von|/)?\s*\d*', l.lower()):
+            continue
+        if re.fullmatch(r'\d{1,3}', l):
+            continue
+        key = l.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(l)
+    # Mehrfachspaces
+    out = "\n".join(cleaned)
+    out = re.sub(r'[ \t]{2,}', ' ', out)
+    return out.strip()
+
+def chunk_text(text: str, max_chars: int = 12000) -> list[str]:
+    """Teilt Text in Absätze/Blöcke <= max_chars."""
+    if not text:
+        return []
+    parts = re.split(r'\n\s*\n', text)
+    chunks: list[str] = []
+    buf: list[str] = []
+    size = 0
+    for p in parts:
+        p = p.strip()
+        if not p:
+            continue
+        if size + len(p) + 2 > max_chars and buf:
+            chunks.append("\n\n".join(buf))
+            buf = [p]
+            size = len(p)
+        else:
+            buf.append(p)
+            size += len(p) + 2
+    if buf:
+        chunks.append("\n\n".join(buf))
+    return chunks
+
+def import_from_text_structured(text_content: str, default_category: str) -> list[dict]:
+    """Klassischer Import aus Text (Frage:/Lösung:)."""
+    questions: list[dict] = []
+    current_question: str | None = None
+    current_answer: str | None = None
+
+    for raw_line in (text_content or "").splitlines():
+        text = raw_line.strip()
+        if not text:
+            continue
+
+        lower = text.lower()
+        if lower.startswith("frage:") or text.startswith("FRAGE:"):
+            if current_question:
+                questions.append({
+                    'content': current_question.strip(),
+                    'answer': (current_answer or '').strip(),
+                    'category': default_category,
+                    'subcategory': '',
+                    'tags': '',
+                    'difficulty': 3
+                })
+            current_question = text.split(":", 1)[1].strip() if ":" in text else text.strip()
+            current_answer = None
+            continue
+
+        if lower.startswith("lösung:") or text.startswith("LÖSUNG:") or lower.startswith("loesung:"):
+            if current_question:
+                current_answer = text.split(":", 1)[1].strip() if ":" in text else text.strip()
+            continue
+
+        # Weiterer Text zur Frage oder Lösung
+        if current_question and not current_answer:
+            current_question += "<br>" + text
+        elif current_answer is not None:
+            current_answer += "<br>" + text
+
+    if current_question:
+        questions.append({
+            'content': current_question.strip(),
+            'answer': (current_answer or '').strip(),
+            'category': default_category,
+            'subcategory': '',
+            'tags': '',
+            'difficulty': 3
+        })
+
+    return questions
+
+def llm_extract_exam_metadata(llm_config, text_content: str) -> dict:
+    """Extrahiert Titel + Datum der Klausur per LLM. Gibt dict zurück."""
+    prompt = (
+        "Extrahiere aus dem folgenden Text die Metadaten einer Klausur/Prüfung.\n"
+        "Gib ausschließlich JSON zurück im Format:\n"
+        "{\n"
+        "  \"exam_title\": \"...\",\n"
+        "  \"exam_date\": \"YYYY-MM-DD\" oder null,\n"
+        "  \"is_past_exam\": true oder false\n"
+        "}\n\n"
+        "Wenn kein Datum eindeutig erkennbar ist, setze exam_date auf null.\n"
+        "Wenn der Text klar eine Klausur/Prüfung beschreibt, setze is_past_exam auf true.\n\n"
+        f"Text:\n{text_content}\n"
+    )
+    raw = call_llm_text(llm_config, prompt)
+    raw = raw.strip()
+    if '```json' in raw:
+        raw = raw.split('```json')[1].split('```')[0].strip()
+    elif '```' in raw:
+        raw = raw.split('```')[1].split('```')[0].strip()
+    try:
+        data = json.loads(raw)
+        return {
+            "exam_title": (data.get("exam_title") or "").strip(),
+            "exam_date": (data.get("exam_date") or None),
+            "is_past_exam": bool(data.get("is_past_exam", False)),
+        }
+    except Exception:
+        # Fallback: nichts
+        return {"exam_title": "", "exam_date": None, "is_past_exam": False}
+
+def normalize_subcategory(value: str) -> str:
+    """Normalisiert Unterkategorienamen (kurz, ohne doppelten Whitespace)."""
+    if not value:
+        return ""
+    v = re.sub(r'\s+', ' ', str(value)).strip()
+    v = v.strip('"').strip("'").strip()
+    return v[:80]
+
 
 def get_local_ip():
     """Ermittle die lokale IP-Adresse für LAN-Zugriff"""
@@ -71,6 +350,36 @@ def get_local_ip():
         return "127.0.0.1"
 
 
+@app.route('/api/filters')
+def get_filters():
+    """Liefert alle verfügbaren Kategorien und Unterkategorien für die Filter"""
+    try:
+        # Hole alle eindeutigen Kategorien und Subkategorien
+        categories = db.session.query(Question.category).distinct().order_by(Question.category).all()
+        subcategories = db.session.query(Question.subcategory).distinct().order_by(Question.subcategory).all()
+
+        # Stelle sicher, dass die 7 BW-Fachrichtungen immer auswählbar sind
+        bw_names = [fr["name"] for fr in BW_FACHRICHTUNGEN]
+        db_names = [c[0] for c in categories if c[0]]
+        merged = sorted(set(db_names + bw_names))
+
+        # Stelle sicher, dass Standard-Unterkategorien immer auswählbar sind
+        db_sub = [c[0] for c in subcategories if c[0]]
+        merged_sub = sorted(set(db_sub + BW_UNTERKATEGORIEN))
+        
+        return jsonify({
+            'categories': merged,
+            'subcategories': merged_sub
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/fachrichtungen')
+def get_fachrichtungen():
+    """Liefert die 7 BW-Gärtnerfachrichtungen (Name + optionale Kennziffer)."""
+    return jsonify({"fachrichtungen": BW_FACHRICHTUNGEN})
+
+
 @app.route('/')
 def index():
     """Hauptseite - Exam Builder"""
@@ -82,34 +391,190 @@ def index():
 def questions():
     """API: Liste aller Fragen (filterbar)"""
     try:
-        category = request.args.get('category', '')
-        tag = request.args.get('tag', '')
+        # --- Filter Parameter ---
+        category = (request.args.get('category') or '').strip()
+        category_code = request.args.get('category_code', type=int)
+        subcategory = (request.args.get('subcategory') or '').strip()
         difficulty = request.args.get('difficulty', type=int)
-        active_only = request.args.get('active_only', 'true') == 'true'
-        
-        query = Question.query
-        
-        if active_only:
-            query = query.filter(Question.active == True)
-        if category:
+
+        # Aktiv/Inaktiv
+        active = request.args.get('active')
+        # legacy
+        active_only = request.args.get('active_only')
+        if active is None and active_only is not None:
+            active = 'true' if (active_only == 'true') else None
+
+        # Tags: comma-separated (ANY)
+        tags_any = (request.args.get('tags_any') or '').strip()
+
+        # Volltextsuche über Felder
+        qtext = (request.args.get('q') or '').strip()
+
+        # Last used Filter
+        used_status = (request.args.get('used_status') or '').strip()  # '', 'ever', 'never'
+        used_after = (request.args.get('used_after') or '').strip()    # YYYY-MM-DD
+        used_before = (request.args.get('used_before') or '').strip()  # YYYY-MM-DD
+
+        # Last used exam title contains
+        exam_q = (request.args.get('exam_q') or '').strip()
+
+        # --- Last used subquery (max exam date) ---
+        last_used_subq = (
+            db.session.query(
+                ExamItem.original_question_id.label('qid'),
+                func.max(Exam.date_created).label('last_used_dt')
+            )
+            .join(Exam, Exam.id == ExamItem.exam_id)
+            .group_by(ExamItem.original_question_id)
+            .subquery()
+        )
+
+        # correlated subquery to get last used exam title (best-effort)
+        last_used_title_sq = (
+            db.session.query(Exam.title)
+            .join(ExamItem, ExamItem.exam_id == Exam.id)
+            .filter(ExamItem.original_question_id == Question.id)
+            .order_by(Exam.date_created.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
+
+        # Base query with last_used join
+        query = (
+            db.session.query(Question, last_used_subq.c.last_used_dt)
+            .outerjoin(last_used_subq, last_used_subq.c.qid == Question.id)
+        )
+
+        # --- Apply filters ---
+        if active is not None:
+            if active == 'true':
+                query = query.filter(Question.active == True)
+            elif active == 'false':
+                query = query.filter(Question.active == False)
+
+        if category_code:
+            query = query.filter(Question.category_code == category_code)
+        elif category:
             query = query.filter(Question.category == category)
-        if tag:
-            query = query.filter(Question.tags.contains(tag))
+
+        if subcategory:
+            query = query.filter(Question.subcategory == subcategory)
+
         if difficulty:
             query = query.filter(Question.difficulty == difficulty)
-        
-        questions = query.order_by(Question.date_created.desc()).all()
-        
-        return jsonify([{
-            'id': q.id,
-            'content': q.content or '',
-            'answer': q.answer or '',
-            'category': q.category or '',
-            'tags': [t.strip() for t in q.tags.split(',')] if q.tags and q.tags.strip() else [],
-            'difficulty': q.difficulty,
-            'active': q.active
-        } for q in questions])
+
+        if tags_any:
+            tags = [t.strip() for t in tags_any.split(',') if t.strip()]
+            if tags:
+                query = query.filter(or_(*[Question.tags.contains(t) for t in tags]))
+
+        if used_status == 'never':
+            query = query.filter(last_used_subq.c.last_used_dt.is_(None))
+        elif used_status == 'ever':
+            query = query.filter(last_used_subq.c.last_used_dt.is_not(None))
+
+        def _parse_date(s: str) -> datetime | None:
+            try:
+                return datetime.strptime(s, '%Y-%m-%d')
+            except:
+                return None
+
+        if used_after:
+            dt = _parse_date(used_after)
+            if dt:
+                query = query.filter(last_used_subq.c.last_used_dt.is_not(None)).filter(last_used_subq.c.last_used_dt >= dt)
+        if used_before:
+            dt = _parse_date(used_before)
+            if dt:
+                query = query.filter(last_used_subq.c.last_used_dt.is_not(None)).filter(last_used_subq.c.last_used_dt <= dt)
+
+        if exam_q:
+            pattern = f"%{exam_q.lower()}%"
+            query = query.filter(func.lower(last_used_title_sq).like(pattern))
+
+        if qtext:
+            pattern = f"%{qtext.lower()}%"
+            query = query.filter(or_(
+                func.lower(Question.content).like(pattern),
+                func.lower(Question.answer).like(pattern),
+                func.lower(func.coalesce(Question.category, '')).like(pattern),
+                func.lower(func.coalesce(Question.subcategory, '')).like(pattern),
+                func.lower(func.coalesce(Question.tags, '')).like(pattern),
+                func.lower(func.coalesce(last_used_title_sq, '')).like(pattern),
+            ))
+
+        rows = query.order_by(Question.date_created.desc()).all()
+
+        result = []
+        for q, last_used_dt in rows:
+            last_used_date = last_used_dt.strftime('%d.%m.%Y') if last_used_dt else None
+            last_used_exam = None
+            try:
+                last_used_exam = db.session.query(last_used_title_sq).filter(Question.id == q.id).scalar()
+            except:
+                last_used_exam = None
+
+            result.append({
+                'id': q.id,
+                'content': q.content or '',
+                'answer': q.answer or '',
+                'category': q.category or '',
+                'category_code': q.category_code,
+                'subcategory': q.subcategory or '',
+                'tags': [t.strip() for t in q.tags.split(',')] if q.tags and q.tags.strip() else [],
+                'difficulty': q.difficulty,
+                'active': q.active,
+                'last_used_date': last_used_date,
+                'last_used_exam': last_used_exam
+            })
+
+        return jsonify(result)
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/question/<int:question_id>/update', methods=['POST'])
+def update_question(question_id):
+    """Bestehende Frage bearbeiten"""
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type muss application/json sein'}), 400
+        
+        question = Question.query.get_or_404(question_id)
+        data = request.json
+        
+        content = data.get('content', '').strip()
+        answer = data.get('answer', '').strip()
+        
+        if not content:
+            return jsonify({'error': 'Frage darf nicht leer sein'}), 400
+            
+        question.content = content
+        question.answer = answer
+        question.category = data.get('category', '')
+        question.category_code = data.get('category_code')
+        question.subcategory = data.get('subcategory', '')
+        question.tags = data.get('tags', '')
+        question.difficulty = max(1, min(5, int(data.get('difficulty', 3))))
+        question.active = data.get('active', True)
+        
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/question/<int:question_id>/delete', methods=['DELETE'])
+def delete_question(question_id):
+    """Frage löschen"""
+    try:
+        question = Question.query.get_or_404(question_id)
+        db.session.delete(question)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 
@@ -117,7 +582,9 @@ def questions():
 def exam_view(exam_id):
     """Ansicht einer Prüfung"""
     exam = Exam.query.get_or_404(exam_id)
-    return render_template('exam.html', exam=exam)
+    llm_configs = LLMConfig.query.filter_by(active=True).all()
+    default_cfg = LLMConfig.query.filter_by(active=True, is_default=True).first() or (llm_configs[0] if llm_configs else None)
+    return render_template('exam.html', exam=exam, llm_configs=llm_configs, default_llm_config_id=(default_cfg.id if default_cfg else None))
 
 
 @app.route('/exam/<int:exam_id>/items')
@@ -131,11 +598,233 @@ def exam_items(exam_id):
             'id': item.id,
             'content': item.snapshot_content or '',
             'answer': item.snapshot_answer or '',
+            'category': item.snapshot_category or '',
+            'subcategory': item.snapshot_subcategory or '',
+            'tags': [t.strip() for t in item.snapshot_tags.split(',')] if item.snapshot_tags and item.snapshot_tags.strip() else [],
+            'difficulty': item.snapshot_difficulty or 3,
             'points': item.points,
             'position': item.position,
             'original_question_id': item.original_question_id
         } for item in items])
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/question/<int:question_id>')
+def get_question(question_id):
+    """API: Einzelne Originalfrage abrufen (für Sync/Referenz im Exam-Editor)"""
+    try:
+        q = Question.query.get_or_404(question_id)
+        return jsonify({
+            'id': q.id,
+            'content': q.content or '',
+            'answer': q.answer or '',
+            'category': q.category or '',
+            'subcategory': q.subcategory or '',
+            'tags': q.tags or '',
+            'difficulty': q.difficulty or 3,
+            'active': q.active
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/exam/<int:exam_id>/item/<int:item_id>/update', methods=['POST'])
+def exam_item_update(exam_id, item_id):
+    """API: Snapshot-Daten eines ExamItems bearbeiten"""
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type muss application/json sein'}), 400
+
+        item = ExamItem.query.filter_by(id=item_id, exam_id=exam_id).first_or_404()
+        data = request.json or {}
+
+        content = (data.get('content') or '').strip()
+        if not content:
+            return jsonify({'error': 'Frage darf nicht leer sein'}), 400
+
+        item.snapshot_content = content
+        item.snapshot_answer = (data.get('answer') or '').strip()
+        item.snapshot_category = (data.get('category') or '').strip()
+        item.snapshot_subcategory = (data.get('subcategory') or '').strip()
+        item.snapshot_tags = (data.get('tags') or '').strip()
+        try:
+            item.snapshot_difficulty = max(1, min(5, int(data.get('difficulty', 3))))
+        except Exception:
+            item.snapshot_difficulty = 3
+        try:
+            item.points = max(1, int(data.get('points', item.points or 1)))
+        except Exception:
+            item.points = 1
+
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/exam/<int:exam_id>/item/<int:item_id>/sync_from_original', methods=['POST'])
+def exam_item_sync_from_original(exam_id, item_id):
+    """API: Snapshot aus Originalfrage aktualisieren (ändert NICHT die Originalfrage)."""
+    try:
+        item = ExamItem.query.filter_by(id=item_id, exam_id=exam_id).first_or_404()
+        if not item.original_question_id:
+            return jsonify({'error': 'Keine Originalfrage verknüpft'}), 400
+
+        q = Question.query.get_or_404(item.original_question_id)
+        item.snapshot_content = q.content or ''
+        item.snapshot_answer = q.answer or ''
+        item.snapshot_category = q.category or ''
+        item.snapshot_subcategory = q.subcategory or ''
+        item.snapshot_tags = q.tags or ''
+        item.snapshot_difficulty = q.difficulty or 3
+
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/exam/<int:exam_id>/item/<int:item_id>/ai', methods=['POST'])
+def exam_item_ai(exam_id, item_id):
+    """KI-Helfer für ExamItem: generate_answer / rewrite_question."""
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type muss application/json sein'}), 400
+
+        item = ExamItem.query.filter_by(id=item_id, exam_id=exam_id).first_or_404()
+        data = request.json or {}
+        llm_config_id = data.get('llm_config_id')
+        action = (data.get('action') or '').strip()
+
+        if not llm_config_id:
+            return jsonify({'error': 'LLM-Konfiguration fehlt'}), 400
+
+        llm_config = LLMConfig.query.get_or_404(int(llm_config_id))
+
+        if action == 'generate_answer':
+            prompt = generate_answer_prompt(item.snapshot_content, item.snapshot_category or '', item.snapshot_subcategory or '')
+            answer = call_llm_text(llm_config, prompt)
+            if answer:
+                answer = normalize_llm_answer_to_plaintext(answer)
+                answer = f"{AI_GENERATED_TOKEN}\n{answer}"
+            return jsonify({'success': True, 'answer': answer})
+
+        if action == 'rewrite_question':
+            prompt = generate_rewrite_prompt(item.snapshot_content, item.snapshot_category or '', item.snapshot_subcategory or '')
+            content = call_llm_text(llm_config, prompt)
+            return jsonify({'success': True, 'content': content})
+
+        return jsonify({'error': 'Unbekannte Aktion'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def _try_parse_json_from_llm(text: str):
+    """Versucht JSON aus LLM-Output zu parsen (auch aus ```json``` Blöcken)."""
+    if not text:
+        return None
+    raw = (text or '').strip()
+    if '```json' in raw:
+        raw = raw.split('```json', 1)[1].split('```', 1)[0].strip()
+    elif '```' in raw:
+        raw = raw.split('```', 1)[1].split('```', 1)[0].strip()
+    try:
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
+@app.route('/llm/proofread', methods=['POST'])
+def llm_proofread():
+    """
+    KI-gestütztes Korrektorat (LanguageTool-ähnlich, aber über LLMConfig).
+    Erwartet JSON: { llm_config_id, text, mode: "question"|"answer" }
+    Antwort: { corrected_text, notes[] }
+    """
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type muss application/json sein'}), 400
+        data = request.json or {}
+        llm_config_id = data.get('llm_config_id')
+        text = (data.get('text') or '').strip()
+        mode = (data.get('mode') or 'answer').strip()
+
+        if not llm_config_id:
+            return jsonify({'error': 'LLM-Konfiguration fehlt'}), 400
+        if not text:
+            return jsonify({'corrected_text': '', 'notes': []})
+
+        llm_config = LLMConfig.query.get_or_404(int(llm_config_id))
+
+        purpose = "Prüfungsfrage" if mode == 'question' else "Musterlösung"
+        prompt = (
+            f"Du bist ein deutscher Korrektor. Prüfe folgenden Text ({purpose}) auf Rechtschreibung, Grammatik, Zeichensetzung und Stil.\n"
+            "Wichtig: Inhalte fachlich NICHT verändern, nur sprachlich verbessern. Zahlen/Einheiten nicht ändern.\n"
+            "Gib als JSON zurück mit genau diesen Keys:\n"
+            "{\n"
+            '  "corrected_text": "…",\n'
+            '  "notes": ["kurzer Hinweis 1", "kurzer Hinweis 2"]\n'
+            "}\n\n"
+            f"Text:\n{text}\n"
+        )
+
+        out = call_llm_text(llm_config, prompt)
+        parsed = _try_parse_json_from_llm(out)
+        if isinstance(parsed, dict) and 'corrected_text' in parsed:
+            return jsonify({
+                'corrected_text': (parsed.get('corrected_text') or '').strip(),
+                'notes': parsed.get('notes') if isinstance(parsed.get('notes'), list) else []
+            })
+
+        # Fallback: wenn kein JSON zurückkam, nutze Output als korrigierten Text
+        return jsonify({'corrected_text': (out or '').strip(), 'notes': []})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/exams')
+def list_exams():
+    """API: Liste aller Prüfungen (für Dropdown/Öffnen)"""
+    try:
+        exams = Exam.query.order_by(Exam.date_created.desc()).all()
+        return jsonify([{
+            'id': e.id,
+            'title': e.title,
+            'status': e.status,
+            'date_created': e.date_created.strftime('%Y-%m-%d')
+        } for e in exams])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/exam/<int:exam_id>/rename', methods=['POST'])
+def exam_rename(exam_id):
+    """API: Titel einer Prüfung ändern"""
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type muss application/json sein'}), 400
+        exam = Exam.query.get_or_404(exam_id)
+        title = (request.json.get('title') or '').strip()
+        if not title:
+            return jsonify({'error': 'Titel darf nicht leer sein'}), 400
+        exam.title = title
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/exam/<int:exam_id>/delete', methods=['DELETE'])
+def exam_delete(exam_id):
+    """API: Prüfung löschen"""
+    try:
+        exam = Exam.query.get_or_404(exam_id)
+        db.session.delete(exam)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 
@@ -187,6 +876,10 @@ def exam_add_question(exam_id):
             original_question_id=question_id,
             snapshot_content=question.content or '',  # SNAPSHOT!
             snapshot_answer=question.answer or '',    # SNAPSHOT!
+            snapshot_category=question.category or '',
+            snapshot_subcategory=question.subcategory or '',
+            snapshot_tags=question.tags or '',
+            snapshot_difficulty=question.difficulty or 3,
             points=max(1, request.json.get('points', 1)),  # Mindestens 1 Punkt
             position=max_position + 1
         )
@@ -237,125 +930,248 @@ def exam_reorder(exam_id):
 
 @app.route('/import', methods=['GET', 'POST'])
 def import_questions():
-    """Word-Dokument hochladen und Fragen importieren"""
+    """Dokument (.docx/.pdf) hochladen und Fragen importieren"""
     if request.method == 'GET':
         llm_configs = LLMConfig.query.filter_by(active=True).all()
-        return render_template('import.html', llm_configs=llm_configs)
+        default_cfg = LLMConfig.query.filter_by(active=True, is_default=True).first() or (llm_configs[0] if llm_configs else None)
+        return render_template('import.html', llm_configs=llm_configs, default_llm_config_id=(default_cfg.id if default_cfg else None))
     
     if 'file' not in request.files:
         flash('Keine Datei ausgewählt', 'error')
         return redirect(url_for('import_questions'))
     
-    file = request.files['file']
-    if file.filename == '':
+    files = request.files.getlist('file')
+    files = [f for f in files if f and f.filename]
+    if not files:
         flash('Keine Datei ausgewählt', 'error')
         return redirect(url_for('import_questions'))
     
-    if file and file.filename.endswith('.docx'):
-        filename = secure_filename(file.filename)
+    use_llm = request.form.get('use_llm') == 'on'
+    llm_config_id = request.form.get('llm_config_id', type=int)
+    category_default = request.form.get('category', 'Allgemein') or 'Allgemein'
+
+    llm_configs = LLMConfig.query.filter_by(active=True).all()
+
+    imports = []
+    any_questions = False
+
+    for f in files:
+        if not (f.filename.lower().endswith('.docx') or f.filename.lower().endswith('.pdf')):
+            continue
+
+        filename = secure_filename(f.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
+
         try:
-            file.save(filepath)
-            
-            # Prüfe ob Datei wirklich gespeichert wurde
+            f.save(filepath)
             if not os.path.exists(filepath):
-                flash('Fehler beim Speichern der Datei', 'error')
-                return redirect(url_for('import_questions'))
-            
-            use_llm = request.form.get('use_llm') == 'on'
-            llm_config_id = request.form.get('llm_config_id', type=int)
-            
+                continue
+
+            text_content = extract_text_from_upload(filepath)
+
             if use_llm and llm_config_id:
-                # LLM-basierter Import
-                count = import_from_word_with_llm(filepath, llm_config_id)
+                questions_data = import_from_text_with_llm(text_content, llm_config_id)
             else:
-                # Klassischer Import
-                count = import_from_word(filepath)
-            
-            if count > 0:
-                flash(f'{count} Fragen erfolgreich importiert!', 'success')
+                questions_data = import_from_text_structured(text_content, category_default)
+
+            # Metadaten je Datei
+            exam_title = extract_exam_title_heuristic(text_content) or ""
+            exam_date = extract_exam_date_heuristic(text_content)
+            is_past_exam = False
+
+            if use_llm and llm_config_id:
+                llm_config = LLMConfig.query.get_or_404(llm_config_id)
+                meta = llm_extract_exam_metadata(llm_config, preprocess_text_for_llm(text_content))
+                if meta.get("exam_title"):
+                    exam_title = meta["exam_title"]
+                if meta.get("exam_date"):
+                    exam_date = meta["exam_date"]
+                is_past_exam = bool(meta.get("is_past_exam", False))
             else:
-                flash('Keine Fragen gefunden. Bitte überprüfe das Format der Word-Datei.', 'error')
+                if exam_title and any(k in exam_title.lower() for k in ("prüfung", "klausur", "abschlussprüfung")):
+                    is_past_exam = True
+
+            # Quelle ergänzen
+            for q in questions_data:
+                q['source_file'] = filename
+
+            imports.append({
+                "source_file": filename,
+                "questions": questions_data,
+                "exam_title_prefill": exam_title,
+                "exam_date_prefill": exam_date,
+                "is_past_exam_prefill": is_past_exam
+            })
+
+            if questions_data:
+                any_questions = True
         except Exception as e:
-            flash(f'Fehler beim Import: {str(e)}', 'error')
+            flash(f'Fehler beim Import ({filename}): {str(e)}', 'error')
         finally:
-            # Datei löschen
             try:
                 if os.path.exists(filepath):
                     os.remove(filepath)
             except:
                 pass
+
+    if any_questions:
+        # Kategorien/Unterkategorien für Autocomplete im Review bereitstellen
+        categories_options = [fr["name"] for fr in BW_FACHRICHTUNGEN]
+        sub_from_import = []
+        for imp in imports:
+            for q in imp.get("questions", []):
+                if q.get("subcategory"):
+                    sub_from_import.append(q["subcategory"])
+        try:
+            db_sub = [r[0] for r in db.session.query(Question.subcategory).distinct().all() if r[0]]
+        except Exception:
+            db_sub = []
+        subcategories_options = sorted(set(BW_UNTERKATEGORIEN + db_sub + sub_from_import))
+
+        default_cfg = LLMConfig.query.filter_by(active=True, is_default=True).first() or (llm_configs[0] if llm_configs else None)
+
+        return render_template(
+            'import_review.html',
+            imports=imports,
+            llm_configs=llm_configs,
+            llm_config_id=llm_config_id,
+            default_llm_config_id=(default_cfg.id if default_cfg else None),
+            categories_options=categories_options,
+            subcategories_options=subcategories_options
+        )
+    else:
+        flash('Keine Fragen gefunden. Bitte überprüfe das Format der Dateien.', 'error')
     
     return redirect(url_for('import_questions'))
 
 
-def import_from_word(filepath):
-    """Word-Dokument einlesen und Fragen extrahieren"""
+@app.route('/import/save', methods=['POST'])
+def save_import():
+    """Speichert die überprüften Fragen aus dem Review-Prozess"""
     try:
-        doc = Document(filepath)
-        count = 0
-        current_question = None
-        current_answer = None
-        current_category = request.form.get('category', 'Allgemein') or 'Allgemein'
-        
-        for paragraph in doc.paragraphs:
-            text = paragraph.text.strip()
-            
-            # Ignoriere leere Zeilen
-            if not text:
+        data = request.json
+        imports = data.get('imports')
+        # Backward compatibility: altes Format (single)
+        if imports is None:
+            imports = [{
+                "source_file": "",
+                "questions": data.get('questions', []),
+                "is_past_exam": data.get('is_past_exam', False),
+                "exam_title": data.get('exam_title', ''),
+                "exam_date": data.get('exam_date', '')
+            }]
+
+        if not imports:
+            return jsonify({'success': False, 'error': 'Keine Imports zum Speichern'})
+
+        total_count = 0
+        for imp in imports:
+            questions = imp.get('questions', [])
+            is_past_exam = bool(imp.get('is_past_exam', False))
+            exam_title = (imp.get('exam_title') or 'Importierte Prüfung').strip()
+            exam_date_str = imp.get('exam_date')
+
+            if not questions:
                 continue
-            
-            # Frage erkennen (verschiedene Formate)
-            if text.lower().startswith('frage:') or text.startswith('FRAGE:'):
-                # Vorherige Frage speichern
-                if current_question and current_answer:
-                    question = Question(
-                        content=current_question.strip(),
-                        answer=current_answer.strip(),
-                        category=current_category,
-                        active=True
-                    )
+
+            exam = None
+            if is_past_exam:
+                if not exam_title:
+                    return jsonify({'success': False, 'error': 'Prüfungstitel fehlt (bei vergangener Prüfung).'})
+                if not exam_date_str:
+                    return jsonify({'success': False, 'error': 'Prüfungsdatum fehlt (bei vergangener Prüfung).'})
+
+                exam = Exam(title=exam_title, status='Archived')
+                try:
+                    exam.date_created = datetime.strptime(exam_date_str, '%Y-%m-%d')
+                except:
+                    pass
+                db.session.add(exam)
+                db.session.flush()
+
+            for q_data in questions:
+                question = Question(
+                    content=q_data.get('content', '').strip(),
+                    answer=q_data.get('answer', '').strip(),
+                    category=q_data.get('category', ''),
+                    category_code=q_data.get('category_code'),
+                    subcategory=q_data.get('subcategory', ''),
+                    tags=q_data.get('tags', ''),
+                    difficulty=q_data.get('difficulty', 3),
+                    active=True
+                )
+
+                if question.content:
                     db.session.add(question)
-                    count += 1
-                
-                # Neue Frage beginnen
-                current_question = text.replace('Frage:', '').replace('FRAGE:', '').replace('frage:', '').strip()
-                current_answer = None
-            
-            # Lösung erkennen (verschiedene Formate)
-            elif text.lower().startswith('lösung:') or text.startswith('LÖSUNG:') or text.lower().startswith('loesung:'):
-                if current_question:
-                    current_answer = text.replace('Lösung:', '').replace('LÖSUNG:', '').replace('lösung:', '').replace('Loesung:', '').strip()
-                else:
-                    # Lösung ohne vorherige Frage - überspringen
-                    continue
-            
-            # Weiterer Text zur Frage oder Lösung
-            elif current_question and not current_answer:
-                # Weiterer Text zur Frage
-                if current_question:
-                    current_question += '<br>' + text
-            elif current_answer:
-                # Weiterer Text zur Lösung
-                current_answer += '<br>' + text
-        
-        # Letzte Frage speichern
-        if current_question and current_answer:
-            question = Question(
-                content=current_question.strip(),
-                answer=current_answer.strip(),
-                category=current_category,
-                active=True
-            )
-            db.session.add(question)
-            count += 1
+                    db.session.flush()
+                    total_count += 1
+
+                    if exam:
+                        exam_item = ExamItem(
+                            exam_id=exam.id,
+                            original_question_id=question.id,
+                            snapshot_content=question.content,
+                            snapshot_answer=question.answer,
+                            points=1,
+                            position=total_count
+                        )
+                        db.session.add(exam_item)
         
         db.session.commit()
-        return count
+        flash(f'{total_count} Fragen erfolgreich gespeichert!', 'success')
+        return jsonify({'success': True})
+        
     except Exception as e:
         db.session.rollback()
-        raise Exception(f"Fehler beim Import: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/import/generate_answers', methods=['POST'])
+def generate_answers():
+    """Generiert fehlende Lösungen per LLM (für Import-Review)."""
+    try:
+        if not request.is_json:
+            return jsonify({'success': False, 'error': 'Content-Type muss application/json sein'}), 400
+
+        data = request.json
+        llm_config_id = data.get('llm_config_id')
+        items = data.get('questions', [])
+
+        if not llm_config_id:
+            return jsonify({'success': False, 'error': 'LLM-Konfiguration fehlt'}), 400
+        if not isinstance(items, list) or not items:
+            return jsonify({'success': False, 'error': 'Keine Fragen übergeben'}), 400
+
+        llm_config = LLMConfig.query.get_or_404(llm_config_id)
+
+        results = []
+        for item in items:
+            q = (item.get('content') or '').strip()
+            if not q:
+                results.append({'answer': ''})
+                continue
+
+            prompt = generate_answer_prompt(
+                question_html=q,
+                category=item.get('category', ''),
+                subcategory=item.get('subcategory', '')
+            )
+            answer = call_llm_text(llm_config, prompt)
+            if answer:
+                answer = normalize_llm_answer_to_plaintext(answer)
+                answer = f"{AI_GENERATED_TOKEN}\n{answer}"
+            results.append({'answer': answer})
+
+        return jsonify({'success': True, 'results': results})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def import_from_word(filepath):
+    """Legacy: klassischer Import aus docx (nutzt Text-Parser)."""
+    current_category = request.form.get('category', 'Allgemein') or 'Allgemein'
+    text_content = extract_text_from_word(filepath)
+    return import_from_text_structured(text_content, current_category)
 
 
 def extract_text_from_word(filepath):
@@ -368,7 +1184,56 @@ def extract_text_from_word(filepath):
     return '\n\n'.join(text_parts)
 
 
-def call_llm_api(llm_config, text_content, category="Allgemein"):
+def import_from_text_with_llm(text_content: str, llm_config_id: int) -> list[dict]:
+    """LLM-Import aus bereits extrahiertem Text (PDF oder DOCX)."""
+    llm_config = LLMConfig.query.get_or_404(llm_config_id)
+
+    if not (text_content or "").strip():
+        raise Exception("Das Dokument enthält keinen Text")
+
+    category = request.form.get('category', 'Allgemein')
+    # Unterkategorie-Auswahl: Standard + bereits vorhandene aus DB
+    try:
+        db_sub = [r[0] for r in db.session.query(Question.subcategory).distinct().all() if r[0]]
+    except Exception:
+        db_sub = []
+    allowed_sub = sorted(set(BW_UNTERKATEGORIEN + db_sub))
+
+    # Vorverarbeitung: wiederholte Zeilen/Leerzeichen reduzieren -> weniger Tokens
+    text_content = preprocess_text_for_llm(text_content)
+    # Chunking: große Dokumente in kleinere Blöcke teilen -> schneller/robuster, weniger Timeouts
+    chunks = chunk_text(text_content, max_chars=12000)
+
+    questions_data: list[dict] = []
+    for chunk in chunks:
+        questions_data.extend(call_llm_api(llm_config, chunk, category, timeout=240, allowed_subcategories=allowed_sub))
+
+    normalized_questions = []
+    for q in questions_data:
+        normalized_questions.append({
+            'content': q.get('content', '').strip(),
+            'answer': q.get('answer', '').strip(),
+            'category': q.get('category', category),
+            'subcategory': normalize_subcategory(q.get('subcategory', '') or ''),
+            'tags': q.get('tags', ''),
+            'difficulty': q.get('difficulty', 3)
+        })
+
+    # Dedup: gleiche Inhalte zusammenführen (hilft bei Chunk-Overlap)
+    seen = set()
+    deduped = []
+    for q in normalized_questions:
+        key = (q.get('content') or '').strip().lower()
+        if not key:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(q)
+    return deduped
+
+
+def call_llm_api(llm_config, text_content, category="Allgemein", timeout: int = 180, allowed_subcategories: list[str] | None = None):
     """Ruft die konfigurierte LLM-API auf und extrahiert Fragen"""
     try:
         headers = {
@@ -397,7 +1262,15 @@ def call_llm_api(llm_config, text_content, category="Allgemein"):
         if llm_config.prompt_template:
             prompt = llm_config.prompt_template.replace('{text}', text_content).replace('{category}', category)
         else:
+            allowed_block = ""
+            if allowed_subcategories:
+                allowed_block = (
+                    "\n\nWähle für \"subcategory\" eine passende Unterkategorie aus dieser Liste:\n"
+                + "\n".join([f"- {s}" for s in allowed_subcategories])
+                + "\n\nFalls wirklich keine passt, erfinde eine neue, kurze Unterkategorie (max. 3 Wörter).\n"
+                )
             prompt = f"""Analysiere folgenden Text und extrahiere alle Prüfungsfragen mit ihren Lösungen.
+Ordne jede Frage einer passenden Unterkategorie (Themenbereich) zu.{allowed_block}
 
 Text:
 {text_content}
@@ -409,6 +1282,7 @@ Bitte gib die Fragen und Lösungen im folgenden JSON-Format zurück:
       "content": "Die Frage hier",
       "answer": "Die Lösung hier",
       "category": "{category}",
+      "subcategory": "Themenbereich",
       "tags": "Tag1, Tag2",
       "difficulty": 3
     }}
@@ -448,7 +1322,7 @@ Nur JSON zurückgeben, keine zusätzlichen Erklärungen."""
             llm_config.api_url,
             headers=headers,
             json=body,
-            timeout=60
+            timeout=timeout
         )
         response.raise_for_status()
         
@@ -496,8 +1370,116 @@ Nur JSON zurückgeben, keine zusätzlichen Erklärungen."""
         raise Exception(f"LLM-API Fehler: {str(e)}")
 
 
+def call_llm_text(llm_config, prompt: str) -> str:
+    """Ruft die konfigurierte LLM-API auf und gibt reinen Text zurück."""
+    try:
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        
+        # API-Key hinzufügen falls vorhanden
+        if llm_config.api_key:
+            if llm_config.provider == 'openai':
+                headers['Authorization'] = f'Bearer {llm_config.api_key}'
+            elif llm_config.provider == 'anthropic':
+                headers['x-api-key'] = llm_config.api_key
+                headers['anthropic-version'] = '2023-06-01'
+            else:
+                headers['Authorization'] = f'Bearer {llm_config.api_key}'
+        
+        # Zusätzliche Headers aus JSON parsen
+        if llm_config.headers:
+            try:
+                extra_headers = json.loads(llm_config.headers)
+                headers.update(extra_headers)
+            except:
+                pass
+        
+        # Request-Body je nach Provider
+        if llm_config.provider == 'openai':
+            body = {
+                "model": llm_config.model or "gpt-4o",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.2
+            }
+        elif llm_config.provider == 'anthropic':
+            body = {
+                "model": llm_config.model or "claude-3-5-sonnet-20240620",
+                "max_tokens": 1200,
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ]
+            }
+        else:
+            # Custom API - erwartet Standard-Format
+            body = {
+                "model": llm_config.model,
+                "prompt": prompt,
+                "temperature": 0.2,
+                "max_tokens": 1200
+            }
+        
+        response = requests.post(
+            llm_config.api_url,
+            headers=headers,
+            json=body,
+            timeout=240
+        )
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        if llm_config.provider == 'openai':
+            content = data['choices'][0]['message']['content']
+        elif llm_config.provider == 'anthropic':
+            content = data['content'][0]['text']
+        else:
+            content = data.get('response') or data.get('text') or data.get('content') or str(data)
+        
+        return (content or '').strip()
+    except Exception as e:
+        raise Exception(f"LLM-API Fehler: {str(e)}")
+
+
+def generate_answer_prompt(question_html: str, category: str = "", subcategory: str = "") -> str:
+    """Prompt für Antwortgenerierung. Output soll nur die fertige Lösung sein."""
+    q_text = re.sub(r'<[^>]+>', '', (question_html or '')).strip()
+    ctx = []
+    if category:
+        ctx.append(f"Fachrichtung: {category}")
+    if subcategory:
+        ctx.append(f"Themenbereich: {subcategory}")
+    ctx_block = ("\n".join(ctx) + "\n\n") if ctx else ""
+    return (
+        f"{ctx_block}"
+        "Erstelle eine fachlich korrekte, prüfungstaugliche Musterlösung zur folgenden Prüfungsfrage.\n"
+        "Denke intern sorgfältig, gib aber ausschließlich die fertige Lösung aus (ohne Herleitung, ohne Meta-Kommentare).\n"
+        "Wenn Annahmen nötig sind, formuliere sie kurz und plausibel.\n\n"
+        "WICHTIG: Gib reinen Text aus – KEIN Markdown (keine **, keine Überschriften, keine Codeblöcke) und KEINE LaTeX/Math-Syntax (kein \\( \\), \\[ \\], \\times etc.).\n"
+        f"Frage:\n{q_text}\n"
+    )
+
+
+def generate_rewrite_prompt(question_html: str, category: str = "", subcategory: str = "") -> str:
+    q_text = re.sub(r'<[^>]+>', '', (question_html or '')).strip()
+    ctx = []
+    if category:
+        ctx.append(f"Fachrichtung: {category}")
+    if subcategory:
+        ctx.append(f"Themenbereich: {subcategory}")
+    ctx_block = ("\n".join(ctx) + "\n\n") if ctx else ""
+    return (
+        f"{ctx_block}"
+        "Formuliere die folgende Prüfungsfrage sprachlich klarer und prüfungstauglich um.\n"
+        "Behalte Inhalt und Schwierigkeitsgrad möglichst bei. Gib nur den neuen Fragetext aus.\n\n"
+        f"Frage:\n{q_text}\n"
+    )
+
+
 def import_from_word_with_llm(filepath, llm_config_id):
-    """Word-Dokument mit LLM analysieren und Fragen extrahieren"""
+    """Word-Dokument mit LLM analysieren und Fragen extrahieren (Rückgabe als Liste von Dicts)"""
     llm_config = LLMConfig.query.get_or_404(llm_config_id)
     
     # Text aus Word extrahieren
@@ -510,23 +1492,19 @@ def import_from_word_with_llm(filepath, llm_config_id):
     category = request.form.get('category', 'Allgemein')
     questions_data = call_llm_api(llm_config, text_content, category)
     
-    # Fragen in Datenbank speichern
-    count = 0
-    for q_data in questions_data:
-        question = Question(
-            content=q_data.get('content', '').strip(),
-            answer=q_data.get('answer', '').strip(),
-            category=q_data.get('category', category),
-            tags=q_data.get('tags', ''),
-            difficulty=q_data.get('difficulty', 3),
-            active=True
-        )
-        if question.content and question.answer:
-            db.session.add(question)
-            count += 1
-    
-    db.session.commit()
-    return count
+    # Datenaufbereitung (Normalisierung)
+    normalized_questions = []
+    for q in questions_data:
+        normalized_questions.append({
+            'content': q.get('content', '').strip(),
+            'answer': q.get('answer', '').strip(),
+            'category': q.get('category', category),
+            'subcategory': q.get('subcategory', ''),
+            'tags': q.get('tags', ''),
+            'difficulty': q.get('difficulty', 3)
+        })
+        
+    return normalized_questions
 
 
 @app.route('/settings', methods=['GET', 'POST'])
@@ -560,10 +1538,16 @@ def settings():
                 provider=request.form.get('provider', 'custom'),
                 headers=request.form.get('headers', '').strip(),
                 prompt_template=request.form.get('prompt_template', '').strip(),
-                active=request.form.get('active') == 'on'
+                active=request.form.get('active') == 'on',
+                is_default=request.form.get('is_default') == 'on'
             )
+            if config.is_default:
+                config.active = True
             db.session.add(config)
             db.session.commit()
+            if config.is_default:
+                LLMConfig.query.filter(LLMConfig.id != config.id).update({LLMConfig.is_default: False})
+                db.session.commit()
             flash('LLM-Konfiguration erfolgreich erstellt!', 'success')
         
         elif action == 'update':
@@ -588,7 +1572,13 @@ def settings():
             config.headers = request.form.get('headers', '').strip()
             config.prompt_template = request.form.get('prompt_template', '').strip()
             config.active = request.form.get('active') == 'on'
+            config.is_default = request.form.get('is_default') == 'on'
+            if config.is_default:
+                config.active = True
             db.session.commit()
+            if config.is_default:
+                LLMConfig.query.filter(LLMConfig.id != config.id).update({LLMConfig.is_default: False})
+                db.session.commit()
             flash('LLM-Konfiguration erfolgreich aktualisiert!', 'success')
         
         elif action == 'delete':
@@ -598,8 +1588,17 @@ def settings():
                 return redirect(url_for('settings'))
             
             config = LLMConfig.query.get_or_404(config_id)
+            was_default = bool(getattr(config, 'is_default', False))
             db.session.delete(config)
             db.session.commit()
+            if was_default:
+                try:
+                    first_active = LLMConfig.query.filter_by(active=True).order_by(LLMConfig.date_created.desc()).first()
+                    if first_active:
+                        first_active.is_default = True
+                        db.session.commit()
+                except Exception:
+                    db.session.rollback()
             flash('LLM-Konfiguration gelöscht!', 'success')
         
         return redirect(url_for('settings'))
@@ -623,10 +1622,49 @@ def get_api_config(config_id):
             'provider': config.provider or 'custom',
             'headers': config.headers or '',
             'prompt_template': config.prompt_template or '',
-            'active': config.active
+            'active': config.active,
+            'is_default': bool(getattr(config, 'is_default', False))
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/settings/test', methods=['POST'])
+def test_api_config():
+    """API: Verbindung testen"""
+    try:
+        data = request.json
+        
+        # Temporäres Config-Objekt erstellen
+        config = LLMConfig(
+            api_url=data.get('api_url'),
+            api_key=data.get('api_key'),
+            model=data.get('model'),
+            provider=data.get('provider'),
+            headers=data.get('headers'),
+            prompt_template=data.get('prompt_template')
+        )
+        
+        # Test-Aufruf
+        try:
+            # Wir nutzen einen sehr einfachen Text
+            test_content = "Frage: Was ist 1+1? Lösung: 2"
+            questions = call_llm_api(config, test_content, "Test")
+            
+            return jsonify({
+                'success': True, 
+                'message': f'Erfolg! {len(questions)} Frage(n) extrahiert.',
+                'details': questions
+            })
+        except Exception as e:
+            return jsonify({
+                'success': False, 
+                'message': f'API-Fehler: {str(e)}'
+            })
+            
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'System-Fehler: {str(e)}'}), 500
+
 
 
 @app.route('/export/<int:exam_id>')

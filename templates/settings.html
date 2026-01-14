@@ -8,7 +8,7 @@
         <h2>⚙️ LLM-API Konfigurationen</h2>
         <p class="text-muted">Konfiguriere LLM-APIs für intelligente Frage-Extraktion aus Word-Dokumenten</p>
         
-        <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#configModal" onclick="newConfig()">
+        <button class="btn btn-primary mb-3" onclick="newConfig()">
             ✨ Neue Konfiguration
         </button>
         
@@ -32,6 +32,9 @@
                         <td><small>{{ config.api_url[:50] }}...</small></td>
                         <td>{{ config.model or '-' }}</td>
                         <td>
+                            {% if config.is_default %}
+                                <span class="badge bg-primary">Standard</span>
+                            {% endif %}
                             {% if config.active %}
                                 <span class="badge bg-success">Aktiv</span>
                             {% else %}
@@ -62,6 +65,10 @@
     </div>
 </div>
 
+</div>
+{% endblock %}
+
+{% block modals %}
 <!-- Modal für Konfiguration -->
 <div class="modal fade" id="configModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -100,13 +107,32 @@
                         <label for="api_key" class="form-label">API Key</label>
                         <input type="password" class="form-control" id="api_key" name="api_key" 
                                placeholder="sk-...">
-                        <small class="form-text text-muted">Wird verschlüsselt gespeichert</small>
+                        <small class="form-text text-muted">
+                            Wird verschlüsselt gespeichert
+                        </small>
                     </div>
                     
                     <div class="mb-3">
                         <label for="model" class="form-label">Modell</label>
-                        <input type="text" class="form-control" id="model" name="model" 
-                               placeholder="gpt-4, claude-3-opus-20240229, etc.">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="model" name="model" 
+                                   placeholder="gpt-4o, gpt-3.5-turbo, claude-3-opus...">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Modelle
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><h6 class="dropdown-header">OpenAI</h6></li>
+                                <li><a class="dropdown-item" href="#" onclick="selectModel('gpt-4o')">GPT-4o</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="selectModel('gpt-4-turbo')">GPT-4 Turbo</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="selectModel('gpt-3.5-turbo')">GPT-3.5 Turbo</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header">Anthropic</h6></li>
+                                <li><a class="dropdown-item" href="#" onclick="selectModel('claude-3-5-sonnet-20240620')">Claude 3.5 Sonnet</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="selectModel('claude-3-opus-20240229')">Claude 3 Opus</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="selectModel('claude-3-sonnet-20240229')">Claude 3 Sonnet</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="selectModel('claude-3-haiku-20240307')">Claude 3 Haiku</a></li>
+                            </ul>
+                        </div>
                     </div>
                     
                     <div class="mb-3">
@@ -130,10 +156,20 @@
                         <input type="checkbox" class="form-check-input" id="active" name="active" checked>
                         <label class="form-check-label" for="active">Aktiv</label>
                     </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="is_default" name="is_default">
+                        <label class="form-check-label" for="is_default">Als Standard verwenden (Vorauswahl in Import/Editor)</label>
+                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
-                    <button type="submit" class="btn btn-primary">Speichern</button>
+                <div class="modal-footer d-flex justify-content-between">
+                    <button type="button" class="btn btn-info text-white" onclick="testConfig()">
+                        🧪 Verbindung testen
+                    </button>
+                    <div>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary">Speichern</button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -143,13 +179,58 @@
 
 {% block extra_js %}
 <script>
+function testConfig() {
+    const btn = document.querySelector('button[onclick="testConfig()"]');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Teste...';
+    
+    const data = {
+        api_url: document.getElementById('api_url').value,
+        api_key: document.getElementById('api_key').value,
+        model: document.getElementById('model').value,
+        provider: document.getElementById('provider').value,
+        headers: document.getElementById('headers').value,
+        prompt_template: document.getElementById('prompt_template').value
+    };
+    
+    fetch('/settings/test', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            alert('✅ ' + result.message);
+        } else {
+            alert('❌ ' + result.message);
+        }
+    })
+    .catch(error => {
+        alert('❌ Netzwerk-Fehler: ' + error);
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+}
+
 function newConfig() {
     document.getElementById('configModalTitle').textContent = 'Neue LLM-Konfiguration';
     document.getElementById('formAction').value = 'create';
     document.getElementById('configId').value = '';
     document.getElementById('configForm').reset();
     document.getElementById('active').checked = true;
+    document.getElementById('is_default').checked = false;
     updateProviderTemplate();
+    
+    // Modal explizit anzeigen
+    const modalEl = document.getElementById('configModal');
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
 }
 
 function editConfig(configId) {
@@ -172,16 +253,22 @@ function editConfig(configId) {
             document.getElementById('headers').value = config.headers || '';
             document.getElementById('prompt_template').value = config.prompt_template || '';
             document.getElementById('active').checked = config.active;
+            document.getElementById('is_default').checked = !!config.is_default;
             
             updateProviderTemplate();
             
-            const modal = new bootstrap.Modal(document.getElementById('configModal'));
+            const modalEl = document.getElementById('configModal');
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
             modal.show();
         })
         .catch(error => {
             console.error('Fehler:', error);
             alert('Fehler beim Laden der Konfiguration: ' + error.message);
         });
+}
+
+function selectModel(modelName) {
+    document.getElementById('model').value = modelName;
 }
 
 function updateProviderTemplate() {
@@ -191,13 +278,12 @@ function updateProviderTemplate() {
     
     if (provider === 'openai') {
         apiUrl.value = 'https://api.openai.com/v1/chat/completions';
-        model.placeholder = 'gpt-4, gpt-3.5-turbo, etc.';
+        if (!model.value) model.value = 'gpt-4o';
     } else if (provider === 'anthropic') {
         apiUrl.value = 'https://api.anthropic.com/v1/messages';
-        model.placeholder = 'claude-3-opus-20240229, claude-3-sonnet-20240229, etc.';
+        if (!model.value) model.value = 'claude-3-5-sonnet-20240620';
     } else {
         apiUrl.value = '';
-        model.placeholder = 'Modell-Name';
     }
 }
 </script>

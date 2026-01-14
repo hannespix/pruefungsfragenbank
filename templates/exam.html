@@ -12,6 +12,23 @@
                 <a href="{{ url_for('export_exam', exam_id=exam.id) }}" class="btn btn-success">📄 Als Word exportieren</a>
             </div>
         </div>
+
+        <div class="card mb-3">
+            <div class="card-body d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                <div class="d-flex gap-2 align-items-center">
+                    <strong>KI-Konfiguration:</strong>
+                    <select id="llmConfigSelect" class="form-select form-select-sm" style="min-width: 260px;">
+                        <option value="">-- auswählen --</option>
+                        {% for c in llm_configs %}
+                        <option value="{{ c.id }}" {% if default_llm_config_id and default_llm_config_id == c.id %}selected{% endif %}>{{ c.name }}{% if c.model %} ({{ c.model }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="text-muted small">
+                    Änderungen hier betreffen nur diese Prüfung (Snapshot) – die Originalfragen in der Fragenbank bleiben unverändert.
+                </div>
+            </div>
+        </div>
         
         <div class="card">
             <div class="card-header">
@@ -27,9 +44,181 @@
 </div>
 {% endblock %}
 
+{% block modals %}
+<div class="modal fade" id="editExamItemModal" tabindex="-1" aria-labelledby="editExamItemModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editExamItemModalLabel">Prüfungsfrage bearbeiten</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editItemId" />
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Frage (HTML erlaubt)</label>
+                        <div class="wysiwyg-toolbar mb-2" data-editor="editContentEditor">
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="bold"><strong>B</strong></button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="italic"><em>I</em></button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="underline"><u>U</u></button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="insertUnorderedList">• Liste</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="insertOrderedList">1. Liste</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="createLink">Link</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="removeFormat">Format löschen</button>
+                        </div>
+                        <div id="editContentEditor" class="form-control wysiwyg-editor" contenteditable="true" data-paste-plain="true" style="min-height: 180px;"></div>
+                        <div class="mt-2 d-flex flex-wrap gap-2">
+                            <button class="btn btn-sm btn-outline-secondary" type="button" onclick="aiProofread('editContentEditor','question')">🧹 Text prüfen (Frage)</button>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Lösung</label>
+                        <div class="wysiwyg-toolbar mb-2" data-editor="editAnswerEditor">
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="bold"><strong>B</strong></button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="italic"><em>I</em></button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="underline"><u>U</u></button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="insertUnorderedList">• Liste</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="insertOrderedList">1. Liste</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="createLink">Link</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-wys" data-cmd="removeFormat">Format löschen</button>
+                        </div>
+                        <div id="editAnswerEditor" class="form-control wysiwyg-editor" contenteditable="true" data-paste-plain="true" style="min-height: 180px;"></div>
+                        <div class="form-text" id="aiTokenHint" style="display:none;">
+                            Diese Lösung ist als <strong>KI-generiert</strong> markiert. Sobald du sie manuell änderst, wird der Token entfernt.
+                        </div>
+                        <div class="mt-2 d-flex flex-wrap gap-2">
+                            <button class="btn btn-sm btn-outline-secondary" type="button" onclick="aiProofread('editAnswerEditor','answer')">🧹 Text prüfen (Lösung)</button>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Punkte</label>
+                        <input id="editPoints" type="number" class="form-control" min="1" value="1" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Schwierigkeit (1-5)</label>
+                        <input id="editDifficulty" type="number" class="form-control" min="1" max="5" value="3" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Tags (kommagetrennt)</label>
+                        <input id="editTags" type="text" class="form-control" placeholder="z.B. botanik, bodenkunde" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Fachrichtung</label>
+                        <input id="editCategory" type="text" class="form-control" placeholder="z.B. Garten- und Landschaftsbau" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Themenbereich</label>
+                        <input id="editSubcategory" type="text" class="form-control" placeholder="z.B. Botanik" />
+                    </div>
+                    <div class="col-12">
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-outline-primary" id="btnAiGenerateAnswer" type="button" onclick="aiGenerateAnswer()">🤖 Lösung generieren</button>
+                            <button class="btn btn-outline-primary" id="btnAiRewriteQuestion" type="button" onclick="aiRewriteQuestion()">🪄 Frage umformulieren</button>
+                            <button class="btn btn-outline-secondary" type="button" onclick="syncFromOriginal()">↩️ Aus Original übernehmen</button>
+                            <a id="originalLink" class="btn btn-outline-secondary" target="_blank" rel="noopener">🔗 Original-ID</a>
+                        </div>
+                        <div class="form-text">KI nutzt die ausgewählte Konfiguration oben. Falls keine aktiv ist, bitte in Einstellungen konfigurieren.</div>
+                    </div>
+                    <div class="col-12">
+                        <div id="proofreadResults" class="mt-2"></div>
+                    </div>
+                    <div class="col-12">
+                        <div id="aiStatus" class="small text-muted" style="min-height: 1.25rem;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+                <button type="button" class="btn btn-primary" onclick="saveExamItem()">💾 Speichern</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
 {% block extra_js %}
 <script>
 const examId = {{ exam.id }};
+let examItemsCache = [];
+
+function escapeHtml(s) {
+    return (s || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function tagsToString(tags) {
+    if (!tags) return '';
+    if (Array.isArray(tags)) return tags.join(', ');
+    return String(tags);
+}
+
+function renderAnswer(raw) {
+    if (!raw) return '';
+    const s = String(raw);
+    // Wenn HTML enthalten ist, so lassen (manuelle Eingaben können HTML nutzen)
+    if (/<\/?[a-z][\s\S]*>/i.test(s)) return s;
+
+    // LaTeX/Markdown-Noise runtertrimmen (clientseitig für Altbestand)
+    let t = s
+        .replaceAll('\\(', '')
+        .replaceAll('\\)', '')
+        .replaceAll('\\[', '')
+        .replaceAll('\\]', '')
+        .replaceAll('\\times', '×')
+        .replaceAll('\\cdot', '·')
+        .replaceAll('\\,', ' ');
+    t = t.replace(/\\text\{([^}]*)\}/g, '$1');
+    t = t.replace(/\\([A-Za-z]+)/g, '$1');
+
+    // erst escapen, dann leichtes Markdown
+    let e = escapeHtml(t);
+    e = e.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    e = e.replace(/(^|\s)\*(?!\s)(.+?)(?<!\s)\*(?=\s|$)/g, '$1<em>$2</em>');
+    e = e.replace(/\n/g, '<br>');
+    return e;
+}
+
+function getEditorEl(id) {
+    return document.getElementById(id);
+}
+
+function setEditorHtml(id, html) {
+    const el = getEditorEl(id);
+    if (!el) return;
+    const s = String(html || '');
+    if (/<\/?[a-z][\s\S]*>/i.test(s)) {
+        el.innerHTML = s;
+    } else {
+        // plain text
+        el.textContent = s;
+    }
+}
+
+function getEditorHtmlSanitized(id) {
+    const el = getEditorEl(id);
+    if (!el) return '';
+    const raw = el.innerHTML || '';
+    if (window.HortiWysiwyg && typeof window.HortiWysiwyg.sanitizeHtml === 'function') {
+        return window.HortiWysiwyg.sanitizeHtml(raw);
+    }
+    return raw;
+}
+
+function getEditorText(id) {
+    const el = getEditorEl(id);
+    return el ? (el.innerText || '') : '';
+}
+
+function updateAiHint() {
+    const ta = document.getElementById('editAnswerEditor');
+    const hint = document.getElementById('aiTokenHint');
+    if (!ta || !hint) return;
+    hint.style.display = (getEditorText('editAnswerEditor') || '').trim().startsWith('[KI-generiert]') ? 'block' : 'none';
+}
 
 function loadExamItems() {
     fetch(`/exam/${examId}/items`)
@@ -40,6 +229,7 @@ function loadExamItems() {
             return response.json();
         })
         .then(data => {
+            examItemsCache = data || [];
             const container = document.getElementById('examItemsContainer');
             if (data.length === 0) {
                 container.innerHTML = '<div class="text-center text-muted"><p>Keine Fragen in dieser Prüfung</p></div>';
@@ -47,21 +237,38 @@ function loadExamItems() {
             }
             
             container.innerHTML = data.map((item, idx) => `
-                <div class="exam-item mb-4">
-                    <div class="d-flex align-items-center mb-3">
-                        <h5 class="mb-0 me-3">Frage ${idx + 1}</h5>
-                        <span class="badge bg-primary">${item.points} ${item.points === 1 ? 'Punkt' : 'Punkte'}</span>
+                <div class="exam-item mb-4 exam-item-reorderable" data-item-id="${item.id}">
+                    <div class="d-flex align-items-center mb-3 justify-content-between gap-3 flex-wrap">
+                        <div class="d-flex align-items-center flex-wrap gap-2">
+                            <h5 class="mb-0 me-2">Frage ${idx + 1}</h5>
+                            <span class="badge bg-primary">${item.points} ${item.points === 1 ? 'Punkt' : 'Punkte'}</span>
+                            <span class="badge bg-secondary ms-1">Lvl ${item.difficulty ?? 3}</span>
+                        </div>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm btn-outline-secondary reorder-btn" type="button" title="Nach oben" onclick="moveItem(${item.id}, -1)">↑</button>
+                            <button class="btn btn-sm btn-outline-secondary reorder-btn" type="button" title="Nach unten" onclick="moveItem(${item.id}, 1)">↓</button>
+                        </div>
+                    </div>
+                    <div class="mb-2 d-flex flex-wrap gap-2">
+                        ${item.category ? `<span class="badge bg-info text-dark">${escapeHtml(item.category)}</span>` : ``}
+                        ${item.subcategory ? `<span class="badge bg-info text-dark">${escapeHtml(item.subcategory)}</span>` : ``}
+                        ${(item.tags || []).slice(0, 8).map(t => `<span class="badge tag-pill">${escapeHtml(t)}</span>`).join('')}
                     </div>
                     <div class="mb-3" style="font-size: 1.1rem; line-height: 1.7;">${item.content}</div>
                     <div class="collapse" id="answer${item.id}">
                         <div class="card card-body" style="background: var(--ctp-surface0); border-left: 4px solid var(--ctp-green); margin-top: 1rem;">
                             <strong style="color: var(--ctp-green);">💡 Lösung:</strong>
-                            <div style="margin-top: 0.5rem; line-height: 1.7;">${item.answer}</div>
+                            <div style="margin-top: 0.5rem; line-height: 1.7; white-space: normal;">${renderAnswer(item.answer)}</div>
                         </div>
                     </div>
-                    <button class="btn btn-sm btn-outline-primary mt-2" type="button" data-bs-toggle="collapse" data-bs-target="#answer${item.id}">
-                        👁️ Lösung anzeigen
-                    </button>
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#answer${item.id}">
+                            👁️ Lösung anzeigen
+                        </button>
+                        <button class="btn btn-sm btn-primary" type="button" onclick="openEditModal(${item.id})">
+                            ✏️ Bearbeiten
+                        </button>
+                    </div>
                 </div>
             `).join('');
         })
@@ -72,6 +279,325 @@ function loadExamItems() {
         });
 }
 
-document.addEventListener('DOMContentLoaded', loadExamItems);
+function setReorderStatus(html) {
+    let el = document.getElementById('reorderStatus');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'reorderStatus';
+        el.className = 'mb-3';
+        const container = document.getElementById('examItemsContainer');
+        if (container) container.prepend(el);
+    }
+    el.innerHTML = html || '';
+}
+
+function saveExamOrder() {
+    const container = document.getElementById('examItemsContainer');
+    if (!container) return;
+    const ids = Array.from(container.querySelectorAll('.exam-item-reorderable[data-item-id]'))
+        .map(el => parseInt(el.getAttribute('data-item-id')));
+    setReorderStatus('<div class="text-muted">Speichere Reihenfolge…</div>');
+    fetch(`/exam/${examId}/reorder`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ item_ids: ids })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) throw new Error(data.error || 'Unbekannter Fehler');
+        setReorderStatus('<div class="alert alert-success mb-0">Reihenfolge gespeichert.</div>');
+        // Nummerierung aktualisieren
+        loadExamItems();
+    })
+    .catch(err => {
+        setReorderStatus(`<div class="alert alert-warning mb-0">Fehler beim Speichern der Reihenfolge: ${escapeHtml(String(err || ''))}</div>`);
+    });
+}
+
+function moveItem(itemId, direction) {
+    const container = document.getElementById('examItemsContainer');
+    if (!container) return;
+    const el = container.querySelector(`.exam-item-reorderable[data-item-id="${itemId}"]`);
+    if (!el) return;
+
+    const siblings = Array.from(container.querySelectorAll('.exam-item-reorderable[data-item-id]'));
+    const idx = siblings.indexOf(el);
+    if (idx === -1) return;
+
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= siblings.length) return;
+
+    const target = siblings[newIdx];
+    if (direction < 0) {
+        container.insertBefore(el, target);
+    } else {
+        container.insertBefore(target, el);
+    }
+
+    setReorderStatus('<div class="text-muted">Reihenfolge geändert…</div>');
+    saveExamOrder();
+}
+
+function openEditModal(itemId) {
+    const item = (examItemsCache || []).find(i => i.id === itemId);
+    if (!item) return;
+
+    document.getElementById('editItemId').value = String(item.id);
+    setEditorHtml('editContentEditor', item.content || '');
+    setEditorHtml('editAnswerEditor', item.answer || '');
+    document.getElementById('editPoints').value = item.points ?? 1;
+    document.getElementById('editDifficulty').value = item.difficulty ?? 3;
+    document.getElementById('editTags').value = tagsToString(item.tags);
+    document.getElementById('editCategory').value = item.category || '';
+    document.getElementById('editSubcategory').value = item.subcategory || '';
+
+    const originalLink = document.getElementById('originalLink');
+    if (item.original_question_id) {
+        originalLink.href = `/question/${item.original_question_id}`;
+        originalLink.textContent = `🔗 Original-ID ${item.original_question_id}`;
+        originalLink.style.display = 'inline-block';
+    } else {
+        originalLink.href = '#';
+        originalLink.textContent = '🔗 Keine Original-ID';
+        originalLink.style.display = 'none';
+    }
+
+    updateAiHint();
+    const modalEl = document.getElementById('editExamItemModal');
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+// Entferne KI-Token sobald man manuell editiert
+document.addEventListener('input', (ev) => {
+    if (ev.target && ev.target.id === 'editAnswerEditor') {
+        // Wenn User in der Lösung tippt: Token entfernen (falls vorhanden)
+        const t = getEditorText('editAnswerEditor');
+        if (t.includes('[KI-generiert]') && !t.trim().startsWith('[KI-generiert]')) {
+            // best effort: token überall entfernen, dann Text neu setzen
+            const cleaned = t.replace('[KI-generiert]', '').trimStart();
+            const el = document.getElementById('editAnswerEditor');
+            if (el) el.textContent = cleaned;
+        }
+        updateAiHint();
+    }
+});
+
+function saveExamItem() {
+    const itemId = document.getElementById('editItemId').value;
+    const payload = {
+        content: getEditorHtmlSanitized('editContentEditor'),
+        answer: getEditorHtmlSanitized('editAnswerEditor'),
+        points: document.getElementById('editPoints').value,
+        difficulty: document.getElementById('editDifficulty').value,
+        tags: document.getElementById('editTags').value,
+        category: document.getElementById('editCategory').value,
+        subcategory: document.getElementById('editSubcategory').value
+    };
+    fetch(`/exam/${examId}/item/${itemId}/update`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) throw new Error(data.error || 'Unbekannter Fehler');
+        const modalEl = document.getElementById('editExamItemModal');
+        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        loadExamItems();
+    })
+    .catch(err => alert('Fehler beim Speichern: ' + err));
+}
+
+function getSelectedLlmConfigId() {
+    const sel = document.getElementById('llmConfigSelect');
+    return sel ? sel.value : '';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const sel = document.getElementById('llmConfigSelect');
+    if (sel) {
+        const last = localStorage.getItem('hortiexam:lastLlmConfigId');
+        if (last && Array.from(sel.options).some(o => o.value === last)) {
+            sel.value = last;
+        }
+        sel.addEventListener('change', () => {
+            if (sel.value) localStorage.setItem('hortiexam:lastLlmConfigId', sel.value);
+        });
+    }
+});
+
+function setAiStatus(msg) {
+    const el = document.getElementById('aiStatus');
+    if (!el) return;
+    el.innerHTML = msg ? `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${escapeHtml(msg)}` : '';
+}
+
+function setAiButtonsDisabled(disabled) {
+    const ids = ['btnAiGenerateAnswer', 'btnAiRewriteQuestion'];
+    ids.forEach(id => {
+        const b = document.getElementById(id);
+        if (b) b.disabled = !!disabled;
+    });
+    // Proofread Buttons
+    document.querySelectorAll('button[onclick^="aiProofread"]').forEach(b => b.disabled = !!disabled);
+}
+
+function aiGenerateAnswer() {
+    const itemId = document.getElementById('editItemId').value;
+    const llmId = getSelectedLlmConfigId();
+    if (!llmId) return alert('Bitte oben eine KI-Konfiguration auswählen.');
+    setAiStatus('Lösung wird generiert…');
+    setAiButtonsDisabled(true);
+    fetch(`/exam/${examId}/item/${itemId}/ai`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ llm_config_id: llmId, action: 'generate_answer' })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) throw new Error(data.error || 'Unbekannter Fehler');
+        setEditorHtml('editAnswerEditor', data.answer || '');
+        updateAiHint();
+        setAiStatus('');
+        setAiButtonsDisabled(false);
+    })
+    .catch(err => {
+        setAiStatus('');
+        setAiButtonsDisabled(false);
+        alert('KI-Fehler: ' + err);
+    });
+}
+
+function aiRewriteQuestion() {
+    const itemId = document.getElementById('editItemId').value;
+    const llmId = getSelectedLlmConfigId();
+    if (!llmId) return alert('Bitte oben eine KI-Konfiguration auswählen.');
+    setAiStatus('Frage wird umformuliert…');
+    setAiButtonsDisabled(true);
+    fetch(`/exam/${examId}/item/${itemId}/ai`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ llm_config_id: llmId, action: 'rewrite_question' })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) throw new Error(data.error || 'Unbekannter Fehler');
+        if (data.content) setEditorHtml('editContentEditor', data.content);
+        setAiStatus('');
+        setAiButtonsDisabled(false);
+    })
+    .catch(err => {
+        setAiStatus('');
+        setAiButtonsDisabled(false);
+        alert('KI-Fehler: ' + err);
+    });
+}
+
+function syncFromOriginal() {
+    const itemId = document.getElementById('editItemId').value;
+    fetch(`/exam/${examId}/item/${itemId}/sync_from_original`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) throw new Error(data.error || 'Unbekannter Fehler');
+            // Reload und Modal neu öffnen
+            return fetch(`/exam/${examId}/items`).then(r => r.json());
+        })
+        .then(items => {
+            examItemsCache = items || [];
+            openEditModal(parseInt(itemId));
+            loadExamItems();
+        })
+        .catch(err => alert('Fehler beim Übernehmen: ' + err));
+}
+
+let lastProofread = null;
+
+function aiProofread(fieldId, mode) {
+    const llmId = getSelectedLlmConfigId();
+    if (!llmId) return alert('Bitte oben eine KI-Konfiguration auswählen.');
+
+    const el = document.getElementById(fieldId);
+    if (!el) return;
+    const text = (el.innerText || '').trim();
+    if (!text.trim()) return;
+
+    const resultsEl = document.getElementById('proofreadResults');
+    if (resultsEl) resultsEl.innerHTML = '<div class="text-muted">KI prüft Text…</div>';
+    setAiStatus('Text wird geprüft…');
+    setAiButtonsDisabled(true);
+
+    fetch('/llm/proofread', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ llm_config_id: llmId, text, mode })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) throw new Error(data.error);
+        lastProofread = { fieldId, mode, original: text, corrected: data.corrected_text || '', notes: data.notes || [] };
+        renderProofreadResults();
+        setAiStatus('');
+        setAiButtonsDisabled(false);
+    })
+    .catch(err => {
+        const resultsEl = document.getElementById('proofreadResults');
+        if (resultsEl) resultsEl.innerHTML = `<div class="alert alert-warning mb-0">${escapeHtml(String(err || 'Unbekannter Fehler'))}</div>`;
+        setAiStatus('');
+        setAiButtonsDisabled(false);
+    });
+}
+
+function renderProofreadResults() {
+    const resultsEl = document.getElementById('proofreadResults');
+    if (!resultsEl) return;
+    if (!lastProofread) {
+        resultsEl.innerHTML = '';
+        return;
+    }
+    const { corrected, notes } = lastProofread;
+    if (!corrected.trim()) {
+        resultsEl.innerHTML = '<div class="alert alert-warning mb-0">Keine Ausgabe der KI erhalten.</div>';
+        return;
+    }
+    const notesHtml = (notes || []).slice(0, 10).map(n => `<li>${escapeHtml(n)}</li>`).join('');
+    resultsEl.innerHTML = `
+        <div class="alert alert-info">
+            <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                <div><strong>KI-Korrektorat</strong></div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-primary" type="button" onclick="applyProofread()">✅ Übernehmen</button>
+                    <button class="btn btn-sm btn-secondary" type="button" onclick="clearProofread()">✖ Verwerfen</button>
+                </div>
+            </div>
+            ${notesHtml ? `<ul class="mt-2 mb-0">${notesHtml}</ul>` : `<div class="small text-muted mt-2">Keine Hinweise (nur still korrigiert).</div>`}
+        </div>
+        <div class="border rounded p-2">
+            <div class="small text-muted mb-1">Vorschau (korrigiert):</div>
+            <div style="white-space: pre-wrap;">${escapeHtml(corrected)}</div>
+        </div>
+    `;
+}
+
+function applyProofread() {
+    if (!lastProofread) return;
+    const { fieldId, corrected } = lastProofread;
+    const el = document.getElementById(fieldId);
+    if (el) {
+        el.textContent = corrected;
+        if (fieldId === 'editAnswerEditor') updateAiHint();
+    }
+    clearProofread();
+}
+
+function clearProofread() {
+    lastProofread = null;
+    const resultsEl = document.getElementById('proofreadResults');
+    if (resultsEl) resultsEl.innerHTML = '';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.HortiWysiwyg) window.HortiWysiwyg.bindAll();
+    loadExamItems();
+});
 </script>
 {% endblock %}

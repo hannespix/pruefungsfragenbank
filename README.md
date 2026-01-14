@@ -31,6 +31,10 @@ Ein lokales Web-Tool zur Verwaltung von Prüfungsfragen und Erstellung von Klaus
 pip install -r requirements.txt
 ```
 
+## KI-Korrektorat (Rechtschreibung/Grammatik/Stil) – optional
+
+Im Prüfungs-Editor gibt es Buttons **„🧹 Text prüfen“**. Diese Funktion nutzt **die in den Einstellungen konfigurierte KI (LLMConfig)**, um Texte sprachlich zu verbessern (Rechtschreibung/Grammatik/Zeichensetzung/Stil), ohne den fachlichen Inhalt zu verändern.
+
 ### Entwicklung starten
 
 **Mit Auto-Reload (empfohlen für Entwicklung):**
