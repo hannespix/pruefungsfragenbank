@@ -3,15 +3,17 @@ import sys
 import socket
 import re
 import json
+import io
 import requests
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file, Response
 from werkzeug.utils import secure_filename
 from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from models import db, Question, Exam, ExamItem, LLMConfig
 from sqlalchemy import func, or_, text
+import qrcode
 
 # PyInstaller Trick: resource_path() Funktion
 def resource_path(relative_path):
@@ -67,6 +69,16 @@ with app.app_context():
             db.session.execute(text(ddl))
             db.session.commit()
 
+    # Question: Neue Spalten für erweiterte Kategorisierung
+    _ensure_column('questions', 'category_code', "ALTER TABLE questions ADD COLUMN category_code INTEGER")
+    _ensure_column('questions', 'subcategory', "ALTER TABLE questions ADD COLUMN subcategory VARCHAR(100)")
+    
+    # ExamItem: Snapshot-Spalten für erweiterte Metadaten
+    _ensure_column('exam_items', 'snapshot_category', "ALTER TABLE exam_items ADD COLUMN snapshot_category VARCHAR(100)")
+    _ensure_column('exam_items', 'snapshot_subcategory', "ALTER TABLE exam_items ADD COLUMN snapshot_subcategory VARCHAR(100)")
+    _ensure_column('exam_items', 'snapshot_tags', "ALTER TABLE exam_items ADD COLUMN snapshot_tags VARCHAR(500)")
+    _ensure_column('exam_items', 'snapshot_difficulty', "ALTER TABLE exam_items ADD COLUMN snapshot_difficulty INTEGER DEFAULT 3")
+    
     # LLMConfig: Standard-Auswahl
     _ensure_column('llm_configs', 'is_default', "ALTER TABLE llm_configs ADD COLUMN is_default INTEGER DEFAULT 0")
 
@@ -378,6 +390,45 @@ def get_filters():
 def get_fachrichtungen():
     """Liefert die 7 BW-Gärtnerfachrichtungen (Name + optionale Kennziffer)."""
     return jsonify({"fachrichtungen": BW_FACHRICHTUNGEN})
+
+@app.route('/api/local-ip')
+def get_local_ip_api():
+    """Liefert die lokale IP-Adresse und die URL für den QR-Code"""
+    local_ip = get_local_ip()
+    port = 5000
+    url = f"http://{local_ip}:{port}"
+    return jsonify({
+        "ip": local_ip,
+        "port": port,
+        "url": url
+    })
+
+@app.route('/api/qrcode')
+def get_qrcode():
+    """Generiert einen QR-Code für die LAN-URL"""
+    local_ip = get_local_ip()
+    port = 5000
+    url = f"http://{local_ip}:{port}"
+    
+    # QR-Code erstellen
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    
+    # QR-Code als Bild generieren
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # Bild in Bytes umwandeln
+    img_io = io.BytesIO()
+    img.save(img_io, 'PNG')
+    img_io.seek(0)
+    
+    return Response(img_io.getvalue(), mimetype='image/png')
 
 
 @app.route('/')
@@ -1744,4 +1795,6 @@ if __name__ == '__main__':
     print(f"{'='*60}\n")
     
     # Auto-Reload aktiviert für automatische Neustarts bei Dateiänderungen
-    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=True)
+    # Deaktiviere Reloader wenn HORTIEXAM_NO_RELOAD gesetzt ist (für Desktop-App)
+    use_reloader = os.environ.get('HORTIEXAM_NO_RELOAD') != '1'
+    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=use_reloader)

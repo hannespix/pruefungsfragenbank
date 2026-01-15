@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=HortiExam
+Comment=Fragenbank für Gartenbau-Prüfungen
+Exec=/home/hannes/Dokumente/webs/pruefungsfragenbank/start-hortiexam.sh
+Icon=/home/hannes/Dokumente/webs/pruefungsfragenbank/static/favicon.svg
+Terminal=false
+Categories=Education;Office;
+Keywords=exam;prüfung;fragen;gartenbau;horticulture;
+StartupNotify=true
