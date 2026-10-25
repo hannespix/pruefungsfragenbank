@@ -6,9 +6,9 @@ Die Website enthält die Anwendung und einen verschlüsselten Aufgabenbestand. D
 
 - HTTPS-Adresse öffnen, Zugangspasswort einfügen.
 - Originalbestand bearbeiten, Zwischen-/Abschlussprüfung auswählen, neue Prüfungen erstellen.
-- Vor dem Schließen **Projekt sichern**. Projektdateien, Gruppenpakete und Prüfungsexporte sind ausdrücklich **unverschlüsselt und vertraulich**. Sie benötigen einen geeigneten Speicherort.
+- Vor dem Schließen **Projekt sichern**. Projektdateien und Prüfungsexporte sind ausdrücklich **unverschlüsselt und vertraulich**. Sie benötigen einen geeigneten Speicherort.
 - Zum Weiterarbeiten nach erneutem Entschlüsseln die zuletzt exportierte Projektdatei öffnen.
-- Sitzung schließen verwirft den Arbeitsstand nach Bestätigung. Auch Browserabsturz kann nicht exportierte Änderungen verlieren. Es gibt absichtlich keine Klartextspeicherung in IndexedDB oder Local Storage. Auch aus dieser Testversion exportierte Gruppen-HTML-Dateien arbeiten nur im Sitzungsspeicher; dort regelmäßig „Projekt sichern“ verwenden.
+- Sitzung schließen verwirft den Arbeitsstand nach Bestätigung. Auch Browserabsturz kann nicht exportierte Änderungen verlieren. Es gibt absichtlich keine Klartextspeicherung in IndexedDB oder Local Storage. Offline-Gruppenpakete werden nicht mehr erzeugt.
 
 ## Sicherheitsgrenze
 
@@ -30,4 +30,4 @@ Den erzeugten Ordner prüfen und nur `manifest.json` und `part-*.bin` unter `off
 
 Zuerst den Workflow **Encrypted HortiExam Pages** unter Actions deaktivieren, damit Änderungen die Seite nicht erneut bereitstellen. Anschließend unter Settings → Pages die Site über **Unpublish site** zurückziehen. Das entfernt weder heruntergeladene Kopien noch Ciphertext aus der Git-Historie.
 
-Für Gruppenrechte, widerrufbare Zugänge und gemeinsame Speicherung ist weiterhin ein echtes Backend vorgesehen, z. B. PHP und MySQL bei webgo.
+Für Gruppenrechte, widerrufbare Zugänge und gemeinsame Speicherung ist eine serverlose API vor dem privaten GitHub-Datenrepository vorgesehen. GitHub Pages bleibt die Oberfläche. Details: `docs/architecture/github-session-access.md`. Noch kein Prüferbetrieb; das gemeinsame Testpasswort nicht als Prüferzugang verteilen.

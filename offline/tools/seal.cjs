@@ -7,7 +7,7 @@ for(const k of ['--seed','--password-file','--out'])if(!args.includes(k)||!get(k
 const password=fs.readFileSync(get('--password-file'),'utf8').trim();
 if(password.length<24)throw Error('Use a randomly generated password of at least 24 characters.');
 const data=JSON.parse(fs.readFileSync(get('--seed'),'utf8'));
-require('../src/core.js').validate(data);
+require('../src/core.js').validate(structuredClone(data));
 const out=path.resolve(get('--out'));
 if(fs.existsSync(out))throw Error('Output directory already exists; choose a new directory.');
 const salt=crypto.randomBytes(16),iv=crypto.randomBytes(12),key=crypto.pbkdf2Sync(password,salt,600000,32,'sha256');
