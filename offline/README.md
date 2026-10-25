@@ -10,7 +10,7 @@ python offline/tools/build.py
 node --test offline/tests/*.test.cjs
 ```
 
-Das Repository enthält ausschließlich synthetische Beispieldaten. Reale Prüfungsdaten außerhalb des Repositorys aufbewahren. Ein privates Paket kann lokal gebaut werden:
+Das Repository enthält synthetische Beispieldaten und unter `pages/sealed` den verschlüsselten Testbestand. Unverschlüsselte Originaldaten und Passwörter bleiben außerhalb des Repositorys. Ein privates Paket kann lokal gebaut werden:
 
 ```bash
 python offline/tools/build.py --seed /absoluter/privater/bestand.json --out /absoluter/privater/Start.html
@@ -20,15 +20,15 @@ python offline/tools/build.py --seed /absoluter/privater/bestand.json --out /abs
 
 ## Arbeitsablauf
 
-1. Aufgaben nach Fachrichtung, ZP/AP, Bestandsteil, Thema und Quelljahr filtern.
-2. Über **Ansehen** Aufgaben, Originale, Varianten und Hinweise prüfen. Die Familienzuordnung ist ein überprüfbarer Vorschlag, kein unveränderlicher Befund.
-3. Aufgaben bearbeiten: eine neue Bankrevision oder gezielt eine Kopie innerhalb einer Prüfung. Vorgängerversionen bleiben im Familienvergleich erreichbar.
-4. Lösungen, Bewertungskriterien, Teilpunkte, Grafiken und Bearbeitungszeit ergänzen. Die fachliche Freigabe verlangt ein Namenskürzel. Beim erneuten Bearbeiten werden übernommene Freigaben zurückgesetzt.
-5. Aufgaben per Drag-and-drop oder Schaltfläche in die Prüfung übernehmen. Die Reihenfolge lässt sich auch mit Pfeiltasten ändern.
-6. **Prüfung + Lösung exportieren** erzeugt ein ZIP mit zwei druckfertigen HTML-Dateien. Bereitgestellten Download anklicken, ZIP entpacken und die gewünschte Fassung im Browser öffnen. Über Drucken als PDF speichern. Separate PDF-Anlagen liegen in getrennten Teilnehmer-/Prüferordnern.
-7. **Projekt sichern** lädt die vollständige Datenbank einschließlich Originalen, Bildern und Prüfungen herunter. Browser-Speicherung ist nur eine zusätzliche Arbeitshilfe, kein Backup.
-8. Arbeitsgruppen erhalten eigenständige HTML-Pakete je Fachrichtung. Rückgabe über die Projekt-JSON; **JSON zusammenführen** erhält abweichende Datensätze als separate Rückläufe. Wiederholtes Einlesen desselben Rücklaufs erzeugt keine zusätzlichen Kopien.
-9. Tatsächliche Einsätze in **Meine Prüfungen** gesondert bestätigen. Ein geplanter Termin oder Jahr im Dateinamen reicht dafür nicht. Eingesetzte Prüfungen sind im Editor gesperrt; für Änderungen duplizieren.
+1. **Prüfungsbereich**: Zwischen- oder Abschlussprüfung und Fachrichtung wählen. Kategorien, Familien, Quellen und Entwürfe bleiben diesem Bereich zugeordnet.
+2. **Prüfungsmuster**: aus originalen Aufgabenköpfen vorgeschlagene Kategorien prüfen, erforderliche Anzahlen festlegen und mit Namen bestätigen. Der Archivbestand beweist keine vollständige jährliche Zusammensetzung. 0 schließt eine Kategorie aus.
+3. **Kategorien → Aufgabenfamilien → Varianten**: Varianten vergleichen, Quelljahre und bestätigte Einsätze getrennt prüfen. Manuelle Kategorienkorrektur im Aufgabeneditor; Kombinationsaufgaben dürfen mehrere Kategorien abdecken.
+4. Neue Prüfung übernimmt eine feste Musterkopie. Die Kategorienanzeige zeigt fehlende, passende und überbesetzte Slots. Rotationsvorschläge bevorzugen ältere Familienbelege und vermeiden doppelte Familien. Unbekannte Historie zählt nicht als „nie benutzt“.
+5. Aufgaben bearbeiten, Lösungen, Punkte, Grafiken und Zeit ergänzen; Teilnehmer- und Prüferfassung ansehen. Nicht bestätigte Muster, unpassende Kategorien oder fehlende fachliche Freigaben bleiben als Entwurf gekennzeichnet.
+6. Im **Koordinationsprototyp**: Projektdatei vor dem Schließen sichern; Prüfung und Lösung können gemeinsam als ZIP exportiert werden. Diese Exporte sind vertraulicher Klartext. Es gibt keine Offline-Satellitenfunktion mehr.
+7. Tatsächliche Einsätze gesondert bestätigen. Geplante Termine werden nicht als Nutzung gewertet. Eingesetzte Prüfungen sind gesperrt; zum Ändern duplizieren.
+
+JSON-Import erhält abweichende Aufgaben als separate Kopien. **Abweichende Prüfungsmuster desselben Bereichs werden ausdrücklich abgewiesen**, bis sie fachlich abgeglichen wurden; keine stille Auswahl oder Löschung eines Konflikts.
 
 ## Datenmodell / Servermigration
 
@@ -41,15 +41,12 @@ python offline/tools/build.py --seed /absoluter/privater/bestand.json --out /abs
 | sources | Originaldokumente, Rohtext, Quelljahr mit Herkunft, Prüfungsart und Fachrichtung |
 | assets | Erhaltene Binärdateien; im Offline-Format Base64 |
 | exams | Prüfungsentwürfe und unveränderlich kopierte Aufgabeninhalte inklusive Lösung/Anlagenverweise |
+| patterns | Bestätigbare, versionierte Pflichtkategorien pro Prüfungsart und Fachrichtung; jede Prüfung erhält eine Kopie |
 | uses | Manuell bestätigte tatsächliche Einsätze; Rückverweis auf die eingesetzte Prüfung |
 
-Für Webgo ist als nächste Stufe ein serverseitiger PHP-Dienst vorgesehen, der diese Strukturen nach MySQL überträgt. `server/schema.mysql.sql` ist ein **noch nicht gegen einen konkreten Hostingtarif getesteter Schemaentwurf**, kein produktiver Server. Vorgehen:
+Die Oberfläche bleibt auf GitHub Pages. Für temporäre Prüferzugänge und gemeinsames Speichern ist **GitHub Pages + privates Datenrepository + serverlose API** vorgesehen. Siehe `docs/architecture/github-session-access.md` für Sitzungsfreigabe, QR-Einladungen, serverseitige Rollen, Exportrechte und Konfliktbehandlung. Diese Zugangskontrolle ist noch nicht implementiert oder ausgerollt. Das aktuelle gemeinsame Passwort ist nur für den Koordinationstest geeignet.
 
-1. Tarif und PHP/MySQL-Versionen prüfen; private Testumgebung einrichten.
-2. Serverseitige Anmeldung, Rollen (Koordination/Prüfer), projektbezogene Rechte und CSRF-Schutz implementieren. Keine Datenbank-Zugangsdaten im Browser.
-3. Binärdateien außerhalb des öffentlichen Webverzeichnisses ablegen; Downloads nur nach Rechteprüfung. JSON-IDs unverändert übernehmen, Inhalte und Referenzen prüfen.
-4. Import in einer Transaktion durchführen. Projektversion per `If-Match`/Revision abgleichen; parallele Änderungen als Konflikt behandeln. Die Offline-Zusammenführung ist kein Ersatz für Servertransaktionen.
-5. Automatische Sicherung und Wiederherstellung testen. Sitzungen/Aufträge zeitlich begrenzen; heruntergeladene Kopien bleiben technisch außerhalb der Kontrolle.
+`server/schema.mysql.sql` bleibt ein älterer, nicht ausgerollter Alternativentwurf. Er ist keine Voraussetzung für die nun gewünschte GitHub-Architektur.
 
 Die vorhandene Flask-/SQLite-Datenbank wird durch diesen Prototyp nicht verändert oder automatisch migriert. Eine etwaige Übernahme ihres Bestands benötigt einen gesonderten, geprüften Importadapter.
 
@@ -61,7 +58,7 @@ Die vorhandene Flask-/SQLite-Datenbank wird durch diesen Prototyp nicht verände
 - Neue `.doc`-Dateien in Word als `.docx` speichern. Der bereitgestellte Altbestand wurde separat konvertiert und geprüft; Originaldateien bleiben erhalten.
 - Bilder werden nur bei ausdrücklicher Zuordnung zur Teilnehmer-/Prüferfassung ausgegeben. Originalgrafiken starten als Quellenanlagen. Zeichnungsmaßstab und Seitenumbrüche beim Ausdruck prüfen.
 - IndexedDB kann auf administrierten Geräten oder bei `file://` eingeschränkt sein. Dann weiter mit manuell gesicherten Projektdateien arbeiten. Das Tool zeigt den Speicherstatus an.
-- Kein gleichzeitiges Mehrbenutzerarbeiten in einer Datei. Fachrichtungs-Pakete sind vertrauliche Offline-Kopien, keine Zugriffskontrolle.
+- Kein gleichzeitiges Mehrbenutzerarbeiten in einer Datei. Keine Prüferrollen oder widerrufbaren Sitzungskonten im statischen Prototyp.
 
 ## Prüfungen
 
