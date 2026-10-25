@@ -63,3 +63,7 @@ private-build/
 *.docx
 *.pdf
 *.zip
+
+# Encrypted Pages build and local key material
+pages-dist/
+*.password.txt

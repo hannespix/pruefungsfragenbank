@@ -1,0 +1,46 @@
+name: Encrypted HortiExam Pages
+on:
+  push:
+    branches: [main]
+    paths: ['offline/**', '.github/workflows/pages.yml']
+  pull_request:
+    paths: ['offline/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: encrypted-pages-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test offline editor and encryption
+        run: node --test offline/tests/*.test.cjs
+      - name: Build public launcher with encrypted data only
+        run: python offline/tools/build_pages.py --sealed offline/pages/sealed --out pages-dist
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: pages-dist
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy encrypted test site
+        id: deployment
+        uses: actions/deploy-pages@v4

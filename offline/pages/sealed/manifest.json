@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "cipher": "AES-256-GCM",
+  "kdf": "PBKDF2-SHA256",
+  "iterations": 600000,
+  "compression": "gzip",
+  "salt": "f6UjauW6KKIoYQvFkyu9Ew==",
+  "iv": "kjwOY5fYwEK7KtAi",
+  "chunks": [
+    "part-000.bin",
+    "part-001.bin",
+    "part-002.bin",
+    "part-003.bin",
+    "part-004.bin",
+    "part-005.bin",
+    "part-006.bin",
+    "part-007.bin",
+    "part-008.bin",
+    "part-009.bin",
+    "part-010.bin",
+    "part-011.bin",
+    "part-012.bin",
+    "part-013.bin",
+    "part-014.bin",
+    "part-015.bin",
+    "part-016.bin",
+    "part-017.bin"
+  ]
+}
