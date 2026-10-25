@@ -1,0 +1,332 @@
+{
+  "schemaVersion": 1,
+  "projectId": "project-hortiexam-demo-v1",
+  "name": "HortiExam · Beispieldaten",
+  "createdAt": "2026-10-25T00:00:00Z",
+  "families": [
+    {
+      "id": "demo-family-inventory",
+      "title": "Bestandszählung",
+      "reviewStatus": "review"
+    },
+    {
+      "id": "demo-family-2",
+      "title": "Materialbedarf für eine Demonstrationsfläche",
+      "reviewStatus": "review"
+    },
+    {
+      "id": "demo-family-3",
+      "title": "Arbeitsablauf erläutern",
+      "reviewStatus": "review"
+    },
+    {
+      "id": "demo-family-4",
+      "title": "Gefäße zählen",
+      "reviewStatus": "review"
+    },
+    {
+      "id": "demo-family-5",
+      "title": "Erntekisten inventarisieren",
+      "reviewStatus": "review"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "demo-task-0",
+      "familyId": "demo-family-inventory",
+      "title": "Pflanzenbestand zählen",
+      "text": "Zählen Sie die Pflanzen in drei Reihen mit jeweils acht Pflanzen. Dokumentieren Sie den Gesamtbestand.",
+      "examType": "ZP",
+      "specialty": "Baumschule",
+      "category": "Inventur",
+      "tags": [
+        "Inventur",
+        "Demobeispiel"
+      ],
+      "minutes": 10,
+      "points": 5,
+      "criteria": [
+        {
+          "id": "demo-criterion-0",
+          "text": "Ergebnis und nachvollziehbarer Rechenweg",
+          "points": 5,
+          "answer": "24"
+        }
+      ],
+      "solution": "Ergebnis: 24. Rechenweg entsprechend den angegebenen Mengen bzw. Maßen.",
+      "solutionStatus": "approved",
+      "reviewStatus": "approved",
+      "reviewedBy": "Demobeispiel",
+      "sourceIds": [
+        "demo-source-0"
+      ],
+      "assetLinks": [],
+      "flags": [],
+      "kind": "practical",
+      "qualification": "Demobeispiel",
+      "createdAt": "2026-10-25T00:00:00Z"
+    },
+    {
+      "id": "demo-task-1",
+      "familyId": "demo-family-inventory",
+      "title": "Pflanzenbestand zählen: andere Menge",
+      "text": "Zählen Sie die Pflanzen in vier Reihen mit jeweils sechs Pflanzen. Dokumentieren Sie den Gesamtbestand.",
+      "examType": "ZP",
+      "specialty": "Baumschule",
+      "category": "Inventur",
+      "tags": [
+        "Inventur",
+        "Demobeispiel"
+      ],
+      "minutes": 10,
+      "points": 5,
+      "criteria": [
+        {
+          "id": "demo-criterion-1",
+          "text": "Ergebnis und nachvollziehbarer Rechenweg",
+          "points": 5,
+          "answer": "24"
+        }
+      ],
+      "solution": "Ergebnis: 24. Rechenweg entsprechend den angegebenen Mengen bzw. Maßen.",
+      "solutionStatus": "approved",
+      "reviewStatus": "approved",
+      "reviewedBy": "Demobeispiel",
+      "sourceIds": [
+        "demo-source-1"
+      ],
+      "assetLinks": [],
+      "flags": [],
+      "kind": "practical",
+      "qualification": "Demobeispiel",
+      "createdAt": "2026-10-25T00:00:00Z"
+    },
+    {
+      "id": "demo-task-2",
+      "familyId": "demo-family-2",
+      "title": "Materialbedarf für eine Demonstrationsfläche",
+      "text": "Eine rechteckige Demonstrationsfläche ist 3 m lang und 2 m breit. Berechnen Sie ihre Fläche.",
+      "examType": "ZP",
+      "specialty": "Garten- und Landschaftsbau",
+      "category": "Fachrechnen",
+      "tags": [
+        "Fachrechnen",
+        "Demobeispiel"
+      ],
+      "minutes": 10,
+      "points": 4,
+      "criteria": [
+        {
+          "id": "demo-criterion-2",
+          "text": "Ergebnis und nachvollziehbarer Rechenweg",
+          "points": 4,
+          "answer": "6"
+        }
+      ],
+      "solution": "Ergebnis: 6. Rechenweg entsprechend den angegebenen Mengen bzw. Maßen.",
+      "solutionStatus": "approved",
+      "reviewStatus": "approved",
+      "reviewedBy": "Demobeispiel",
+      "sourceIds": [
+        "demo-source-2"
+      ],
+      "assetLinks": [],
+      "flags": [],
+      "kind": "practical",
+      "qualification": "Demobeispiel",
+      "createdAt": "2026-10-25T00:00:00Z"
+    },
+    {
+      "id": "demo-task-3",
+      "familyId": "demo-family-3",
+      "title": "Arbeitsablauf erläutern",
+      "text": "Erläutern Sie die Arbeitsschritte für eine von der Prüfungskommission vorgegebene einfache Kulturarbeit.",
+      "examType": "AP",
+      "specialty": "Baumschule",
+      "category": "Planung",
+      "tags": [
+        "Planung",
+        "Demobeispiel"
+      ],
+      "minutes": 10,
+      "points": null,
+      "criteria": [],
+      "solution": "",
+      "solutionStatus": "missing",
+      "reviewStatus": "review",
+      "reviewedBy": "Demobeispiel",
+      "sourceIds": [
+        "demo-source-3"
+      ],
+      "assetLinks": [],
+      "flags": [],
+      "kind": "practical",
+      "qualification": "Demobeispiel",
+      "createdAt": "2026-10-25T00:00:00Z"
+    },
+    {
+      "id": "demo-task-4",
+      "familyId": "demo-family-4",
+      "title": "Gefäße zählen",
+      "text": "Auf einem Tisch stehen fünf Reihen mit je zehn Gefäßen. Ermitteln Sie die Gesamtzahl.",
+      "examType": "ZP",
+      "specialty": "Zierpflanzenbau",
+      "category": "Inventur",
+      "tags": [
+        "Inventur",
+        "Demobeispiel"
+      ],
+      "minutes": 10,
+      "points": 5,
+      "criteria": [
+        {
+          "id": "demo-criterion-4",
+          "text": "Ergebnis und nachvollziehbarer Rechenweg",
+          "points": 5,
+          "answer": "50"
+        }
+      ],
+      "solution": "Ergebnis: 50. Rechenweg entsprechend den angegebenen Mengen bzw. Maßen.",
+      "solutionStatus": "approved",
+      "reviewStatus": "approved",
+      "reviewedBy": "Demobeispiel",
+      "sourceIds": [
+        "demo-source-4"
+      ],
+      "assetLinks": [],
+      "flags": [],
+      "kind": "practical",
+      "qualification": "Demobeispiel",
+      "createdAt": "2026-10-25T00:00:00Z"
+    },
+    {
+      "id": "demo-task-5",
+      "familyId": "demo-family-5",
+      "title": "Erntekisten inventarisieren",
+      "text": "Zählen Sie die bereitgestellten leeren Erntekisten und dokumentieren Sie die Stückzahl.",
+      "examType": "ZP",
+      "specialty": "Gemüsebau",
+      "category": "Inventur",
+      "tags": [
+        "Inventur",
+        "Demobeispiel"
+      ],
+      "minutes": 10,
+      "points": null,
+      "criteria": [],
+      "solution": "",
+      "solutionStatus": "missing",
+      "reviewStatus": "review",
+      "reviewedBy": "Demobeispiel",
+      "sourceIds": [
+        "demo-source-5"
+      ],
+      "assetLinks": [],
+      "flags": [],
+      "kind": "practical",
+      "qualification": "Demobeispiel",
+      "createdAt": "2026-10-25T00:00:00Z"
+    }
+  ],
+  "sources": [
+    {
+      "id": "demo-source-0",
+      "name": "Demobeispiel_2024.txt",
+      "path": "Synthetisches Beispiel",
+      "sha256": "demo-0",
+      "year": 2024,
+      "yearEvidence": "filename",
+      "date": null,
+      "examType": "ZP",
+      "specialty": "Baumschule",
+      "role": "Synthetisches Beispiel",
+      "text": "Zählen Sie die Pflanzen in drei Reihen mit jeweils acht Pflanzen. Dokumentieren Sie den Gesamtbestand.",
+      "assetId": null,
+      "attachmentIds": [],
+      "flags": []
+    },
+    {
+      "id": "demo-source-1",
+      "name": "Demobeispiel_2025.txt",
+      "path": "Synthetisches Beispiel",
+      "sha256": "demo-1",
+      "year": 2025,
+      "yearEvidence": "filename",
+      "date": null,
+      "examType": "ZP",
+      "specialty": "Baumschule",
+      "role": "Synthetisches Beispiel",
+      "text": "Zählen Sie die Pflanzen in vier Reihen mit jeweils sechs Pflanzen. Dokumentieren Sie den Gesamtbestand.",
+      "assetId": null,
+      "attachmentIds": [],
+      "flags": []
+    },
+    {
+      "id": "demo-source-2",
+      "name": "Demobeispiel_2026.txt",
+      "path": "Synthetisches Beispiel",
+      "sha256": "demo-2",
+      "year": 2026,
+      "yearEvidence": "filename",
+      "date": null,
+      "examType": "ZP",
+      "specialty": "Garten- und Landschaftsbau",
+      "role": "Synthetisches Beispiel",
+      "text": "Eine rechteckige Demonstrationsfläche ist 3 m lang und 2 m breit. Berechnen Sie ihre Fläche.",
+      "assetId": null,
+      "attachmentIds": [],
+      "flags": []
+    },
+    {
+      "id": "demo-source-3",
+      "name": "Demobeispiel_2024.txt",
+      "path": "Synthetisches Beispiel",
+      "sha256": "demo-3",
+      "year": 2024,
+      "yearEvidence": "filename",
+      "date": null,
+      "examType": "AP",
+      "specialty": "Baumschule",
+      "role": "Synthetisches Beispiel",
+      "text": "Erläutern Sie die Arbeitsschritte für eine von der Prüfungskommission vorgegebene einfache Kulturarbeit.",
+      "assetId": null,
+      "attachmentIds": [],
+      "flags": []
+    },
+    {
+      "id": "demo-source-4",
+      "name": "Demobeispiel_2025.txt",
+      "path": "Synthetisches Beispiel",
+      "sha256": "demo-4",
+      "year": 2025,
+      "yearEvidence": "filename",
+      "date": null,
+      "examType": "ZP",
+      "specialty": "Zierpflanzenbau",
+      "role": "Synthetisches Beispiel",
+      "text": "Auf einem Tisch stehen fünf Reihen mit je zehn Gefäßen. Ermitteln Sie die Gesamtzahl.",
+      "assetId": null,
+      "attachmentIds": [],
+      "flags": []
+    },
+    {
+      "id": "demo-source-5",
+      "name": "Demobeispiel_2026.txt",
+      "path": "Synthetisches Beispiel",
+      "sha256": "demo-5",
+      "year": 2026,
+      "yearEvidence": "filename",
+      "date": null,
+      "examType": "ZP",
+      "specialty": "Gemüsebau",
+      "role": "Synthetisches Beispiel",
+      "text": "Zählen Sie die bereitgestellten leeren Erntekisten und dokumentieren Sie die Stückzahl.",
+      "assetId": null,
+      "attachmentIds": [],
+      "flags": []
+    }
+  ],
+  "assets": [],
+  "uses": [],
+  "exams": []
+}

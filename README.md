@@ -1,5 +1,16 @@
 # HortiExam - Fragenbank für Gartenbau-Prüfungen
 
+## Neue Offline-Prüfungswerkstatt
+
+Für verwaltete Dienst-PCs ohne lokalen Server gibt es jetzt einen eigenständigen HTML-Prototyp unter [`offline/`](offline/README.md): praktische Aufgaben, Familien/Varianten, Grafiken und Lösungen, Prüfungseditor, Teilnehmer-/Prüferexport und Arbeitsgruppen-Rückläufe. Der Build enthält nur synthetische Beispieldaten. Reale Prüfungsunterlagen werden getrennt und vertraulich verarbeitet.
+
+```bash
+python offline/tools/build.py
+# dist/index.html direkt im Browser öffnen
+```
+
+Die nachfolgend beschriebene Flask-Anwendung bleibt unverändert verfügbar.
+
 Ein lokales Web-Tool zur Verwaltung von Prüfungsfragen und Erstellung von Klausuren für den Gartenbau. Das Tool kann als einzelne .exe-Datei auf Windows-PCs ohne Admin-Rechte laufen und ist im lokalen Netzwerk (LAN) für Kollegen erreichbar.
 
 ## Features
