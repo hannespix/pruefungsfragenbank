@@ -1,4 +1,10 @@
-# HortiExam - Fragenbank für Gartenbau-Prüfungen
+# Prüfungswerkstatt Gartenbau
+
+Aufgaben sammeln. Prüfungen gemeinsam gestalten.
+
+Die aktuelle Online-Anwendung verbindet die Aufgabenbank mit der gemeinsamen Prüfungsvorbereitung. Technische Einrichtung und Sicherheitskonzept: [`online/`](online/README.md).
+
+Auf kleinen Bildschirmen öffnet „Menü“ die Navigation. Im Prüfungseditor wechseln „Aufgaben auswählen“ und „Prüfungsblatt“ zwischen Auswahl und Bearbeitung; Aufgaben lassen sich per „Hinzufügen“ übernehmen. Die automatische Ansicht passt das Blatt zum Lesen an, der Export bleibt im A4-Format.
 
 ## Neue Offline-Prüfungswerkstatt
 
