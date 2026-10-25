@@ -11,7 +11,7 @@ backup integration; it is not the active store.
 
 1. Open the existing Pages URL and sign in with the coordinator password.
 2. Create a preparation meeting, exam year and specialties.
-3. Under **Gruppen & Einladungen**, activate a session for 2–12 hours.
+3. Under **Gruppen & Einladungen**, activate a session for up to 24 hours.
 4. Show each specialty's QR code or copy its link. Members provide a device label.
 5. Compare the device code and approve each pending request.
 6. Groups prepare ZP and AP separately. Changes save centrally. The coordinator
@@ -26,10 +26,21 @@ changes unsaved; use the UI's conflict recovery to keep a separate draft or relo
 Groups can edit snapshots inside drafts, but cannot approve their own edits,
 change bank records/patterns, download originals or invoke coordinator exports.
 
+The **Fragenbank** offers combined filters, cards/table views and selected-task
+CSV, JSON or printable ZIP exports for coordinators. These filtered exports are
+not full-project backups. The **Prüfungsblatt** editor uses the same A4 template
+as preview/export; edits affect exam snapshots and reset review approval.
+**Hilfe & Sicherheit** explains storage, processing, access and limits in German
+and is available before sign-in.
+
 ## Security boundaries
 
-- Bearer tokens are 256-bit random values, held only in tab memory. Only hashes
-  persist in D1. Closing/reloading the tab requires a fresh login/approval.
+- Bearer tokens are 256-bit random values. The browser keeps only the token and
+  pending device code in tab-scoped sessionStorage, so reloads preserve sign-in.
+  Every restore revalidates approval and expiry on the server; it never extends
+  access. Logout/revocation/expiry clear the saved token. Browser tab restoration
+  may restore sessionStorage, so explicitly log out on shared devices. Only token
+  hashes persist in D1; passwords and exam data are never saved in browser storage.
 - Invitations travel in URL fragments, immediately removed from the address bar.
   Invitations alone never authorize reading data: every device requires approval.
 - The existing high-entropy coordinator password is checked using a PBKDF2-SHA256
