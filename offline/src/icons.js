@@ -1,6 +1,6 @@
 /* Local SVG interface icons. No font glyphs, network requests or executable markup. */
 (function(root){'use strict';
-const paths={
+const paths={trash:'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>',undo:'<path d="M3 10h10a7 7 0 1 1-6 10M3 10l5-5M3 10l5 5"/>',
  home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-8H9v8H4a1 1 0 0 1-1-1Z"/>',
  users:'<circle cx="9" cy="8" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M17 5a3 3 0 0 1 0 6m2 4a5 5 0 0 1 2 4v2"/>',
  qr:'<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M15 15h2v2h-2zm6 0v3m-6 3h3m3 0v-1"/>',
@@ -28,7 +28,7 @@ const paths={
  eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'
 };
 function icon(name){return Object.hasOwn(paths,name)?`<svg class="ui-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${paths[name]}</svg>`:'';}
-const actionIcons={backup:'download','export-exam':'download','bank-export':'download',docx:'upload','merge-project':'upload','new-workshop':'plus','new-task':'plus','new-exam':'plus','track-new':'plus',add:'plus','add-asset':'plus','add-criterion':'plus','paper-focus':'check','paper-check':'check','suggest':'idea','preview-candidate':'eye','preview-solution':'eye','invitation':'qr','print-invitation':'file','item-up':'arrowUp','item-down':'arrowDown','item-remove':'close','remove-criterion':'close'};
+const actionIcons={'trash-exam':'trash','confirm-trash-exam':'trash','show-trash':'trash','restore-exam':'undo',backup:'download','export-exam':'download','bank-export':'download',docx:'upload','merge-project':'upload','new-workshop':'plus','new-task':'plus','new-exam':'plus','track-new':'plus',add:'plus','add-asset':'plus','add-criterion':'plus','paper-focus':'check','paper-check':'check','suggest':'idea','preview-candidate':'eye','preview-solution':'eye','invitation':'qr','print-invitation':'file','item-up':'arrowUp','item-down':'arrowDown','item-remove':'close','remove-criterion':'close'};
 function label(action,text,id){let name=action==='bank-layout'?(id==='cards'?'grid':'list'):actionIcons[action];if(!name)return text;const clean=text.replace(/^[+↓↑✦✓▦☷✕]\s*/u,'').replace(/\s*[→↗]$/u,'');return icon(name)+`<span>${clean||({'item-up':'Nach oben','item-down':'Nach unten','item-remove':'Entfernen','remove-criterion':'Entfernen'}[action]||'')}</span>`;}
 const api={icon,label};root.HortiIcons=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(globalThis);
