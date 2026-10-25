@@ -1,4 +1,4 @@
-/* HortiExam portable domain. No DOM, network or storage dependencies. */
+/* Prüfungswerkstatt Gartenbau portable domain. No DOM, network or storage dependencies. */
 (function(root){
 'use strict';
 const SCHEMA=1;
@@ -7,7 +7,7 @@ const Planning=typeof module!=='undefined'&&module.exports?require('./planning.j
 const clone=v=>JSON.parse(JSON.stringify(v));
 const id=prefix=>prefix+'-'+(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
 const now=()=>new Date().toISOString();
-const empty=()=>({schemaVersion:SCHEMA,projectId:id('project'),name:'HortiExam Aufgabenbank',createdAt:now(),families:[],tasks:[],sources:[],assets:[],uses:[],exams:[],patterns:[],workshops:[]});
+const empty=()=>({schemaVersion:SCHEMA,projectId:id('project'),name:'Prüfungswerkstatt Gartenbau Aufgabenbank',createdAt:now(),families:[],tasks:[],sources:[],assets:[],uses:[],exams:[],patterns:[],workshops:[]});
 const canonical=v=>JSON.stringify(v,(_,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const equal=(a,b)=>canonical(a)===canonical(b);
 const collectionNames=['families','tasks','sources','assets','uses','exams','patterns','workshops'];
