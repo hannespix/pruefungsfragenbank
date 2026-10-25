@@ -15,6 +15,7 @@ const number=(v,name)=>{if(v!==null&&v!==undefined&&(!Number.isFinite(v)||v<0))t
 const string=(v,label)=>{if(typeof v!=='string')throw Error('Ungültiges Textfeld: '+label);};
 const strings=(v,label)=>{if(!Array.isArray(v)||v.some(x=>typeof x!=='string'))throw Error('Ungültige Textliste: '+label);};
 const examType=v=>{if(!['AP','ZP'].includes(v))throw Error('Ungültige Prüfungsart.');};
+const SourceLayout=typeof module!=='undefined'&&module.exports?require('./source-layout.js'):root.HortiSourceLayout;
 const checkTask=t=>{
  if(!t||typeof t.title!=='string'||!t.title.trim()||typeof t.text!=='string')throw Error('Aufgabe ohne Titel oder Text.');
  for(const k of ['tags','sourceIds','assetLinks','criteria','flags'])if(!Array.isArray(t[k]))throw Error('Ungültiges Aufgabenfeld: '+k);
@@ -23,6 +24,7 @@ const checkTask=t=>{
  if(t.planningCategoryEvidence!==undefined)string(t.planningCategoryEvidence,'Kategoriebegründung');
  if(t.planningCategories!==undefined){strings(t.planningCategories,'Prüfungskategorien');if(!t.planningCategories.length||new Set(t.planningCategories).size!==t.planningCategories.length||t.planningCategories.some(id=>!Planning.catalog.some(c=>c.id===id)))throw Error('Ungültige Prüfungskategorie.');}
  if(t.timing!==undefined){const x=t.timing;if(!x||!['unknown','explicit','phase-sum','conflict'].includes(x.method)||!Array.isArray(x.phases)||!Array.isArray(x.evidence))throw Error('Ungültige Zeitangaben.');number(x.totalMinutes,'Zeit');for(const p of x.phases){if(!p||typeof p.label!=='string'||!Number.isFinite(p.minutes)||p.minutes<0)throw Error('Ungültige Zeitphase.');number(p.maxMinutes,'Zeitgrenze');}for(const q of x.evidence){if(!q||typeof q.sourceId!=='string'||q.reference!==undefined&&typeof q.reference!=='string')throw Error('Ungültige Zeitquelle.');strings(q.quotes,'Zeitbelege');}}
+ SourceLayout.validate(t);
  number(t.points,'Punkte');number(t.minutes,'Minuten');
  for(const c of t.criteria){if(typeof c.text!=='string'||typeof c.answer!=='string')throw Error('Ungültiges Kriterium.');number(c.points,'Kriteriumspunkte');}
  for(const l of t.assetLinks){if(!l||typeof l.assetId!=='string'||!['candidate','examiner','source'].includes(l.audience)||l.caption!==undefined&&typeof l.caption!=='string')throw Error('Ungültige Anlagenzuordnung.');}
@@ -88,7 +90,7 @@ function merge(local,incoming){
  for(let i=0;i<raw.length;i++){fingerprint=Math.imul(fingerprint^raw.charCodeAt(i),16777619);second=Math.imul(second,33)^raw.charCodeAt(i);}
  const suffix=(fingerprint>>>0).toString(16)+(second>>>0).toString(16);
  const remap=(k,v)=>maps[k][v]||v;
- function fixTask(t){t.id=remap('tasks',t.id);t.familyId=remap('families',t.familyId);t.sourceIds=t.sourceIds.map(v=>remap('sources',v));t.assetLinks.forEach(l=>l.assetId=remap('assets',l.assetId));if(t.previousId)t.previousId=remap('tasks',t.previousId);if(t.supersededBy)t.supersededBy=remap('tasks',t.supersededBy);}
+ function fixTask(t){t.id=remap('tasks',t.id);t.familyId=remap('families',t.familyId);t.sourceIds=t.sourceIds.map(v=>remap('sources',v));t.assetLinks.forEach(l=>l.assetId=remap('assets',l.assetId));if(t.sourceLayout){t.sourceLayout.sourceId=remap('sources',t.sourceLayout.sourceId);t.sourceLayout.pages.forEach(p=>p.backgroundAssetId=remap('assets',p.backgroundAssetId));}if(t.previousId)t.previousId=remap('tasks',t.previousId);if(t.supersededBy)t.supersededBy=remap('tasks',t.supersededBy);}
  function transform(k,original){const x=clone(original);x.id=remap(k,x.id);if(k==='tasks')fixTask(x);if(k==='sources'){if(x.assetId)x.assetId=remap('assets',x.assetId);x.attachmentIds=x.attachmentIds.map(v=>remap('assets',v));}if(k==='exams'){if(x.workshopId)x.workshopId=remap('workshops',x.workshopId);x.items.forEach(i=>{fixTask(i.task);i.originTaskId=remap('tasks',i.originTaskId);});if(maps.exams[original.id]){x.title+=' · Rücklauf';x.importedFrom=original.id;}}if(k==='uses'){x.examId=remap('exams',x.examId);x.taskIds=x.taskIds.map(v=>remap('tasks',v));x.familyIds=x.familyIds.map(v=>remap('families',v));}return x;}
  // Propagate collisions through references until every dependent record has a
  // stable destination. Local records and their snapshots are never rewritten.

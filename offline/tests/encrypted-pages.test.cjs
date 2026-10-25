@@ -40,7 +40,7 @@ test('session-only workshop renders without touching persistent browser storage'
   for(const id of ['#app','#toast','#dialog','#project-input','#docx-input','#asset-input'])elements.set(id,{innerHTML:'',textContent:'',addEventListener(){},classList:{add(){},remove(){}}});
   elements.set('#seed',{textContent:JSON.stringify(seed)});
   elements.set('meta[name=hortiexam-storage]',{content:'memory'});
-  const sandbox={HortiCatalog:require('../src/catalog.js'),HortiHelp:require('../src/help.js'),HortiPaper:require('../src/paper.js'),HortiPlanning:require('../src/planning.js'),HortiIcons:require('../src/icons.js'),HortiCore:require('../src/core.js'),HortiPrint:require('../src/print.js'),structuredClone,console,setTimeout,clearTimeout,
+  const sandbox={HortiCatalog:require('../src/catalog.js'),HortiHelp:require('../src/help.js'),HortiPaper:require('../src/paper.js'),HortiPlanning:require('../src/planning.js'),HortiSourceLayout:require('../src/source-layout.js'),HortiIcons:require('../src/icons.js'),HortiCore:require('../src/core.js'),HortiPrint:require('../src/print.js'),structuredClone,console,setTimeout,clearTimeout,
     window:{addEventListener(){}},document:{querySelector:q=>elements.get(q)||null,querySelectorAll:()=>[],addEventListener(){}},
     indexedDB:{open(){storageTouches++;throw Error('Persistent storage forbidden in Pages test');}}};
   await vm.runInNewContext(fs.readFileSync(path.join(root,'src/app.js'),'utf8'),sandbox);
