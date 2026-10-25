@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "hortiexam-access",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {"ALLOWED_ORIGIN": "https://hannespix.github.io"},
+  "d1_databases": [{"binding":"DB","database_name":"hortiexam-production","database_id":"105c477b-13ba-4a19-8ef1-c7ee08091a65"}],
+  "observability": {"enabled": false}
+}
