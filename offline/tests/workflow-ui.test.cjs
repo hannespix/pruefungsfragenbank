@@ -5,7 +5,7 @@ async function ui(){
  const elements=new Map(),listeners={};
  for(const id of ['#app','#toast','#dialog','#project-input','#docx-input','#asset-input'])elements.set(id,{innerHTML:'',textContent:'',showModal(){this.open=true;},close(){this.open=false;},addEventListener(){},classList:{add(){},remove(){}}});
  elements.set('#seed',{textContent:JSON.stringify(data)});elements.set('meta[name=hortiexam-storage]',{content:'memory'});
- const sandbox={HortiIcons:require('../src/icons.js'),HortiCatalog:require('../src/catalog.js'),HortiHelp:require('../src/help.js'),HortiPaper:require('../src/paper.js'),HortiPlanning:require('../src/planning.js'),HortiCore:require('../src/core.js'),HortiPrint:require('../src/print.js'),console,setTimeout,clearTimeout,
+ const sandbox={HortiSourceLayout:require('../src/source-layout.js'),HortiIcons:require('../src/icons.js'),HortiCatalog:require('../src/catalog.js'),HortiHelp:require('../src/help.js'),HortiPaper:require('../src/paper.js'),HortiPlanning:require('../src/planning.js'),HortiCore:require('../src/core.js'),HortiPrint:require('../src/print.js'),console,setTimeout,clearTimeout,
  window:{addEventListener(){}},document:{querySelector:q=>elements.get(q)||null,querySelectorAll:()=>[],addEventListener:(name,fn)=>listeners[name]=fn}};
  await vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/app.js'),'utf8'),sandbox);
  return {html:()=>elements.get('#app').innerHTML,dialog:()=>elements.get('#dialog'),data,click:async(kind,value,id)=>listeners.click({target:{closest:selector=>selector===`[data-${kind}]`?{dataset:{[kind]:value,id}}:null}})};
