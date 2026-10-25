@@ -87,3 +87,22 @@ Deploy compatible backend changes before merging frontend changes.
 Tests exercise real SQLite transactions and API requests, including revocation,
 expiry, scope, source stripping, conflicts, invalid approvals and large assets.
 Browser UI fixtures contain synthetic demo data only and are not published.
+
+## Point proposals and original-style printing
+
+Missing totals can receive an explicitly provisional 100-point working scale via
+`HortiCore.proposePoints`. Existing totals and known partial scores are preserved;
+proposed criteria fill only the remainder. Source solutions are never generated.
+The private-bank update uses per-record version checks, keeps a before-image and
+leaves used exams unchanged. Editable drafts may receive missing scores without
+changing their task text or solutions.
+
+`assetLinks[].role = "letterhead"` identifies a source logo separately from task
+figures. Candidate-visible letterheads participate in existing scoped asset
+authorization and lazy loading. Only inspected source logos receive this role.
+The shared paper renderer includes the letterhead and name/date boxes. Original
+PDF plans remain separate attachments alongside their inline preview; image
+fitting never guarantees scale. No private assets are bundled in Pages.
+
+Category/tag selection and inserted task buttons navigate the paper stage only.
+The target is highlighted; reduced-motion preferences disable smooth animation.
