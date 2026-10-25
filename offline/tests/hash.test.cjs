@@ -1,0 +1,2 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const {createHash}=require('node:crypto');const H=require('../src/hash.js');
+test('portable SHA-256 matches known vectors including multi-block binary',()=>{for(const b of [Buffer.from(''),Buffer.from('abc'),Buffer.alloc(1000,0xff),Buffer.from(Array.from({length:4097},(_,i)=>i%256))])assert.equal(H(b),createHash('sha256').update(b).digest('hex'));});

@@ -54,3 +54,12 @@ __pycache__/
 
 # Uploads
 uploads/
+
+# Confidential offline projects and generated exam material
+*.pruefbank.json
+private-data/
+private-build/
+*.doc
+*.docx
+*.pdf
+*.zip
