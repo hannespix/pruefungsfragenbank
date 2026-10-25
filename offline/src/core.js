@@ -22,6 +22,7 @@ const checkTask=t=>{
  for(const k of ['specialty','category','solution'])string(t[k],k);for(const k of ['tags','sourceIds','flags'])strings(t[k],k);examType(t.examType);if(!['review','approved'].includes(t.reviewStatus))throw Error('Ungültiger Prüfstatus.');if(t.kind!==undefined&&!['practical','oral','other'].includes(t.kind))throw Error('Ungültiger Aufgabenbestandsteil.');
  if(t.planningCategoryEvidence!==undefined)string(t.planningCategoryEvidence,'Kategoriebegründung');
  if(t.planningCategories!==undefined){strings(t.planningCategories,'Prüfungskategorien');if(!t.planningCategories.length||new Set(t.planningCategories).size!==t.planningCategories.length||t.planningCategories.some(id=>!Planning.catalog.some(c=>c.id===id)))throw Error('Ungültige Prüfungskategorie.');}
+ if(t.timing!==undefined){const x=t.timing;if(!x||!['unknown','explicit','phase-sum','conflict'].includes(x.method)||!Array.isArray(x.phases)||!Array.isArray(x.evidence))throw Error('Ungültige Zeitangaben.');number(x.totalMinutes,'Zeit');for(const p of x.phases){if(!p||typeof p.label!=='string'||!Number.isFinite(p.minutes)||p.minutes<0)throw Error('Ungültige Zeitphase.');number(p.maxMinutes,'Zeitgrenze');}for(const q of x.evidence){if(!q||typeof q.sourceId!=='string'||q.reference!==undefined&&typeof q.reference!=='string')throw Error('Ungültige Zeitquelle.');strings(q.quotes,'Zeitbelege');}}
  number(t.points,'Punkte');number(t.minutes,'Minuten');
  for(const c of t.criteria){if(typeof c.text!=='string'||typeof c.answer!=='string')throw Error('Ungültiges Kriterium.');number(c.points,'Kriteriumspunkte');}
  for(const l of t.assetLinks){if(!l||typeof l.assetId!=='string'||!['candidate','examiner','source'].includes(l.audience)||l.caption!==undefined&&typeof l.caption!=='string')throw Error('Ungültige Anlagenzuordnung.');}
@@ -96,6 +97,31 @@ function merge(local,incoming){
  validate(result);return {db:result,conflicts};
 }
 function subset(d,specialty){const p={...empty(),name:'Arbeitsgruppe '+specialty};p.tasks=clone(d.tasks.filter(t=>t.specialty===specialty));const fs=new Set(p.tasks.map(t=>t.familyId)),ss=new Set(p.tasks.flatMap(t=>t.sourceIds));p.families=clone(d.families.filter(f=>fs.has(f.id)));p.sources=clone(d.sources.filter(s=>ss.has(s.id)));const as=new Set([...p.tasks.flatMap(t=>t.assetLinks.map(l=>l.assetId)),...p.sources.flatMap(s=>[s.assetId,...s.attachmentIds])]);p.assets=clone(d.assets.filter(a=>as.has(a.id)));return validate(p);}
-const api={proposePoints,pointsLabel,SCHEMA,specialties,checkWorkshop,checkExamWorkshop,saveWorkshop,workshopExams,clone,id,now,empty,equal,validate,newExam,addItem,revise,totals,readiness,validDate,recordUse,merge,subset,checkTask};
+
+// Import evidence only: isolated phase times never imply a complete task duration.
+function extractTiming(text){
+ const lines=String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean),phases=[],evidence=[];
+ const add=(label,minutes,quote,maxMinutes)=>{if(phases.some(p=>p.label===label))return;phases.push({label,minutes,...(maxMinutes?{maxMinutes}:{})});evidence.push(quote);};
+ let totalMinutes=null,method='unknown';
+ for(const [index,line] of lines.entries()){
+  let m=line.match(/(?:Zeitablauf|Zeitvorgabe|\bZeit|Dauer|[Ii]nsgesamt)\s*:?\s*\(?(\d+)\s*(?:Min|min)/);
+  if(!m&&index<9&&!/Planung|Vorbereit|Durchführ|Reflekt|Reflex|Eigenref|Mündliche Prüfung \(|Aufgabe .*\(\d+ Min\./i.test(line))m=line.match(/\((\d+)\s*(?:Minuten|Min\.)\)/);
+  if(m&&totalMinutes===null){totalMinutes=Number(m[1]);method='explicit';evidence.push(line);}
+  m=line.match(/Richtzeit sind (\d+) Minuten, max\. (\d+) Minuten/i);if(m)add('Planungsphase (Richtzeit)',+m[1],line,+m[2]);
+  m=line.match(/(?:Planungszeit|Planungsphase)[^\d\n]*(\d+)\s*Min/i)||line.match(/Planung haben Sie\s*(\d+)\s*Minuten Zeit/i)||line.match(/Sie haben\s*(\d+)\s*Minuten Zeit für die Planung/i)||line.match(/davon\s*(\d+)\s*Minuten Vorbereitungszeit/i);
+  if(m)add('Planung / Vorbereitung',+m[1],line);
+  m=line.match(/(?:Beschreiben|Nennen) Sie unten in (\d+) Minuten/i);if(m)add('Schriftliche Vorbereitung',+m[1],line);
+  m=line.match(/Durchführ(?:ung|ungszeit)[^\d\n]*(\d+)\s*Min/i)||line.match(/^\d*\.?\s*Aufgaben?[^\n]*\((\d+)\s*Min[.,)]/i)||line.match(/Für die Aufgaben .* haben Sie (\d+) Minuten Zeit/i);
+  if(m)add(/Mündliche/.test(line)?'Prüfgespräch':'Durchführung',+m[1],line);
+  m=line.match(/(?:Reflektionszeit|Reflexionszeit|Reflektionsgespräch|Reflexionsgespräch|Eigenreflexion|Eigenreflektion)[^\d\n]*(\d+)\s*Min/i);if(m)add('Reflexion',+m[1],line);
+  m=line.match(/(?:Prüfgespräch dauert|verbleibenden)\s*(\d+)\s*Minuten/i);if(m)add('Prüfgespräch',+m[1],line);
+ }
+ const labels=phases.map(p=>p.label),complete=labels.includes('Durchführung')&&labels.includes('Reflexion')||labels.includes('Prüfgespräch')&&(labels.includes('Planung / Vorbereitung')||labels.includes('Durchführung'));
+ if(totalMinutes===null&&complete){totalMinutes=phases.reduce((n,p)=>n+p.minutes,0);method='phase-sum';}
+ return {totalMinutes,method,phases,evidence:[...new Set(evidence)]};
+}
+function durationSummary(t){return t.unknownMinutes?(t.minutes?`Bearbeitungszeit: ${t.minutes} Minuten bekannt · ${t.unknownMinutes} Aufgaben noch offen`:'Bearbeitungszeit noch festzulegen'):`Bearbeitungszeit gesamt: ${t.minutes} Minuten`;}
+
+const api={extractTiming,durationSummary,proposePoints,pointsLabel,SCHEMA,specialties,checkWorkshop,checkExamWorkshop,saveWorkshop,workshopExams,clone,id,now,empty,equal,validate,newExam,addItem,revise,totals,readiness,validDate,recordUse,merge,subset,checkTask};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;root.HortiCore=api;
 })(globalThis);
