@@ -2,14 +2,15 @@
 (function(root){
 'use strict';
 const SCHEMA=1;
+const specialties=['Baumschule','Friedhofsgärtnerei','Garten- und Landschaftsbau','Gemüsebau','Obstbau','Staudengärtnerei','Zierpflanzenbau'];
 const Planning=typeof module!=='undefined'&&module.exports?require('./planning.js'):root.HortiPlanning;
 const clone=v=>JSON.parse(JSON.stringify(v));
 const id=prefix=>prefix+'-'+(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
 const now=()=>new Date().toISOString();
-const empty=()=>({schemaVersion:SCHEMA,projectId:id('project'),name:'HortiExam Aufgabenbank',createdAt:now(),families:[],tasks:[],sources:[],assets:[],uses:[],exams:[],patterns:[]});
+const empty=()=>({schemaVersion:SCHEMA,projectId:id('project'),name:'HortiExam Aufgabenbank',createdAt:now(),families:[],tasks:[],sources:[],assets:[],uses:[],exams:[],patterns:[],workshops:[]});
 const canonical=v=>JSON.stringify(v,(_,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const equal=(a,b)=>canonical(a)===canonical(b);
-const collectionNames=['families','tasks','sources','assets','uses','exams','patterns'];
+const collectionNames=['families','tasks','sources','assets','uses','exams','patterns','workshops'];
 const number=(v,name)=>{if(v!==null&&v!==undefined&&(!Number.isFinite(v)||v<0))throw Error(name+' muss eine nichtnegative Zahl oder unbekannt sein.');};
 const string=(v,label)=>{if(typeof v!=='string')throw Error('Ungültiges Textfeld: '+label);};
 const strings=(v,label)=>{if(!Array.isArray(v)||v.some(x=>typeof x!=='string'))throw Error('Ungültige Textliste: '+label);};
@@ -27,7 +28,7 @@ const checkTask=t=>{
 };
 function validate(d){
  if(!d||d.schemaVersion!==SCHEMA)throw Error('Nicht unterstütztes Datenformat / Schema-Version. Bestand bleibt unverändert.');
- d.patterns??=[];
+ d.patterns??=[];d.workshops??=[];
  for(const k of collectionNames){if(!Array.isArray(d[k]))throw Error('Fehlende Sammlung: '+k);const seen=new Set();for(const x of d[k]){if(!x||typeof x.id!=='string'||!x.id||seen.has(x.id))throw Error('Ungültige oder doppelte ID in '+k);seen.add(x.id);}}
  string(d.name,'Projektname');string(d.projectId,'Projektkennung');
  d.families.forEach(f=>{string(f.title,'Familientitel');});
@@ -37,11 +38,25 @@ function validate(d){
  d.tasks.forEach(links);d.patterns.forEach(Planning.checkPattern);const patternScopes=new Set();for(const p of d.patterns){const key=JSON.stringify([p.examType,p.specialty]);if(patternScopes.has(key))throw Error('Mehrere Prüfungsmuster für denselben Prüfungsbereich.');patternScopes.add(key);}
  d.sources.forEach(s=>{for(const k of ['name','specialty','role','text'])string(s[k],k);if(s.flags!==undefined)strings(s.flags,'Quellenhinweise');if(s.year!=null&&(!Number.isInteger(s.year)||s.year<1900||s.year>2200))throw Error('Ungültiges Quelljahr.');examType(s.examType);if(s.assetId)ref('assets',s.assetId);if(!Array.isArray(s.attachmentIds))throw Error('Ungültige Quellenanlagen.');s.attachmentIds.forEach(x=>ref('assets',x));});
  d.assets.forEach(a=>{if(typeof a.data!=='string'||typeof a.mime!=='string'||typeof a.name!=='string'||!/^[-\w.+]+\/[-\w.+]+$/.test(a.mime)||!/^[A-Za-z0-9+/=\s]*$/.test(a.data))throw Error('Ungültige Anlagendaten.');});
- d.exams.forEach(e=>{examType(e.examType);for(const k of ['specialty','date','notes'])string(e[k],k);if(e.pattern)Planning.checkPattern(e.pattern);if(typeof e.title!=='string'||!Array.isArray(e.items))throw Error('Ungültige Prüfung.');const seen=new Set();e.items.forEach(i=>{if(!i.id||seen.has(i.id))throw Error('Doppelte Prüfungsposition.');seen.add(i.id);if(typeof i.originTaskId!=='string')throw Error('Fehlende Aufgabenherkunft.');links(i.task);});});
+ d.workshops.forEach(checkWorkshop);
+ d.exams.forEach(e=>{checkExamWorkshop(d,e);examType(e.examType);for(const k of ['specialty','date','notes'])string(e[k],k);if(e.pattern)Planning.checkPattern(e.pattern);if(typeof e.title!=='string'||!Array.isArray(e.items))throw Error('Ungültige Prüfung.');const seen=new Set();e.items.forEach(i=>{if(!i.id||seen.has(i.id))throw Error('Doppelte Prüfungsposition.');seen.add(i.id);if(typeof i.originTaskId!=='string')throw Error('Fehlende Aufgabenherkunft.');links(i.task);});});
  d.uses.forEach(u=>{ref('exams',u.examId);strings(u.taskIds,'Einsatzaufgaben');strings(u.familyIds,'Einsatzfamilien');if(!validDate(u.date))throw Error('Ungültiger Einsatztermin.');});
  return d;
 }
-function newExam(fields={}){return {id:id('exam'),title:fields.title||'Neue praktische Prüfung',examType:fields.examType||'ZP',specialty:fields.specialty||'',date:fields.date||'',notes:'',status:'draft',createdAt:now(),updatedAt:now(),items:[],...(fields.pattern?{pattern:clone(fields.pattern)}:{})};}
+function checkWorkshop(w){
+ if(!w||typeof w.id!=='string'||!w.id||typeof w.title!=='string'||!w.title.trim())throw Error('Bitte einen Namen für den Vorbereitungstermin eingeben.');
+ if(!Number.isInteger(w.examYear)||w.examYear<1900||w.examYear>2200)throw Error('Bitte ein gültiges Prüfungsjahr eingeben (1900–2200).');
+ if(typeof w.meetingDate!=='string'||w.meetingDate&&!validDate(w.meetingDate))throw Error('Ungültiges Datum für den Vorbereitungstermin.');
+ if(!Array.isArray(w.specialties)||!w.specialties.length||new Set(w.specialties).size!==w.specialties.length||w.specialties.some(s=>!specialties.includes(s)))throw Error('Bitte gültige Fachrichtungsgruppen wählen.');
+}
+function checkExamWorkshop(d,e){
+ if(e.examYear!==undefined&&(!Number.isInteger(e.examYear)||e.examYear<1900||e.examYear>2200))throw Error('Ungültiges Prüfungsjahr.');
+ if(e.examYear!==undefined&&e.date&&(!validDate(e.date)||Number(e.date.slice(0,4))!==e.examYear))throw Error('Prüfungstermin und Prüfungsjahr müssen übereinstimmen.');
+ if(e.workshopId!==undefined){const w=d.workshops.find(w=>w.id===e.workshopId);if(!w)throw Error('Vorbereitungstermin der Prüfung fehlt.');if(e.examYear!==w.examYear||!w.specialties.includes(e.specialty))throw Error('Prüfungsjahr und Fachrichtung müssen zum Vorbereitungstermin passen. Bestehende Prüfungen zuerst zuordnen.');}
+}
+function saveWorkshop(d,w){checkWorkshop(w);const next=d.workshops.filter(x=>x.id!==w.id).concat(w);for(const e of d.exams)checkExamWorkshop({...d,workshops:next},e);d.workshops=next;return w;}
+function workshopExams(d,workshopId,specialty){return d.exams.filter(e=>e.workshopId===workshopId&&(!specialty||e.specialty===specialty));}
+function newExam(fields={}){return {id:id('exam'),title:fields.title||'Neue praktische Prüfung',examType:fields.examType||'ZP',specialty:fields.specialty||'',date:fields.date||'',notes:'',status:'draft',createdAt:now(),updatedAt:now(),items:[],...(fields.examYear!==undefined?{examYear:fields.examYear}:{}),...(fields.workshopId?{workshopId:fields.workshopId}:{}),...(fields.pattern?{pattern:clone(fields.pattern)}:{})};}
 function addItem(e,t){checkTask(t);const item={id:id('item'),originTaskId:t.id,task:clone(t)};e.items.push(item);e.updatedAt=now();return item;}
 function revise(d,taskId,patch){const old=d.tasks.find(t=>t.id===taskId);if(!old)throw Error('Aufgabe nicht gefunden.');const next={...clone(old),...clone(patch),id:id('task'),previousId:old.id,createdAt:now()};delete next.supersededBy;
  if(old.solutionStatus==='approved'&&['text','points','criteria','assetLinks'].some(k=>k in patch&&!equal(patch[k],old[k])))next.solutionStatus=next.solution?.trim()?'draft':'missing';
@@ -59,7 +74,7 @@ function merge(local,incoming){
  const suffix=(fingerprint>>>0).toString(16)+(second>>>0).toString(16);
  const remap=(k,v)=>maps[k][v]||v;
  function fixTask(t){t.id=remap('tasks',t.id);t.familyId=remap('families',t.familyId);t.sourceIds=t.sourceIds.map(v=>remap('sources',v));t.assetLinks.forEach(l=>l.assetId=remap('assets',l.assetId));if(t.previousId)t.previousId=remap('tasks',t.previousId);if(t.supersededBy)t.supersededBy=remap('tasks',t.supersededBy);}
- function transform(k,original){const x=clone(original);x.id=remap(k,x.id);if(k==='tasks')fixTask(x);if(k==='sources'){if(x.assetId)x.assetId=remap('assets',x.assetId);x.attachmentIds=x.attachmentIds.map(v=>remap('assets',v));}if(k==='exams'){x.items.forEach(i=>{fixTask(i.task);i.originTaskId=remap('tasks',i.originTaskId);});if(maps.exams[original.id]){x.title+=' · Rücklauf';x.importedFrom=original.id;}}if(k==='uses'){x.examId=remap('exams',x.examId);x.taskIds=x.taskIds.map(v=>remap('tasks',v));x.familyIds=x.familyIds.map(v=>remap('families',v));}return x;}
+ function transform(k,original){const x=clone(original);x.id=remap(k,x.id);if(k==='tasks')fixTask(x);if(k==='sources'){if(x.assetId)x.assetId=remap('assets',x.assetId);x.attachmentIds=x.attachmentIds.map(v=>remap('assets',v));}if(k==='exams'){if(x.workshopId)x.workshopId=remap('workshops',x.workshopId);x.items.forEach(i=>{fixTask(i.task);i.originTaskId=remap('tasks',i.originTaskId);});if(maps.exams[original.id]){x.title+=' · Rücklauf';x.importedFrom=original.id;}}if(k==='uses'){x.examId=remap('exams',x.examId);x.taskIds=x.taskIds.map(v=>remap('tasks',v));x.familyIds=x.familyIds.map(v=>remap('families',v));}return x;}
  // Propagate collisions through references until every dependent record has a
  // stable destination. Local records and their snapshots are never rewritten.
  let added;do{added=false;for(const k of collectionNames)for(const x of incoming[k]){if(maps[k][x.id])continue;const old=local[k].find(y=>y.id===x.id);if(old&&!equal(old,transform(k,x))){maps[k][x.id]=x.id+'~'+suffix;conflicts.push({kind:k,id:x.id,newId:maps[k][x.id]});added=true;}}}while(added);
@@ -67,6 +82,6 @@ function merge(local,incoming){
  validate(result);return {db:result,conflicts};
 }
 function subset(d,specialty){const p={...empty(),name:'Arbeitsgruppe '+specialty};p.tasks=clone(d.tasks.filter(t=>t.specialty===specialty));const fs=new Set(p.tasks.map(t=>t.familyId)),ss=new Set(p.tasks.flatMap(t=>t.sourceIds));p.families=clone(d.families.filter(f=>fs.has(f.id)));p.sources=clone(d.sources.filter(s=>ss.has(s.id)));const as=new Set([...p.tasks.flatMap(t=>t.assetLinks.map(l=>l.assetId)),...p.sources.flatMap(s=>[s.assetId,...s.attachmentIds])]);p.assets=clone(d.assets.filter(a=>as.has(a.id)));return validate(p);}
-const api={SCHEMA,clone,id,now,empty,equal,validate,newExam,addItem,revise,totals,readiness,validDate,recordUse,merge,subset,checkTask};
+const api={SCHEMA,specialties,checkWorkshop,checkExamWorkshop,saveWorkshop,workshopExams,clone,id,now,empty,equal,validate,newExam,addItem,revise,totals,readiness,validDate,recordUse,merge,subset,checkTask};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;root.HortiCore=api;
 })(globalThis);

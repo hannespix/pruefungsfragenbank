@@ -65,3 +65,23 @@ Die vorhandene Flask-/SQLite-Datenbank wird durch diesen Prototyp nicht verände
 Node-Tests prüfen Snapshot-Isolation, Revisionen, Importvalidierung, idempotente Rückläufe und abhängige Referenzen, Datumstrennung, Punkte, Kandidaten-/Lösungstrennung und gleichnamige Anlagen. Zusätzlich manuelle Browserprüfung von Bank, Filtern, Bearbeitung und Vorschau. Browser-QA erfolgt mit synthetischen Daten und anschließend mit dem privaten Bestand; dieser wird nicht veröffentlicht.
 
 JSZip 3.10.1 ist lokal gebündelt; Lizenz unter `vendor/JSZip-LICENSE.md`.
+
+## Einstieg für die zuständige Stelle
+
+Nach dem Öffnen erscheint die Leitungsübersicht. „Termin vorbereiten“ legt einen
+Vorbereitungstermin mit Prüfungsjahr und Fachrichtungsgruppen an. Jede Gruppe hat
+zwei getrennte Bereiche für Zwischen- und Abschlussprüfungen; mehrere Entwürfe je
+Prüfungsart sind möglich. „Prüfungen & Ergebnisse“ zeigt auch ältere, noch keinem
+Vorbereitungstermin zugeordnete Prüfungen. Diese können über „Prüfungsdaten
+bearbeiten“ zugeordnet werden, sofern Fachrichtung und Prüfungsjahr passen.
+
+Vorbereitungstermin und tatsächlicher Prüfungstermin sind getrennte Angaben.
+Meeting-Metadaten (`workshops`) und Prüfungsverweise (`workshopId`, `examYear`)
+sind additive Felder des Projektformats. Alte Projekte bleiben lesbar. Konflikte
+beim Import erhalten beide Fassungen einschließlich ihrer Verweise.
+
+„Gruppen & Einladungen“ zeigt den geplanten Zugangsort, erzeugt aber keine
+funktionsfähigen Einladungen: Der serverseitige Anmeldedienst ist noch nicht
+angeschlossen. Der aktuelle Gruppenbereich ist die Bearbeitungsansicht der
+zuständigen Stelle, keine Prüferrolle. Gemeinsames Speichern, temporäre
+QR-/URL-Zugänge und serverseitige Exportrechte sind noch nicht verfügbar.

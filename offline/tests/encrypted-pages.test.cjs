@@ -46,7 +46,7 @@ test('session-only workshop renders without touching persistent browser storage'
   await vm.runInNewContext(fs.readFileSync(path.join(root,'src/app.js'),'utf8'),sandbox);
   assert.equal(storageTouches,0);
   assert.ok(elements.get('#app').innerHTML.includes('Nur diese Sitzung'));
-  assert.ok(elements.get('#app').innerHTML.includes('Aufgabenbank'));
+  assert.ok(elements.get('#app').innerHTML.includes('Termin vorbereiten'));
 });
 
 test('Pages build rejects extra plaintext files in the sealed input directory',()=>{
