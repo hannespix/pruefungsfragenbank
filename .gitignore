@@ -67,3 +67,8 @@ private-build/
 # Encrypted Pages build and local key material
 pages-dist/
 *.password.txt
+/online/node_modules/
+/online/dist/
+/online/.wrangler/
+/online/.dev.vars*
+/online/worker-configuration.d.ts
