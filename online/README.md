@@ -28,7 +28,10 @@ change bank records/patterns, download originals or invoke coordinator exports.
 
 The **Fragenbank** offers combined filters, cards/table views and selected-task
 CSV, JSON or printable ZIP exports for coordinators. These filtered exports are
-not full-project backups. The **Prüfungsblatt** editor uses the same A4 template
+not full-project backups. The focused **Prüfungsblatt** workspace opens a new scoped draft in one click.
+Categories/tasks stay on the left and the editable sheet on the right. Context
+help, tags, related alternatives and advanced options use expandable controls.
+The editor uses the same A4 template
 as preview/export; edits affect exam snapshots and reset review approval.
 **Hilfe & Sicherheit** explains storage, processing, access and limits in German
 and is available before sign-in.
