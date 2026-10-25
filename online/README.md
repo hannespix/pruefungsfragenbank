@@ -33,6 +33,12 @@ as preview/export; edits affect exam snapshots and reset review approval.
 **Hilfe & Sicherheit** explains storage, processing, access and limits in German
 and is available before sign-in.
 
+Attachments load on demand after the workspace opens. Visible image placeholders
+load asynchronously with at most four requests and shared in-flight requests.
+Bytes stay in tab memory and are reused across metadata refreshes; reload clears
+them. Preview/export/backup explicitly await the required bytes and fail on missing
+payloads. Logout discards caches and rejects late results.
+
 ## Security boundaries
 
 - Bearer tokens are 256-bit random values. The browser keeps only the token and
