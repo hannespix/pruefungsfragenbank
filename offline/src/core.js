@@ -42,7 +42,7 @@ function validate(d){
  d.sources.forEach(s=>{for(const k of ['name','specialty','role','text'])string(s[k],k);if(s.flags!==undefined)strings(s.flags,'Quellenhinweise');if(s.year!=null&&(!Number.isInteger(s.year)||s.year<1900||s.year>2200))throw Error('Ungültiges Quelljahr.');examType(s.examType);if(s.assetId)ref('assets',s.assetId);if(!Array.isArray(s.attachmentIds))throw Error('Ungültige Quellenanlagen.');s.attachmentIds.forEach(x=>ref('assets',x));});
  d.assets.forEach(a=>{if(typeof a.data!=='string'||typeof a.mime!=='string'||typeof a.name!=='string'||!/^[-\w.+]+\/[-\w.+]+$/.test(a.mime)||!/^[A-Za-z0-9+/=\s]*$/.test(a.data))throw Error('Ungültige Anlagendaten.');});
  d.workshops.forEach(checkWorkshop);
- d.exams.forEach(e=>{checkExamWorkshop(d,e);examType(e.examType);for(const k of ['specialty','date','notes'])string(e[k],k);if(e.pattern)Planning.checkPattern(e.pattern);if(typeof e.title!=='string'||!Array.isArray(e.items))throw Error('Ungültige Prüfung.');const seen=new Set();e.items.forEach(i=>{if(!i.id||seen.has(i.id))throw Error('Doppelte Prüfungsposition.');seen.add(i.id);if(typeof i.originTaskId!=='string')throw Error('Fehlende Aufgabenherkunft.');links(i.task);});});
+ d.exams.forEach(e=>{if(e.deletedAt!==undefined&&(typeof e.deletedAt!=='string'||!Number.isFinite(Date.parse(e.deletedAt))||e.status==='used'||d.uses.some(u=>u.examId===e.id)))throw Error('Ungültiger Papierkorb-Eintrag oder dokumentierter Einsatz.');checkExamWorkshop(d,e);examType(e.examType);for(const k of ['specialty','date','notes'])string(e[k],k);if(e.pattern)Planning.checkPattern(e.pattern);if(typeof e.title!=='string'||!Array.isArray(e.items))throw Error('Ungültige Prüfung.');const seen=new Set();e.items.forEach(i=>{if(!i.id||seen.has(i.id))throw Error('Doppelte Prüfungsposition.');seen.add(i.id);if(typeof i.originTaskId!=='string')throw Error('Fehlende Aufgabenherkunft.');links(i.task);});});
  d.uses.forEach(u=>{ref('exams',u.examId);strings(u.taskIds,'Einsatzaufgaben');strings(u.familyIds,'Einsatzfamilien');if(!validDate(u.date))throw Error('Ungültiger Einsatztermin.');});
  return d;
 }
@@ -58,7 +58,9 @@ function checkExamWorkshop(d,e){
  if(e.workshopId!==undefined){const w=d.workshops.find(w=>w.id===e.workshopId);if(!w)throw Error('Vorbereitungstermin der Prüfung fehlt.');if(e.examYear!==w.examYear||!w.specialties.includes(e.specialty))throw Error('Prüfungsjahr und Fachrichtung müssen zum Vorbereitungstermin passen. Bestehende Prüfungen zuerst zuordnen.');}
 }
 function saveWorkshop(d,w){checkWorkshop(w);const next=d.workshops.filter(x=>x.id!==w.id).concat(w);for(const e of d.exams)checkExamWorkshop({...d,workshops:next},e);d.workshops=next;return w;}
-function workshopExams(d,workshopId,specialty){return d.exams.filter(e=>e.workshopId===workshopId&&(!specialty||e.specialty===specialty));}
+function workshopExams(d,workshopId,specialty){return d.exams.filter(e=>!e.deletedAt&&e.workshopId===workshopId&&(!specialty||e.specialty===specialty));}
+function trashExam(d,id){const e=d.exams.find(x=>x.id===id);if(!e)throw Error('Prüfung fehlt.');if(e.status==='used'||d.uses.some(u=>u.examId===id))throw Error('Bereits eingesetzte Prüfungen bleiben für die Einsatzhistorie erhalten.');e.deletedAt=e.updatedAt=now();return e;}
+function restoreExam(d,id){const e=d.exams.find(x=>x.id===id);if(!e?.deletedAt)throw Error('Prüfung ist nicht im Papierkorb.');delete e.deletedAt;e.updatedAt=now();return e;}
 function newExam(fields={}){return {id:id('exam'),title:fields.title||'Neue praktische Prüfung',examType:fields.examType||'ZP',specialty:fields.specialty||'',date:fields.date||'',notes:'',status:'draft',createdAt:now(),updatedAt:now(),items:[],...(fields.examYear!==undefined?{examYear:fields.examYear}:{}),...(fields.workshopId?{workshopId:fields.workshopId}:{}),...(fields.pattern?{pattern:clone(fields.pattern)}:{})};}
 function addItem(e,t){checkTask(t);const item={id:id('item'),originTaskId:t.id,task:clone(t)};e.items.push(item);e.updatedAt=now();return item;}
 function revise(d,taskId,patch){const old=d.tasks.find(t=>t.id===taskId);if(!old)throw Error('Aufgabe nicht gefunden.');const next={...clone(old),...clone(patch),id:id('task'),previousId:old.id,createdAt:now()};delete next.supersededBy;
@@ -124,6 +126,6 @@ function extractTiming(text){
 }
 function durationSummary(t){return t.unknownMinutes?(t.minutes?`Bearbeitungszeit: ${t.minutes} Minuten bekannt · ${t.unknownMinutes} Aufgaben noch offen`:'Bearbeitungszeit noch festzulegen'):`Bearbeitungszeit gesamt: ${t.minutes} Minuten`;}
 
-const api={extractTiming,durationSummary,proposePoints,pointsLabel,SCHEMA,specialties,checkWorkshop,checkExamWorkshop,saveWorkshop,workshopExams,clone,id,now,empty,equal,validate,newExam,addItem,revise,totals,readiness,validDate,recordUse,merge,subset,checkTask};
+const api={trashExam,restoreExam,extractTiming,durationSummary,proposePoints,pointsLabel,SCHEMA,specialties,checkWorkshop,checkExamWorkshop,saveWorkshop,workshopExams,clone,id,now,empty,equal,validate,newExam,addItem,revise,totals,readiness,validDate,recordUse,merge,subset,checkTask};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;root.HortiCore=api;
 })(globalThis);
