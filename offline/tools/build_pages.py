@@ -9,8 +9,8 @@ m=json.loads((args.sealed/'manifest.json').read_text())
 expected={'manifest.json',*m['chunks']}
 if m.get('version')!=1 or not m['chunks'] or len(m['chunks'])>256 or m['chunks']!=[f'part-{i:03}.bin' for i in range(len(m['chunks']))] or {f.name for f in args.sealed.iterdir()}!=expected:raise SystemExit('Unexpected sealed package files.')
 html=(ROOT/'src/index.html').read_text().replace('<head>','<head><meta name="hortiexam-storage" content="memory">',1)
-replacements={'CSS':(ROOT/'src/style.css').read_text(),'SEED':'/*PRIVATE_SEED*/','VENDOR':(ROOT/'vendor/jszip.min.js').read_text()+'\n'+(ROOT/'vendor/docx.umd.min.js').read_text()}
-for name in ['SOURCE-LAYOUT','ICONS','PLANNING','CORE','PRINT','CATALOG','PAPER','DOCX-ASSETS','DOCX','HELP','HASH','IMPORT','APP']:replacements[name]=(ROOT/'src'/f'{name.lower()}.js').read_text()
+replacements={'CSS':(ROOT/'src/style.css').read_text(),'SEED':'/*PRIVATE_SEED*/','VENDOR':(ROOT/'vendor/jszip.min.js').read_text()+'\n'+(ROOT/'vendor/docx.umd.min.js').read_text()+'\n'+(ROOT/'vendor/pdf-lib.min.js').read_text()}
+for name in ['SOURCE-LAYOUT','ICONS','PLANNING','CORE','PRINT','CATALOG','PAPER','DOCX-ASSETS','DOCX','ARCHIVE','HELP','HASH','IMPORT','APP']:replacements[name]=(ROOT/'src'/f'{name.lower()}.js').read_text()
 for key,value in replacements.items():html=html.replace('/*'+key+'*/',value)
 wrapper=(ROOT/'pages/index.html').read_text()
 wrapper=wrapper.replace('/*TEMPLATE*/',json.dumps(html,ensure_ascii=False).replace('<','\\u003c')).replace('/*CRYPTO*/',(ROOT/'pages/crypto.js').read_text()).replace('/*LAUNCHER*/',(ROOT/'pages/launcher.js').read_text())
