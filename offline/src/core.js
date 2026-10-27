@@ -60,6 +60,7 @@ function checkExamWorkshop(d,e){
 function saveWorkshop(d,w){checkWorkshop(w);const next=d.workshops.filter(x=>x.id!==w.id).concat(w);for(const e of d.exams)checkExamWorkshop({...d,workshops:next},e);d.workshops=next;return w;}
 function workshopExams(d,workshopId,specialty){return d.exams.filter(e=>!e.deletedAt&&e.workshopId===workshopId&&(!specialty||e.specialty===specialty));}
 function trashExam(d,id){const e=d.exams.find(x=>x.id===id);if(!e)throw Error('Prüfung fehlt.');if(e.status==='used'||d.uses.some(u=>u.examId===id))throw Error('Bereits eingesetzte Prüfungen bleiben für die Einsatzhistorie erhalten.');e.deletedAt=e.updatedAt=now();return e;}
+function purgeExam(d,id){const e=d.exams.find(x=>x.id===id);if(!e?.deletedAt)throw Error('Prüfung ist nicht im Papierkorb.');if(e.status==='used'||d.uses.some(u=>u.examId===id))throw Error('Bereits eingesetzte Prüfungen bleiben für die Einsatzhistorie erhalten.');d.exams=d.exams.filter(x=>x.id!==id);}
 function restoreExam(d,id){const e=d.exams.find(x=>x.id===id);if(!e?.deletedAt)throw Error('Prüfung ist nicht im Papierkorb.');delete e.deletedAt;e.updatedAt=now();return e;}
 function newExam(fields={}){return {id:id('exam'),title:fields.title||'Neue praktische Prüfung',examType:fields.examType||'ZP',specialty:fields.specialty||'',date:fields.date||'',notes:'',status:'draft',createdAt:now(),updatedAt:now(),items:[],...(fields.examYear!==undefined?{examYear:fields.examYear}:{}),...(fields.workshopId?{workshopId:fields.workshopId}:{}),...(fields.pattern?{pattern:clone(fields.pattern)}:{})};}
 function addItem(e,t){checkTask(t);const item={id:id('item'),originTaskId:t.id,task:clone(t)};e.items.push(item);e.updatedAt=now();return item;}
@@ -126,6 +127,6 @@ function extractTiming(text){
 }
 function durationSummary(t){return t.unknownMinutes?(t.minutes?`Bearbeitungszeit: ${t.minutes} Minuten bekannt · ${t.unknownMinutes} Aufgaben noch offen`:'Bearbeitungszeit noch festzulegen'):`Bearbeitungszeit gesamt: ${t.minutes} Minuten`;}
 
-const api={trashExam,restoreExam,extractTiming,durationSummary,proposePoints,pointsLabel,SCHEMA,specialties,checkWorkshop,checkExamWorkshop,saveWorkshop,workshopExams,clone,id,now,empty,equal,validate,newExam,addItem,revise,totals,readiness,validDate,recordUse,merge,subset,checkTask};
+const api={trashExam,restoreExam,purgeExam,extractTiming,durationSummary,proposePoints,pointsLabel,SCHEMA,specialties,checkWorkshop,checkExamWorkshop,saveWorkshop,workshopExams,clone,id,now,empty,equal,validate,newExam,addItem,revise,totals,readiness,validDate,recordUse,merge,subset,checkTask};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;root.HortiCore=api;
 })(globalThis);
