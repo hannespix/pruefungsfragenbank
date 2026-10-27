@@ -24,7 +24,7 @@ const catalog=[
  ['sowing','Ansaatflächen vorbereiten & ansäen',/flächen für ansaaten vorbereiten und ansäen/i]
 ].map(([id,label,re])=>({id,label,re}));
 // Exact Gärtner AP titles from the supplied grading workbook, sheet Aufgaben.
-// GBF sheets and ZP are separate qualifications/exams and are deliberately not renamed.
+// ZP uses the same specialty catalog by coordinator instruction; GBF remains separate.
 const workbookCategories={
  "Zierpflanzenbau": [
   {
@@ -540,9 +540,9 @@ const workbookCategories={
  ]
 };
 const workbookSource={sheet:'Aufgaben',version:'03.02.2020',workbook:'Notenberechnung Gärtner AP S 2026'};
-function workbookScope(t){return t?.examType==='AP'&&!/gartenbaufachwerk|\bGBF\b|\b17[1-7]\b/i.test(t.qualification||'')?workbookCategories[t.specialty]:null;}
+function workbookScope(t){return ['AP','ZP'].includes(t?.examType)&&!/gartenbaufachwerk|\bGBF\b|\b17[1-7]\b/i.test(t.qualification||'')?workbookCategories[t.specialty]:null;}
 for(const c of Object.values(workbookCategories).flat())if(!catalog.some(x=>x.id===c.id))catalog.push({id:c.id,label:c.label,re:/$^/});
-function label(id,context){const legacy=context?.pattern?.examType==='AP'&&!context.pattern.categoryCatalog;return (!legacy&&workbookScope(context)?.find(c=>c.id===id)?.label)||catalog.find(c=>c.id===id)?.label||'Kategorie noch zuordnen';}
+function label(id,context){const legacy=['AP','ZP'].includes(context?.pattern?.examType)&&!context.pattern.categoryCatalog;return (!legacy&&workbookScope(context)?.find(c=>c.id===id)?.label)||catalog.find(c=>c.id===id)?.label||'Kategorie noch zuordnen';}
 const labels=(t,pattern)=>patternClassify(t,pattern).ids.map(id=>label(id,pattern?{...t,pattern}:t));
 const normalizeHeading=s=>s.toLocaleLowerCase('de').replace(/\bu\./g,'und').replace(/\s+/g,' ').trim();
 
@@ -559,7 +559,7 @@ const archiveScopes={
  'Zierpflanzenbau':{ZP:['soil','propagation','plantwork','harvest','machinery','maintenance','materials','plantuse'],AP:['propagation','plantwork','harvest','protection','nutrition','planting','containers','advice','presentation','indoor']}
 };
 function applies(id,t){return id!=='gravecare'||t.specialty==='Friedhofsgärtnerei';}
-function classify(t,{legacy=false}={}){if(t.planningCategories?.length){const ids=t.planningCategories.filter(id=>applies(id,t));return {ids:ids.length?ids:['unassigned'],evidence:t.planningCategoryEvidence||'Manuell zugeordnet',manual:true};}
+function classify(t,{legacy=false}={}){const official=legacy?null:workbookScope(t);const validIds=ids=>[...new Set(ids.map(id=>t.examType==='ZP'&&official&&!official.some(c=>c.id===id)?'unassigned':id))];if(t.planningCategories?.length){const ids=validIds(t.planningCategories.filter(id=>applies(id,t)));return {ids:ids.length?ids:['unassigned'],evidence:t.planningCategoryEvidence||'Manuell zugeordnet',manual:true};}
  let evidence=heading(t);
  if(t.examType==='AP'&&t.specialty==='Garten- und Landschaftsbau'&&/Bewertungsblatt für die Phase I.*Planungsphase/i.test(t.text||'')){
   // The original planning form is a multi-section task: inspect explicit section
@@ -567,7 +567,6 @@ function classify(t,{legacy=false}={}){if(t.planningCategories?.length){const id
   evidence=(t.text||'').replace(/\\n/g,'\n').split('\n').map(x=>x.trim()).filter(x=>/^(?:Ausführungspläne sowie Leistungsverzeichnisse lesen und auf die Baustelle übertragen[.]?|Herstellen von befestigten Flächen|Be- und Verarbeiten von Naturstein|Pflanzungen vorbereiten und durchführen|Flächen für Ansaaten vorbereiten und ansäen)$/i.test(x)).join('\n');
  }
  let ids=catalog.filter(c=>c.re.test(evidence)&&applies(c.id,t)).map(c=>c.id);if(ids.includes('naturalstone'))ids=ids.filter(id=>id!=='materials');
- const official=legacy?null:workbookScope(t);
  if(official){
   const normalized=normalizeHeading(evidence).replace('grabstätte planen, fläche aufteilen','grabstätte planen, flächen aufteilen');
   const exact=official.filter(c=>normalized.includes(normalizeHeading(c.label))).map(c=>c.id);
@@ -576,19 +575,19 @@ function classify(t,{legacy=false}={}){if(t.planningCategories?.length){const id
   if(t.specialty==='Friedhofsgärtnerei'&&exact.includes('planting')&&!exact.includes('soil'))ids=ids.filter(id=>id!=='soil');
   if(exact.some(id=>['sorting','preparation','packaging'].includes(id))&&!exact.includes('harvest')&&!/\bernten\b/i.test(evidence))ids=ids.filter(id=>id!=='harvest');
   if(exact.includes('combinedcare'))ids=ids.filter(id=>!['nutrition','protection'].includes(id)||exact.includes(id));
-  ids=[...new Set([...ids,...exact])];
+  ids=validIds([...ids,...exact]);
   ids.sort((a,b)=>{const index=id=>{const n=official.findIndex(c=>c.id===id);return n<0?999:n;};return index(a)-index(b);});
  }
  return {ids:ids.length?ids:['unassigned'],evidence:evidence||'Kein eindeutiger Aufgabenkopf',manual:false};
 }
-function categories(d,type,specialty,context={}){const scope={examType:type,specialty,...context},official=workbookScope(scope);const ids=new Set([...(official?[]:archiveScopes[specialty]?.[type]||[]),...scoped(d,type,specialty,true).flatMap(t=>classify(t).ids)]);const extra=catalog.filter(c=>ids.has(c.id)&&applies(c.id,scope)&&!official?.some(x=>x.id===c.id));return [...(official||[]),...extra].map(c=>({...c,label:label(c.id,scope)}));}
+function categories(d,type,specialty,context={}){const scope={examType:type,specialty,...context},official=workbookScope(scope);if(official)return official.map(c=>({...c}));const ids=new Set([...(archiveScopes[specialty]?.[type]||[]),...scoped(d,type,specialty,true).flatMap(t=>classify(t).ids)]);return catalog.filter(c=>ids.has(c.id)&&applies(c.id,scope)).map(c=>({...c,label:label(c.id,scope)}));}
 function scoped(d,type,specialty,all=false){return d.tasks.filter(t=>t.examType===type&&t.specialty===specialty&&t.kind==='practical'&&(all||!t.supersededBy));}
-function inferPattern(d,type,specialty){const tasks=scoped(d,type,specialty),ids=new Set(tasks.flatMap(t=>classify(t).ids));return {id:`pattern:${type}:${specialty}`,examType:type,specialty,status:'proposed',version:1,...(type==='AP'?{categoryCatalog:'excel-ap-2026'}:{}),slots:catalog.filter(c=>ids.has(c.id)).map(c=>({categoryId:c.id,count:1})),note:'Aus vorhandenen Aufgabenköpfen abgeleitet. Anzahl und Pflichtkategorien fachlich bestätigen; kein Nachweis eines vollständigen Prüfungsjahres.'};}
+function inferPattern(d,type,specialty){const tasks=scoped(d,type,specialty),ids=new Set(tasks.flatMap(t=>classify(t).ids));return {id:`pattern:${type}:${specialty}`,examType:type,specialty,status:'proposed',version:1,...(['AP','ZP'].includes(type)?{categoryCatalog:'excel-ap-2026'}:{}),slots:catalog.filter(c=>ids.has(c.id)).map(c=>({categoryId:c.id,count:1})),note:'Aus vorhandenen Aufgabenköpfen abgeleitet. Anzahl und Pflichtkategorien fachlich bestätigen; kein Nachweis eines vollständigen Prüfungsjahres.'};}
 function checkPattern(p){if(p?.categoryCatalog!==undefined&&p.categoryCatalog!=='excel-ap-2026')throw Error('Unbekannter Kategorienstand.');if(!p||!Number.isInteger(p.version)||p.version<1||!['AP','ZP'].includes(p.examType)||typeof p.specialty!=='string'||!['proposed','confirmed'].includes(p.status)||!Array.isArray(p.slots)||!p.slots.length)throw Error('Prüfungsmuster benötigt mindestens eine Kategorie.');const seen=new Set();for(const s of p.slots){if(!catalog.some(c=>c.id===s.categoryId)||seen.has(s.categoryId)||!Number.isInteger(s.count)||s.count<1||s.count>10)throw Error('Ungültige Kategorie oder Anzahl im Prüfungsmuster.');seen.add(s.categoryId);}return p;}
 function pattern(d,type,specialty){return d.patterns?.find(p=>p.examType===type&&p.specialty===specialty)||inferPattern(d,type,specialty);}
 function history(d,t){const variants=scoped(d,t.examType,t.specialty,true).filter(v=>v.familyId===t.familyId),sourceIds=new Set(variants.flatMap(v=>v.sourceIds)),years=d.sources.filter(s=>sourceIds.has(s.id)&&Number.isInteger(s.year)&&s.year<=new Date().getFullYear()).map(s=>s.year),uses=d.uses.filter(u=>{const e=d.exams.find(e=>e.id===u.examId);return e?.examType===t.examType&&e?.specialty===t.specialty&&(u.familyIds.includes(t.familyId)||variants.some(v=>u.taskIds.includes(v.id)))&&u.date<=new Date().toISOString().slice(0,10);}).map(u=>u.date).sort();const confirmed=uses.at(-1)||null,sourceYear=years.length?Math.max(...years):null,year=Math.max(sourceYear||0,confirmed?Number(confirmed.slice(0,4)):0)||null;const sortDate=sourceYear&&(!confirmed||sourceYear>Number(confirmed.slice(0,4)))?sourceYear+'-12-31':confirmed;return {confirmed,sourceYear,year,sortDate,unknown:year===null};}
 function rank(d,type,specialty,categoryId,excluded=[]){const skip=new Set(excluded);return scoped(d,type,specialty).filter(t=>!skip.has(t.familyId)&&classify(t).ids.includes(categoryId)).map(task=>({task,history:history(d,task)})).sort((a,b)=>(a.history.sortDate||'9999').localeCompare(b.history.sortDate||'9999')||a.task.familyId.localeCompare(b.task.familyId)||a.task.id.localeCompare(b.task.id));}
-function patternClassify(t,p){return classify(t,{legacy:p?.examType==='AP'&&!p.categoryCatalog});}
+function patternClassify(t,p){return classify(t,{legacy:['AP','ZP'].includes(p?.examType)&&!p.categoryCatalog});}
 function coverage(e){const issues=[],p=e.pattern;try{checkPattern(p);}catch{ return {complete:false,slots:[],issues:['Prüfungsmuster fehlt oder hat noch keine Kategorien.']};}if(p.examType!==e.examType||p.specialty!==e.specialty)issues.push('Prüfungsmuster passt nicht zum Prüfungsbereich.');if(p.status!=='confirmed')issues.push('Prüfungsmuster noch nicht bestätigt.');const families=new Set();for(const i of e.items){if(i.task.examType!==e.examType||i.task.specialty!==e.specialty)issues.push('Aufgabe gehört zu einem anderen Prüfungsbereich.');if(families.has(i.task.familyId))issues.push('Aufgabenfamilie mehrfach ausgewählt.');families.add(i.task.familyId);if(patternClassify(i.task,p).ids.some(id=>!p.slots.some(s=>s.categoryId===id)))issues.push('Aufgabe deckt eine Kategorie außerhalb des Musters ab.');if(patternClassify(i.task,p).ids.includes('unassigned'))issues.push('Aufgabe ohne bestätigbare Kategorie.');}
  const slots=p.slots.map(s=>({...s,actual:e.items.filter(i=>patternClassify(i.task,p).ids.includes(s.categoryId)).length}));for(const s of slots)if(s.actual!==s.count)issues.push(`${label(s.categoryId,e)}: ${s.actual} von ${s.count} vorgesehenen Aufgaben.`);return {complete:issues.length===0,slots,issues};}
 function propose(d,e){

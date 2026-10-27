@@ -58,21 +58,21 @@ test('conflicting pattern imports cannot disappear behind a same-scope profile',
  const broken=structuredClone(d);broken.tasks[0].planningCategoryEvidence={unsafe:true};assert.throws(()=>C.validate(broken));
 });
 
-test('archive category choices differ by specialty and examination type',()=>{
+test('workbook choices differ by specialty and are shared across examination types',()=>{
  const d=make([]),ids=(type,fr)=>P.categories(d,type,fr).map(c=>c.id);
  assert.ok(ids('AP','Friedhofsgärtnerei').includes('gravecare'));
  assert.ok(!ids('AP','Baumschule').includes('gravecare'));
  assert.ok(ids('AP','Baumschule').includes('selection'));
- assert.ok(!ids('ZP','Baumschule').includes('selection'));
+ assert.ok(ids('ZP','Baumschule').includes('selection'));
  assert.ok(ids('AP','Zierpflanzenbau').includes('indoor'));
  assert.ok(!ids('AP','Obstbau').includes('indoor'));
- assert.deepEqual(ids('ZP','Friedhofsgärtnerei'),[]);
+ assert.deepEqual(ids('ZP','Friedhofsgärtnerei'),ids('AP','Friedhofsgärtnerei'));
  assert.ok(ids('AP','Garten- und Landschaftsbau').includes('paving'));
 });
-test('new evidence expands only its own scope and grave care stays exclusive',()=>{
+test('shared specialty categories include nutrition and grave care stays exclusive',()=>{
  const t={...task('new','f','Durchführen von Düngungs- und Bewässerungsmaßnahmen'),specialty:'Baumschule',examType:'AP'},d=make([t]);
  assert.ok(P.categories(d,'AP','Baumschule').some(c=>c.id==='nutrition'));
- assert.ok(!P.categories(d,'ZP','Baumschule').some(c=>c.id==='nutrition'));
+ assert.ok(P.categories(d,'ZP','Baumschule').some(c=>c.id==='nutrition'));
  const invalid={...t,text:'Durchführen von Pflegemaßnahmen an Grabstätten'};
  assert.deepEqual(P.classify(invalid).ids,['unassigned']);
 });
