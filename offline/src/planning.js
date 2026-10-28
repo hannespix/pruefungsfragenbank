@@ -559,7 +559,7 @@ const archiveScopes={
  'Zierpflanzenbau':{ZP:['soil','propagation','plantwork','harvest','machinery','maintenance','materials','plantuse'],AP:['propagation','plantwork','harvest','protection','nutrition','planting','containers','advice','presentation','indoor']}
 };
 function applies(id,t){return id!=='gravecare'||t.specialty==='Friedhofsgärtnerei';}
-function classify(t,{legacy=false}={}){const official=legacy?null:workbookScope(t);const validIds=ids=>[...new Set(ids.map(id=>t.examType==='ZP'&&official&&!official.some(c=>c.id===id)?'unassigned':id))];if(t.planningCategories?.length){const ids=validIds(t.planningCategories.filter(id=>applies(id,t)));return {ids:ids.length?ids:['unassigned'],evidence:t.planningCategoryEvidence||'Manuell zugeordnet',manual:true};}
+function classify(t,{legacy=false}={}){const official=legacy?null:workbookScope(t);const validIds=ids=>[...new Set(ids.map(id=>t.examType==='ZP'&&official&&!official.some(c=>c.id===id)?'unassigned':id))];if((t.planningCategories?.length||t.planningCategoryCatalog==='excel-ap-2026')&&!(legacy&&t.planningCategoryCatalog==='excel-ap-2026')){const ids=validIds(t.planningCategories.filter(id=>applies(id,t)));return {ids:ids.length?ids:['unassigned'],evidence:t.planningCategoryEvidence||'Manuell zugeordnet',manual:true};}
  let evidence=heading(t);
  if(t.examType==='AP'&&t.specialty==='Garten- und Landschaftsbau'&&/Bewertungsblatt für die Phase I.*Planungsphase/i.test(t.text||'')){
   // The original planning form is a multi-section task: inspect explicit section
@@ -580,6 +580,9 @@ function classify(t,{legacy=false}={}){const official=legacy?null:workbookScope(
  }
  return {ids:ids.length?ids:['unassigned'],evidence:evidence||'Kein eindeutiger Aufgabenkopf',manual:false};
 }
+// Explicit workbook assignments belong to the current catalog only. Stored legacy
+// exam patterns keep their original heading-based interpretation.
+function assignCategories(t,ids,evidence){const catalog=workbookScope(t)?'excel-ap-2026':undefined,same=t.planningCategoryCatalog===catalog&&Array.isArray(t.planningCategories)&&t.planningCategories.length===ids.length&&ids.every(id=>t.planningCategories.includes(id));if(!ids.length&&!catalog){delete t.planningCategories;delete t.planningCategoryEvidence;delete t.planningCategoryCatalog;return;}t.planningCategories=[...ids];if(!same||!t.planningCategoryEvidence)t.planningCategoryEvidence=evidence;if(catalog)t.planningCategoryCatalog=catalog;else delete t.planningCategoryCatalog;}
 function categories(d,type,specialty,context={}){const scope={examType:type,specialty,...context},official=workbookScope(scope);if(official)return official.map(c=>({...c}));const ids=new Set([...(archiveScopes[specialty]?.[type]||[]),...scoped(d,type,specialty,true).flatMap(t=>classify(t).ids)]);return catalog.filter(c=>ids.has(c.id)&&applies(c.id,scope)).map(c=>({...c,label:label(c.id,scope)}));}
 function scoped(d,type,specialty,all=false){return d.tasks.filter(t=>t.examType===type&&t.specialty===specialty&&t.kind==='practical'&&(all||!t.supersededBy));}
 function inferPattern(d,type,specialty){const tasks=scoped(d,type,specialty),ids=new Set(tasks.flatMap(t=>classify(t).ids));return {id:`pattern:${type}:${specialty}`,examType:type,specialty,status:'proposed',version:1,...(['AP','ZP'].includes(type)?{categoryCatalog:'excel-ap-2026'}:{}),slots:catalog.filter(c=>ids.has(c.id)).map(c=>({categoryId:c.id,count:1})),note:'Aus vorhandenen Aufgabenköpfen abgeleitet. Anzahl und Pflichtkategorien fachlich bestätigen; kein Nachweis eines vollständigen Prüfungsjahres.'};}
@@ -605,5 +608,5 @@ function propose(d,e){
  search([]);return best;
 }
 
-const api={workbookCategories,workbookSource,workbookScope,patternClassify,labels,catalog,categories,archiveScopes,label,heading,classify,scoped,inferPattern,pattern,checkPattern,history,rank,coverage,propose};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.HortiPlanning=api;
+const api={assignCategories,workbookCategories,workbookSource,workbookScope,patternClassify,labels,catalog,categories,archiveScopes,label,heading,classify,scoped,inferPattern,pattern,checkPattern,history,rank,coverage,propose};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.HortiPlanning=api;
 })(globalThis);
