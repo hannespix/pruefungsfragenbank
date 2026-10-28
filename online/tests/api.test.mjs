@@ -74,3 +74,11 @@ test('permanent deletion is admin-only, trash-only and rejects stale restore or 
  assert.equal((await save(e,4)).status,409);assert.equal((await save(null,4)).status,409);
  assert.equal(t.DB.db.prepare('SELECT COUNT(*) AS n FROM records WHERE kind=? AND id=?').get('exams',e.id).n,0);
 });
+test('source-backed category assignments persist and reject categories from another specialty',async()=>{
+ const t=await setup(),task=structuredClone(t.seed.tasks.find(t=>t.specialty==='Baumschule'));task.planningCategoryCatalog='excel-ap-2026';task.planningCategories=['lifting'];task.planningCategoryEvidence='Synthetic source review';
+ const save=(value,version)=>t.req('/api/save',{changes:[{kind:'tasks',id:task.id,version,value}]},t.admin);
+ assert.equal((await save(task,1)).status,200);
+ const stored=(await t.req('/api/project',undefined,t.admin)).body.project.tasks.find(x=>x.id===task.id);assert.deepEqual(stored,task);
+ assert.equal((await save({...task,planningCategories:['gravecare']},2)).status,400);
+ assert.equal((await save({...task,planningCategories:[]},2)).status,200);
+});

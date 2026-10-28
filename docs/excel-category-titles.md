@@ -44,3 +44,26 @@ muss daher auch der Worker aktualisiert werden; eine Datenmigration ist nicht n�
 „Kategorie noch zuordnen“ sichtbar. Sie werden nicht automatisch einer fachlich
 unpassenden Kategorie zugewiesen. Unversionierte historische ZP-Muster behalten
 wie AP-Muster ihre ursprüngliche Klassifikation.
+
+## Quellenbasierte Zuordnungen
+
+Explizite Zuordnungen zum gemeinsamen Excel-Katalog tragen auf der Aufgabe
+`planningCategoryCatalog: "excel-ap-2026"`. `planningCategories` enthält nur IDs
+für die jeweilige Fachrichtung; eine leere Liste bedeutet ausdrücklich, dass
+keine passende Kategorie in diesem Katalog belegt ist. Die Quellen und die
+Begründung stehen in `planningCategoryEvidence`. Eine solche Zuordnung ist keine
+fachliche Freigabe der Aufgabenstellung oder Lösung.
+
+Die Einordnung stützt sich auf Quellordner (Prüfungsart/Fachrichtung), konkrete
+Arbeitsaufträge und gegebenenfalls mehrere ausdrücklich verlangte Tätigkeiten.
+Allgemeine oder irreführende historische Überschriften sind kein ausreichender
+Beleg. Die Originaltexte, Punkte, Lösungen und gespeicherten Prüfungen werden
+bei einer Kategoriepflege nicht verändert. Aufgaben ohne Entsprechung bleiben
+über „Zuordnung offen“ und ihren ursprünglichen Arbeitsbereich auffindbar.
+
+Versionierte Zuordnungen werden bei unversionierten alten Prüfungsmustern
+ignoriert; deren ursprüngliche Klassifikation bleibt erhalten. Manuelle
+Änderungen im Aufgabendialog verwenden ebenfalls den aktuellen Katalog, sofern
+er für Fachrichtung und Ausbildungsgang gilt. Bei unveränderter Auswahl bleibt
+die vorhandene Quellenbegründung erhalten. Vertrauliche Zuordnungslisten und
+Originalaufgaben gehören ausschließlich in den geschützten Datenbestand.

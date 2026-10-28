@@ -63,3 +63,17 @@ test('previously confirmed exam snapshots retain category coverage until their p
   fresh.status='confirmed';assert.equal(P.coverage({...e,pattern:fresh}).complete,true);
  }
 });
+test('source-reviewed workbook assignments preserve legacy classification and expose missing matches',()=>{
+ const t=task('Baumschule','Erntearbeiten',{examType:'ZP',planningCategories:['lifting'],planningCategoryCatalog:'excel-ap-2026',planningCategoryEvidence:'Zuordnung aus dem Quelldokument.'});
+ assert.deepEqual(P.classify(t).ids,['lifting']);assert.deepEqual(P.classify(t,{legacy:true}).ids,['harvest']);
+ const unmatched=task('Staudengärtnerei','Durchführen von Arbeiten an der Pflanze',{examType:'ZP',planningCategories:[],planningCategoryCatalog:'excel-ap-2026',planningCategoryEvidence:'Gefäßbepflanzung hat hier keine entsprechende Excel-Kategorie.'});
+ assert.deepEqual(P.classify(unmatched).ids,['unassigned']);assert.match(P.classify(unmatched).evidence,/Gefäßbepflanzung/);assert.deepEqual(P.classify(unmatched,{legacy:true}).ids,['plantwork']);
+});
+test('reviewed assignments validate specialty vocabulary and retain evidence when selection is unchanged',()=>{
+ const C=require('../src/core.js'),t={...task('Baumschule','Erntearbeiten',{examType:'ZP'}),solution:'',solutionStatus:'missing',reviewStatus:'review',points:null,minutes:null};
+ P.assignCategories(t,['lifting'],'Quelldokument: Roden und Ballieren');C.checkTask(t);
+ P.assignCategories(t,['lifting'],'Manuell zugeordnet');assert.match(t.planningCategoryEvidence,/Quelldokument/);
+ P.assignCategories(t,[],'Keine passende Excel-Kategorie');C.checkTask(t);assert.deepEqual(P.classify(t).ids,['unassigned']);
+ assert.throws(()=>C.checkTask({...t,planningCategories:['gravecare']}),/Kategorie/);
+ assert.throws(()=>C.checkTask({...t,planningCategoryCatalog:'unknown'}),/Katalog/i);
+});
