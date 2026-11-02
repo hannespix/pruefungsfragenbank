@@ -82,3 +82,44 @@ test('source-backed category assignments persist and reject categories from anot
  assert.equal((await save({...task,planningCategories:['gravecare']},2)).status,400);
  assert.equal((await save({...task,planningCategories:[]},2)).status,200);
 });
+
+test('new invitations are five short words, hash-only at rest, and normalize before device approval',async()=>{
+ const t=await setup(),opened=await t.req('/api/access/open',{meetingId:'meeting',expires:Date.now()+3600000},t.admin);
+ assert.equal(opened.status,200);
+ const invitation=opened.body.invitations.find(i=>i.specialty==='Baumschule').token;
+ assert.match(invitation,/^[a-z]{3,8}(?:-[a-z]{3,8}){4}$/);
+ const stored=t.DB.db.prepare('SELECT * FROM invites WHERE hash=?').get(await hashToken(invitation));
+ assert.equal(stored.specialty,'Baumschule');assert.ok(!JSON.stringify(stored).includes(invitation));
+ const joined=await t.req('/api/join',{invitation:'  '+invitation.toUpperCase().replaceAll('-',' -  ')+'  ',label:'Mein Tablet'});
+ assert.equal(joined.status,200);assert.equal(joined.body.status,'pending');assert.match(joined.body.token,/^[a-f0-9]{64}$/);
+ assert.equal((await t.req('/api/project',undefined,joined.body.token)).status,403);
+ assert.equal((await t.req('/api/assets?ids=secret',undefined,joined.body.token)).status,403);
+ const board=(await t.req('/api/access',undefined,t.admin)).body,pending=board.requests.find(r=>r.code===joined.body.code);
+ assert.equal((await t.req('/api/access/approve',{requestId:pending.id},t.admin)).status,200);
+ const project=(await t.req('/api/project',undefined,joined.body.token)).body.project;
+ assert.ok(project.tasks.every(x=>x.specialty==='Baumschule'));
+ const spaces=await t.req('/api/join',{invitation:invitation.replaceAll('-',' '),label:'Zweites Tablet'});
+ assert.equal(spaces.status,200);assert.equal(spaces.body.status,'pending');
+});
+
+test('invalid, unknown and expired phrases reveal no meeting metadata and consume the join rate limit',async()=>{
+ const t=await setup(),opened=await t.req('/api/access/open',{meetingId:'meeting',expires:Date.now()+3600000},t.admin),invitation=opened.body.invitations[0].token;
+ const invalid=[null,42,'', 'a'.repeat(161),'apfel-birne','apfel_birne_wolke_anker_besen','apfel/birne/wolke/anker/besen','apfel\u200bbirne-wolke-anker-besen', 'apfel-birne-wolke-anker-besen', 'zebra-zebra-zebra-zebra-zebra'];
+ await t.req('/api/access/close',{meetingId:'meeting'},t.admin);
+ invalid.push(invitation);
+ for(const value of invalid){const r=await t.req('/api/join',{invitation:value,label:'Test'});assert.equal(r.status,401);assert.deepEqual(r.body,{error:'Einladung ist ungültig, abgelaufen oder gesperrt.'});}
+ for(let i=invalid.length;i<40;i++)assert.equal((await t.req('/api/join',{invitation:'wrong',label:'Test'})).status,401);
+ assert.equal((await t.req('/api/join',{invitation,label:'Test'})).status,429);
+ assert.equal(t.DB.db.prepare("SELECT COUNT(*) AS n FROM sessions WHERE role='group'").get().n,0);
+});
+
+test('legacy 64-hex invitations still join within their active generation and expire normally',async()=>{
+ const t=await setup(),expires=Date.now()+3600000,legacy='0123456789abcdef'.repeat(4);
+ const opened=await t.req('/api/access/open',{meetingId:'meeting',expires},t.admin);
+ t.DB.db.prepare('INSERT INTO invites(hash,meeting_id,specialty,generation,expires) VALUES(?,?,?,?,?)').run(await hashToken(legacy),'meeting','Baumschule',opened.body.generation,expires);
+ const joined=await t.req('/api/join',{invitation:legacy,label:'Legacy device'});
+ assert.equal(joined.status,200);assert.equal(joined.body.status,'pending');
+ assert.equal((await t.req('/api/project',undefined,joined.body.token)).status,403);
+ t.DB.db.prepare('UPDATE invites SET expires=? WHERE hash=?').run(Date.now()-1,await hashToken(legacy));
+ assert.equal((await t.req('/api/join',{invitation:legacy,label:'Expired'})).status,401);
+});
