@@ -123,3 +123,12 @@ test('legacy 64-hex invitations still join within their active generation and ex
  t.DB.db.prepare('UPDATE invites SET expires=? WHERE hash=?').run(Date.now()-1,await hashToken(legacy));
  assert.equal((await t.req('/api/join',{invitation:legacy,label:'Expired'})).status,401);
 });
+test('FW drafts save for supported groups while AP/FW mixtures and other specialties are rejected',async()=>{
+ const t=await setup(),fw=structuredClone(t.seed.tasks[0]);Object.assign(fw,{id:'fw-api',familyId:'fw-api-family',sourceIds:[],examType:'FW_AP',specialty:'Gemüsebau',qualification:'Gartenbaufachwerker',planningCategories:['soil']});delete fw.planningCategoryCatalog;
+ assert.equal((await t.req('/api/save',{changes:[{kind:'families',id:fw.familyId,version:0,value:{id:fw.familyId,title:'Fachwerker-Testfamilie'}},{kind:'tasks',id:fw.id,version:0,value:fw}]},t.admin)).status,200);
+ const g=await group(t,'Gemüsebau'),e=C.newExam({examType:'FW_AP',specialty:'Gemüsebau',examYear:2027,workshopId:'meeting'});C.addItem(e,fw);
+ assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:0,value:e}]},g.token)).status,200);
+ const mixed=structuredClone(e);mixed.id='mixed';mixed.examType='AP';assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:mixed.id,version:0,value:mixed}]},g.token)).status,403);
+ const other=await group(t,'Baumschule'),invalid={...C.newExam({examType:'AP',specialty:'Baumschule',examYear:2027,workshopId:'meeting'}),examType:'FW_AP'};
+ assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:invalid.id,version:0,value:invalid}]},other.token)).status,400);
+});

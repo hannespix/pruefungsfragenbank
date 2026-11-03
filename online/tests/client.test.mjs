@@ -73,3 +73,23 @@ test('successful deletion removes client baseline so a subsequent save does not 
 test('memory-only permanent deletion retains the unsaved-work warning',async()=>{const u=await ui('admin',true),d=u.sandbox.testUI.getDb(),e=C.newExam();C.trashExam({exams:[e],uses:[]},e.id);d.exams.push(e);u.sandbox.testUI.changed();await u.click('action','confirm-purge-exam',e.id);assert.ok(!u.sandbox.testUI.getDb().exams.some(x=>x.id===e.id));let warned=false;u.dispatch('beforeunload',{preventDefault(){warned=true;}});assert.equal(warned,true);});
 
 test('printed invitation offers five readable words and a base address alongside its QR link',async()=>{const u=await ui('admin'),code='apfel-birne-anker-besen-garten';u.online.board.meetings=[{meeting_id:'meeting',active:1,generation:3,expires:Date.now()+3600000}];u.online.link=()=> 'https://example.test/tool/#invite='+code;u.online.invitationCode=()=>code;u.online.qr=()=>'<svg></svg>';u.elements.get('#dialog').dataset={};await u.click('action','invitation','Baumschule');const html=u.elements.get('#dialog').innerHTML;assert.match(html,/Zugangswörter/);assert.match(html,/apfel · birne · anker · besen · garten/);assert.match(html,/https:\/\/example.test\/tool\//);assert.match(html,/Arbeitsgruppe beitreten/);assert.match(html,/copy-invitation-code/);});
+
+test('FW completion tracks are available only in the two supported groups and clearly labelled',async()=>{
+ const u=await ui('admin'),d=u.sandbox.testUI.getDb();d.workshops[0].specialties=C.specialties;
+ for(const specialty of C.specialties){await u.click('action','open-group',specialty);const html=u.elements.get('#app').innerHTML;assert.equal(html.includes('data-action="track-new" data-id="FW_AP"'),['Gemüsebau','Zierpflanzenbau'].includes(specialty),specialty);}
+ await u.click('action','open-group','Gemüsebau');await u.click('action','track-new','FW_AP');const e=d.exams.at(-1);assert.equal(e.examType,'FW_AP');assert.match(e.title,/Fachwerker/);assert.match(u.elements.get('#app').innerHTML,/Fachwerker/);
+ const before=d.exams.length;await u.click('action','open-group','Baumschule');await u.click('action','track-new','FW_AP');assert.equal(d.exams.length,before);
+});
+test('FW editor offers only FW tasks and the global bank can explicitly filter them',async()=>{
+ const u=await ui('admin'),d=u.sandbox.testUI.getDb();d.workshops[0].specialties.push('Gemüsebau');const fw=structuredClone(d.tasks[0]);Object.assign(fw,{id:'fw-ui',familyId:'fw-ui-family',sourceIds:[],title:'Nur Fachwerker Aufgabe',examType:'FW_AP',specialty:'Gemüsebau',planningCategories:['soil']});delete fw.planningCategoryCatalog;d.families.push({id:fw.familyId,title:'Fachwerker-Testfamilie'});d.tasks.push(fw);
+ await u.click('action','open-group','Gemüsebau');await u.click('action','track-new','FW_AP');let html=u.elements.get('#app').innerHTML;assert.match(html,/Nur Fachwerker Aufgabe/);assert.ok(!html.includes('data-id="'+d.tasks[0].id+'"'));
+ await u.click('action','add',fw.id);assert.equal(d.exams.at(-1).items[0].task.examType,'FW_AP');await u.click('route','catalog');html=u.elements.get('#app').innerHTML;assert.match(html,/value="FW_AP"/);
+});
+
+test('invalid cross-scope task families never mutate the live project and a corrected retry saves',async()=>{
+ const u=await ui('admin'),d=u.sandbox.testUI.getDb();await u.click('action','new-task');
+ const fields={title:'Eigene FW-Aufgabe',text:'Nur ein synthetischer Test.',fr:'Gemüsebau',type:'FW_AP',kind:'practical',family:d.tasks[0].familyId,category:'Bodenbearbeitung',tags:'',qualification:'Gartenbaufachwerker',points:'',minutes:'',solution:'','solution-status':'missing',review:'review',reviewer:'',flags:''};
+ for(const [key,value]of Object.entries(fields))u.elements.set('#task-'+key,{value});
+ const before=JSON.stringify(d);await u.click('action','save-task');assert.equal(JSON.stringify(d),before);assert.match(u.elements.get('#toast').textContent,/Familie|Prüfungsbereich|Fachwerker/i);
+ u.elements.get('#task-family').value='';await u.click('action','save-task');assert.equal(d.tasks.length,JSON.parse(before).tasks.length+1);assert.equal(d.tasks.at(-1).examType,'FW_AP');C.validate(d);
+});

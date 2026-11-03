@@ -60,3 +60,6 @@ button:focus-visible,summary:focus-visible{outline:3px solid #73985d;outline-off
 .invitation-start-url{overflow-wrap:anywhere;font-weight:600}
 .login-mode-switch{display:flex;gap:8px;margin:18px 0;flex-wrap:wrap}.login-mode-switch button{flex:1}
 @media print{.invitation-code{border:1px solid #aaa;background:white;font-size:22px;break-inside:avoid}}
+
+/* Three examination tracks stay readable on desktop and stack on phones. */
+.exam-tracks,.scope-types{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}

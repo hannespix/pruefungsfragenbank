@@ -94,15 +94,16 @@ async function documentFile(e,input,examiner=false){
  }
  function letterhead(t){
   const links=t?t.assetLinks:e.items.flatMap(i=>i.task.assetLinks),candidates=links.filter(l=>l.role==='letterhead'&&l.audience==='candidate'),link=candidates.find(l=>l.design==='bw-2024')||candidates[0];
-  const text=[p('Praktischer Prüfungstag','ExamHeader'),p('„'+e.specialty+'“','ExamHeader'),p((e.examType==='AP'?'Abschlussprüfung':'Zwischenprüfung')+' '+(e.examYear||'')+' · '+label,'ExamSmall',{spacing:{before:100,after:0}})];
+  const text=[p('Praktischer Prüfungstag','ExamHeader'),p('„'+e.specialty+'“','ExamHeader'),p((C.examTypeLabel(e.examType))+' '+(e.examYear||'')+' · '+label,'ExamSmall',{spacing:{before:100,after:0}})];
   return new X.Header({children:link?[table([{cells:[[new X.Paragraph({children:[image(A.requireAsset(d,link.assetId),156,66)],spacing:{after:0}})],[p('','ExamSmall')],text]}],[mm(55),mm(10),mm(109)],{bordered:false,padding:0}),gap(0)]:text});
  }
+ function originalFooter(){return [...(S.scopeLabel(e)?[p(S.scopeLabel(e),'ExamSmall',{alignment:X.AlignmentType.CENTER,spacing:{line:220,after:0},run:{size:16,color:ink}})]:[]),p(draft?'ENTWURF · NICHT FREIGEGEBEN':(examiner?label:''),'ExamSmall',{alignment:X.AlignmentType.CENTER})];}
  function footer(original=false){
-  if(original)return new X.Footer({children:[p(draft?'ENTWURF · NICHT FREIGEGEBEN':(examiner?label:''),'ExamSmall',{alignment:X.AlignmentType.CENTER})]});
+  if(original)return new X.Footer({children:originalFooter()});
   return new X.Footer({children:[new X.Paragraph({style:'ExamSmall',border:{top:{...border,space:6}},tabStops:[{type:X.TabStopType.RIGHT,position:paperWidth}],children:[run(label+' · '),run(draft?'ENTWURF · NICHT FREIGEGEBEN':e.specialty),new X.TextRun({children:[new X.Tab(),'Seite ',X.PageNumber.CURRENT,' / ',X.PageNumber.TOTAL_PAGES]})]})]});
  }
  function section(children,{task=null,original=false,page={width:595.3,height:841.9},header=null,sourceFooter=null,margins=null,type=X.SectionType.NEXT_PAGE}={}){
-  sections.push({properties:{type,page:{size:{width:tw(page.width),height:tw(page.height)},margin:margins||(original?{top:tw(42),bottom:tw(42),left:tw(54),right:tw(36),header:tw(24),footer:tw(24)}:{top:mm(48),bottom:mm(20),left:mm(18),right:mm(18),header:mm(18),footer:mm(10)})}},headers:{default:header||(original?new X.Header({children:[p('','ExamSmall')]}):letterhead(task))},footers:{default:sourceFooter||footer(original)},children:children.length?(original?children:[gap(0),...children]):[gap(0)]});
+  sections.push({properties:{type,page:{size:{width:tw(page.width),height:tw(page.height)},margin:margins||(original?{top:tw(42),bottom:tw(S.scopeLabel(e)?56:42),left:tw(54),right:tw(36),header:tw(24),footer:tw(24)}:{top:mm(48),bottom:mm(20),left:mm(18),right:mm(18),header:mm(18),footer:mm(10)})}},headers:{default:header||(original?new X.Header({children:[p('','ExamSmall')]}):letterhead(task))},footers:{default:sourceFooter||footer(original)},children:children.length?(original?children:[gap(0),...children]):[gap(0)]});
  }
  function identity(){return table([{height:mm(15),cells:[p('Name / Prüflingsnummer:','ExamMeta',{run:{bold:true}}),p('Datum: '+(e.date||''),'ExamMeta',{run:{bold:true}})]}],[Math.round(paperWidth*.58),paperWidth-Math.round(paperWidth*.58)],{padding:mm(3)});}
  function callout(text){return new X.Table({width:{size:paperWidth,type:X.WidthType.DXA},columnWidths:[paperWidth],borders:borders(none),rows:[new X.TableRow({cantSplit:true,children:[new X.TableCell({shading:{fill:'FFF4DF'},margins:{top:180,bottom:180,left:180,right:180},children:[p(text,'ExamMeta')]})]})]});}
@@ -111,7 +112,7 @@ async function documentFile(e,input,examiner=false){
  function graphic(l){const a=A.requireAsset(d,l.assetId);if(/^image\//.test(a.mime))return [new X.Paragraph({children:[image(a,paperWidth/20,mm(175)/20)],keepNext:true,spacing:{before:180,after:80}}),p(l.caption||a.name,'ExamSmall')];const file=P.attachments({items:[{task:{assetLinks:[l]}}]},d,true)[0];return [callout('Separate Anlage: '+(file?.path||a.name)+' – vor Ausgabe beifügen.')];}
  if(!e.items.some(i=>i.task.sourceLayout)){
   const total=C.totals(e);
-  section([p((e.examType==='AP'?'Abschlussprüfung':'Zwischenprüfung')+' '+(e.examYear||''),'ExamEyebrow'),p(e.title,'ExamTitle'),p(e.specialty,'ExamSubtitle'),gap(10),table([{cells:[p('Prüfungstermin','ExamMeta',{run:{bold:true}}),p(e.date||'Noch festzulegen','ExamMeta')]},{cells:[p('Umfang','ExamMeta',{run:{bold:true}}),p(`${e.items.length} Aufgaben · ${total.points}${total.unknownPoints?' + offene':''} Punkte`,'ExamMeta')]},{cells:[p('Bearbeitungszeit','ExamMeta',{run:{bold:true}}),p(C.durationSummary(total),'ExamMeta')]}],[mm(38),paperWidth-mm(38)],{bordered:false,padding:100}),gap(14),identity(),gap(14),p('Hinweise zur Durchführung','ExamHeading'),p(e.notes||'','ExamBody'),gap(12),callout(draft?'ENTWURF · Vor Verwendung Aufgaben, Punkte, Zeiten und Lösungen fachlich prüfen.':'Freigaben vollständig')]);
+  section([p((C.examTypeLabel(e.examType))+' '+(e.examYear||''),'ExamEyebrow'),p(e.title,'ExamTitle'),p(e.specialty,'ExamSubtitle'),gap(10),table([{cells:[p('Prüfungstermin','ExamMeta',{run:{bold:true}}),p(e.date||'Noch festzulegen','ExamMeta')]},{cells:[p('Umfang','ExamMeta',{run:{bold:true}}),p(`${e.items.length} Aufgaben · ${total.points}${total.unknownPoints?' + offene':''} Punkte`,'ExamMeta')]},{cells:[p('Bearbeitungszeit','ExamMeta',{run:{bold:true}}),p(C.durationSummary(total),'ExamMeta')]}],[mm(38),paperWidth-mm(38)],{bordered:false,padding:100}),gap(14),identity(),gap(14),p('Hinweise zur Durchführung','ExamHeading'),p(e.notes||'','ExamBody'),gap(12),callout(draft?'ENTWURF · Vor Verwendung Aufgaben, Punkte, Zeiten und Lösungen fachlich prüfen.':'Freigaben vollständig')]);
  }
  // Source coordinates guide reading order, indents and response space only.
  // All wording remains ordinary Word runs. Paragraphs may wrap and span pages.
@@ -135,7 +136,7 @@ async function documentFile(e,input,examiner=false){
   const headerChildren=headerBlocks.map(b=>sourceParagraph([b],left));
   for(const box of page.logos)headerChildren.push(new X.Paragraph({children:[image(A.requireAsset(d,logo.assetId),box.width,box.height)],alignment:X.AlignmentType.RIGHT,spacing:{after:0,before:0,line:tw(box.height),lineRule:X.LineRuleType.AT_LEAST}}));
   const header=new X.Header({children:headerChildren.length?headerChildren:[p('','ExamSmall')]});
-  const sourceFooter=new X.Footer({children:[...footerBlocks.map(b=>sourceParagraph([b],left)),p(draft?'ENTWURF · NICHT FREIGEGEBEN':(examiner?label:''),'ExamSmall',{alignment:X.AlignmentType.CENTER})]});
+  const sourceFooter=new X.Footer({children:[...footerBlocks.map(b=>sourceParagraph([b],left)),...originalFooter()]});
   const rules=page.rules||[],horizontal=rules.filter(r=>r.width>24&&(r.height||0)<2.5),vertical=rules.filter(r=>r.height>12&&r.width<2.5),frames=[],usedRules=new Set(),framedBlocks=new Set();
   for(const top of horizontal){const bottoms=horizontal.filter(r=>r!==top&&r.y>top.y+12&&Math.abs(r.x-top.x)<3&&Math.abs(r.width-top.width)<3).sort((a,b)=>a.y-b.y);
    for(const bottom of bottoms){const edges=vertical.filter(r=>r.y<=top.y+3&&r.y+r.height>=bottom.y-3&&r.x>=top.x-3&&r.x<=top.x+top.width+3);if(!edges.some(r=>Math.abs(r.x-top.x)<3)||!edges.some(r=>Math.abs(r.x-top.x-top.width)<3))continue;
@@ -144,7 +145,7 @@ async function documentFile(e,input,examiner=false){
    }
   }
   const rows=[];
-  function textRows(blocks){const result=[];for(const b of [...blocks].sort((a,b)=>a.y-b.y||a.x-b.x)){const row=result.at(-1);if(row&&Math.abs(row.y-b.y)<3&&row.blocks.every(a=>a.x+a.width<=b.x+2||b.x+b.width<=a.x+2)){row.blocks.push(b);row.bottom=Math.max(row.bottom,b.y+b.height);}else result.push({kind:'text',y:b.y,bottom:b.y+b.height,blocks:[b]});}return result;}
+  function textRows(blocks){const bullet=b=>b.width<=12&&/^[•·∙]$/.test(b.text.trim()),result=[];for(const b of [...blocks].sort((a,b)=>a.y-b.y||a.x-b.x)){const row=result.at(-1);if(row&&(Math.abs(row.y-b.y)<3||(bullet(b)||row.blocks.some(bullet))&&Math.abs(row.bottom-b.y-b.height)<3)&&row.blocks.every(a=>a.x+a.width<=b.x+2||b.x+b.width<=a.x+2)){row.blocks.push(b);row.bottom=Math.max(row.bottom,b.y+b.height);}else result.push({kind:'text',y:b.y,bottom:b.y+b.height,blocks:[b]});}return result;}
   rows.push(...textRows(bodyBlocks.filter(b=>!framedBlocks.has(b))),...frames);
   // Explicit source graphics are cropped drawings, never rendered source wording.
   for(const g of page.graphics||[]){if(bodyBlocks.some(b=>b.text.trim()&&b.x<g.x+g.width+6&&b.x+b.width>g.x-6&&b.y<g.y+g.height+3&&b.y+b.height>g.y-3))throw Error('Beschriftete Originalzeichnung kann nicht ohne veränderte Zuordnung in Word übertragen werden. Bitte die Zeichnung als eigenständige beschriftete Anlage hinterlegen.');rows.push({kind:'graphic',y:g.y,bottom:g.y+g.height,graphic:g});}
@@ -167,7 +168,7 @@ async function documentFile(e,input,examiner=false){
    previous=Math.max(previous,row.bottom);
   }
   if(rows.at(-1)?.kind==='frame')children.push(gap(0));
-  return {children,header,sourceFooter,margins:{top:tw(top),bottom:tw(footerBlocks.length?66:42),left:tw(left),right:tw(right),header:tw(headerBlocks[0]?.y||36),footer:tw(24)}};
+  return {children,header,sourceFooter,margins:{top:tw(top),bottom:tw(footerBlocks.length?66:S.scopeLabel(e)?56:42),left:tw(left),right:tw(right),header:tw(headerBlocks[0]?.y||36),footer:tw(24)}};
  }
  for(const [n,{task:t}] of e.items.entries()){
   if(t.sourceLayout){
