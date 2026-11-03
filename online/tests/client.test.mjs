@@ -229,3 +229,27 @@ test('new task authoring removes the obsolete reportbook allowance before saving
 test('duplicating a used old exam removes obsolete permissions only from the new copy',async()=>{
  const u=await ui('admin'),d=u.sandbox.testUI.getDb(),t=d.tasks[0],e=C.newExam({examType:t.examType,specialty:t.specialty,examYear:2025});e.status='used';e.items=[{id:'historic-item',originTaskId:t.id,task:{...structuredClone(t),text:'--- das Berichtsheft ist zulässig---'}}];d.exams.push(e);const before=JSON.stringify(e);await u.click('action','duplicate-exam',e.id);assert.equal(d.exams.length,2);assert.equal(JSON.stringify(d.exams[0]),before);assert.doesNotMatch(d.exams.at(-1).items[0].task.text,/Berichtsheft ist zulässig/);
 });
+
+test('AI paper assistance edits only the selected draft text, resets approval and expires with the session',async()=>{
+ const u=await ui(),d=u.sandbox.testUI.getDb(),t=d.tasks.find(t=>t.specialty==='Baumschule'&&t.examType==='ZP');
+ const e=C.newExam({specialty:t.specialty,examType:t.examType,examYear:2027,workshopId:'meeting'});C.addItem(e,t);d.exams.push(e);
+ e.items[0].task.reviewStatus='approved';e.items[0].task.solutionStatus='approved';e.items[0].task.reviewedBy='Test';
+ await u.click('action','select-exam',e.id);assert.match(u.elements.get('#app').innerHTML,/data-action="ai-paper"/);
+ let opened,closed=0,events=0;u.sandbox.Event=class{constructor(type){this.type=type;}};u.sandbox.HortiAI={open:v=>opened=v,close:()=>closed++};
+ const el={dataset:{paperItem:e.items[0].id,paperField:'text'},isConnected:true,getAttribute:()=> 'plaintext-only',dispatchEvent:()=>events++};
+ const points={...el,dataset:{paperItem:e.items[0].id,paperField:'points'}};
+ u.sandbox.document.querySelectorAll=q=>q==='[data-paper-field][contenteditable]'?[el,points]:[];
+ const oldBank=t.text,oldDraft=e.items[0].task.text;
+ await u.click('action','ai-paper');assert.equal(opened.targets.length,1);const target=opened.targets[0];assert.equal(target.read(),oldDraft);assert.equal(target.field,'task');assert.equal(e.items[0].task.text,oldDraft);
+ target.write('Stellen Sie die Materialien bereit.');assert.equal(e.items[0].task.text,'Stellen Sie die Materialien bereit.');assert.equal(t.text,oldBank);assert.equal(e.items[0].task.reviewStatus,'review');assert.equal(e.items[0].task.reviewedBy,'');assert.equal(events,1);assert.equal(target.valid(),true);
+ el.isConnected=false;assert.equal(target.valid(),false);el.isConnected=true;e.status='used';assert.equal(target.valid(),false);
+ u.online.onExpired();assert.equal(closed,1);assert.equal(target.valid(),false);
+});
+
+test('AI form acceptance resets manual approval fields and help explains explicit external processing',async()=>{
+ const u=await ui('admin');let binding;u.sandbox.HortiAI={bindForm:(container,options)=>binding=options};
+ const d=u.sandbox.testUI.getDb(),t=d.tasks[0];await u.click('action','edit-task',t.id);assert.ok(binding);taskFormValues(u,t);
+ u.elements.get('#task-review').value='approved';u.elements.get('#task-reviewer').value='Test';u.elements.get('#task-solution').value='Vorhandene Lösung.';u.elements.get('#task-solution-status').value='approved';
+ binding.onApply({field:'task'});assert.equal(u.elements.get('#task-review').value,'review');assert.equal(u.elements.get('#task-solution-status').value,'draft');assert.equal(u.elements.get('#task-reviewer').value,'');
+ const help=H.view({online:true});assert.match(help,/Erst „Vorschlag erstellen“/);assert.match(help,/Anthropic/);assert.match(help,/nicht ausschließlich in unserer EU-Datenbank/);assert.match(help,/keine zertifizierte Leichte Sprache/);
+});
