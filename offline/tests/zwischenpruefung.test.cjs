@@ -38,30 +38,30 @@ test('combined source tasks remain classified for review but cannot become eligi
  for(const t of [task('title','plantwork',{title:'Kombinationsaufgabe'}),task('units','plantwork',{practicalUnits:[{},{}]}),task('oral','plantwork',{kind:'oral'}),task('wrong','plantwork',{examType:'AP'}),task('unknown','Unbekannt')])assert.equal(P.eligibleZwischenpruefungTask(t),false);
 });
 
-test('new patterns infer eligible themes only, allow a chosen subset and never impose nine tasks',()=>{
- const d=db([task('a','plantwork'),task('b','Erntearbeiten und Aufbereitung'),task('c','Unbekannt')]),p=P.pattern(d,'ZP','Baumschule');assert.equal(p.categoryCatalog,'zp-general-2026');assert.deepEqual(p.slots,[{categoryId:'plantwork',count:1}]);
- const e=exam(d);C.addItem(e,d.tasks[0]);assert.equal(P.coverage(e).complete,true);
+test('new patterns preselect exactly three available themes and partial pools remain incomplete',()=>{
+ const d=db([task('a','plantwork'),task('b','Erntearbeiten und Aufbereitung'),task('c','Unbekannt')]),p=P.pattern(d,'ZP','Baumschule');assert.equal(p.categoryCatalog,'zp-general-2026');assert.equal(p.slots.length,3);assert.equal(p.slots[0].categoryId,'plantwork');
+ const e=exam(d);C.addItem(e,d.tasks[0]);assert.equal(P.coverage(e).complete,false);assert.match(P.coverage(e).issues.join(' '),/1 von 3/);
  assert.throws(()=>P.checkPattern({...p,slots:[{categoryId:'plantwork',count:2}]}),/genau einer/);
  assert.throws(()=>P.checkPattern({...p,slots:[{categoryId:'protection',count:1}]}),/Generalthemen/);
  assert.throws(()=>P.checkPattern({...p,examType:'AP'}),/Kategorienstand/);
- const empty=P.pattern(db(),'ZP','Baumschule');assert.equal(empty.categoryCatalog,'zp-general-2026');assert.deepEqual(empty.slots,[]);assert.doesNotThrow(()=>P.checkPattern(empty));assert.deepEqual(P.propose(db(),{examType:'ZP',specialty:'Baumschule',pattern:empty,items:[]}),[]);assert.match(P.coverage({examType:'ZP',specialty:'Baumschule',pattern:empty,items:[]}).issues.join(' '),/keine Generalthemen/);
+ const empty=P.pattern(db(),'ZP','Baumschule');assert.equal(empty.categoryCatalog,'zp-general-2026');assert.equal(empty.slots.length,3);assert.doesNotThrow(()=>P.checkPattern(empty));assert.deepEqual(P.propose(db(),{examType:'ZP',specialty:'Baumschule',pattern:empty,items:[]}),[]);assert.match(P.coverage({examType:'ZP',specialty:'Baumschule',pattern:empty,items:[]}).issues.join(' '),/0 von 3/);
  assert.doesNotThrow(()=>P.checkPattern({...empty,status:'confirmed'}));assert.equal(P.coverage({examType:'ZP',specialty:'Baumschule',pattern:{...empty,status:'confirmed'},items:[]}).complete,false);
 });
 
 test('old pattern snapshots and Excel assignments retain their old labels, counts and classification',()=>{
  const t=task('old','harvest',{planningCategories:['lifting'],planningCategoryCatalog:'excel-ap-2026'}),d=db([t]),old={id:'old-pattern',version:1,examType:'ZP',specialty:'Baumschule',status:'confirmed',categoryCatalog:'excel-ap-2026',slots:[{categoryId:'lifting',count:2}]};
  d.patterns=[old];const before=structuredClone(d);C.validate(d);assert.deepEqual(P.patternClassify(t,old).ids,['lifting']);assert.equal(P.label('propagation',{...t,pattern:old}),'Vermehren von Gehölzen');
- const unversioned={...old,categoryCatalog:undefined,slots:[{categoryId:'harvest',count:1}]};assert.deepEqual(P.patternClassify(t,unversioned).ids,['harvest']);assert.equal(P.label('harvest',{...t,pattern:unversioned}),'Ernte & Aufbereitung');assert.equal(P.coverage({examType:'ZP',specialty:'Baumschule',pattern:unversioned,items:[{task:t}]}).complete,true);
- const fresh=P.pattern(d,'ZP','Baumschule');assert.equal(fresh.categoryCatalog,'zp-general-2026');assert.equal(fresh.status,'proposed');assert.deepEqual(fresh.slots,[{categoryId:'harvest',count:1}]);assert.deepEqual(d,before);
- old.slots=[{categoryId:'propagation',count:3},{categoryId:'lifting',count:1}];assert.deepEqual(P.pattern(d,'ZP','Baumschule').slots,[{categoryId:'propagation',count:1}]);assert.equal(old.slots[0].count,3);
+ const unversioned={...old,categoryCatalog:undefined,slots:[{categoryId:'harvest',count:1}]};assert.deepEqual(P.patternClassify(t,unversioned).ids,['harvest']);assert.equal(P.label('harvest',{...t,pattern:unversioned}),'Ernte & Aufbereitung');assert.equal(P.coverage({examType:'ZP',specialty:'Baumschule',pattern:unversioned,items:[{task:t}]}).complete,false);
+ const fresh=P.pattern(d,'ZP','Baumschule');assert.equal(fresh.categoryCatalog,'zp-general-2026');assert.equal(fresh.status,'confirmed');assert.equal(fresh.slots.length,3);assert.ok(fresh.slots.some(s=>s.categoryId==='harvest'));assert.deepEqual(d,before);
+ old.slots=[{categoryId:'propagation',count:3},{categoryId:'lifting',count:1}];assert.equal(P.pattern(d,'ZP','Baumschule').slots.length,3);assert.ok(P.pattern(d,'ZP','Baumschule').slots.some(s=>s.categoryId==='propagation'));assert.equal(old.slots[0].count,3);
 });
 
 test('manual add and replacement guards reject combinations and repeated themes without touching snapshots',()=>{
  const first=task('first'),second=task('second'),combo=task('combo','Erntearbeiten und Aufbereitung'),d=db([first,second,combo]),e=exam(d,['plantwork','harvest']);
  const item=C.addItem(e,first),before=structuredClone(e);assert.throws(()=>C.addItem(e,second),/höchstens eine Aufgabe je Generalthema/);assert.throws(()=>C.addItem(e,combo),/Kombinationsaufgaben/);assert.deepEqual(e,before);
  assert.equal(P.zwischenpruefungSelectionIssue(e,second,item.id),'');assert.match(P.zwischenpruefungSelectionIssue(e,second),/höchstens/);assert.match(P.zwischenpruefungSelectionIssue(e,task('wrong','soil',{specialty:'Gemüsebau'})),/Prüfungsbereich/);
- const legacy=C.newExam({examType:'ZP',specialty:'Baumschule',pattern:{id:'legacy',version:1,examType:'ZP',specialty:'Baumschule',status:'confirmed',slots:[{categoryId:'plantwork',count:2}]}});C.addItem(legacy,first);assert.doesNotThrow(()=>C.addItem(legacy,second));
- const invalid={...e,items:[...e.items,{id:'duplicate',task:second},{id:'combo',task:combo}]};assert.equal(P.coverage(invalid).complete,false);assert.match(P.coverage(invalid).issues.join(' '),/höchstens.*Kombinationsaufgaben/);
+ const legacy=C.newExam({examType:'ZP',specialty:'Baumschule',pattern:{id:'legacy',version:1,examType:'ZP',specialty:'Baumschule',status:'confirmed',slots:[{categoryId:'plantwork',count:2}]}});C.addItem(legacy,first);assert.throws(()=>C.addItem(legacy,second),/höchstens eine Aufgabe/);
+ const invalid={...e,items:[...e.items,{id:'duplicate',task:second},{id:'combo',task:combo}]};assert.equal(P.coverage(invalid).complete,false);assert.match(P.coverage(invalid).issues.join(' '),/anderen Generalthema/);assert.match(P.coverage(invalid).issues.join(' '),/Kombinationsaufgaben/);
 });
 
 test('proposals rotate all alternative families, prioritize older recorded uses and leave data untouched',()=>{

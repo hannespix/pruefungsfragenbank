@@ -1,11 +1,11 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const C=require('../src/core.js'),S=require('../src/source-layout.js'),W=require('../src/paper.js'),AI=require('../src/ai.js');
+const C=require('../src/core.js'),S=require('../src/source-layout.js'),W=require('../src/paper.js'),AI=require('../src/ai.js'),L=require('../src/planning.js');
 const block=(id,text,x,y,width=440,bold=false)=>{const lines=text.split('\n').map(text=>({text,runs:[{text,bold,italic:false}]}));return {id,text,originalText:text,x,y,width,height:lines.length*14+1,fontSize:12,lineHeight:14,lines};};
 function fixture(){
  const d=C.validate(JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname,'../demo.json')))),t=C.clone(d.tasks[0]);
  const blocks=[block('heading','Arbeitsauftrag',40,60,200,true),block('start','Ermitteln Sie den Bedarf für die vorgesehene',40,100),block('wrap','Pflanzfläche und begründen Sie das Ergebnis.',58,114,400),block('numbers','1. Bereiten Sie das Material vor.\n2. Prüfen Sie vor dem Aufbau',40,160),block('indent','die Bauteile gemeinsam.',58,188,350),block('bullet','•',40,222,6),block('bullet-body','Beschriften Sie die ausgewählten Bauteile\nund dokumentieren Sie die Zuordnung.',58,220,400),block('next-bullet','•',40,264,6),block('next-body','Kontrollieren Sie das Arbeitsergebnis.',58,262,400),block('heading-two','Dokumentation',40,310,200,true),block('note','Notieren Sie Ihre Beobachtungen.',40,338),block('left-cell','Name:',40,380,150),block('right-cell','Datum:',320,380,150)];
  t.text=blocks.map(b=>b.text).join('\n');t.sourceLayout={version:1,sourceId:t.sourceIds[0],reference:'synthetic-paragraphs',sourcePdfHash:'a'.repeat(64),baselineText:t.text,warnings:[],pages:[{width:595.276,height:841.89,backgroundAssetId:'background-demo',logos:[],blocks},{width:595.276,height:841.89,backgroundAssetId:'background-demo',logos:[],blocks:[]}]};
- d.assets.push({id:'background-demo',name:'Seite.png',mime:'image/png',data:'YWJj'});t.assetLinks.push({assetId:'background-demo',audience:'candidate',role:'source-page'});const e=C.newExam({specialty:t.specialty,examType:t.examType});C.addItem(e,t);return {d,e,t:e.items[0].task};
+ d.assets.push({id:'background-demo',name:'Seite.png',mime:'image/png',data:'YWJj'});t.assetLinks.push({assetId:'background-demo',audience:'candidate',role:'source-page'});L.assignCategories(t,['plantwork'],'Synthetisch bestätigte Einzelaufgabe');const e=C.newExam({specialty:t.specialty,examType:t.examType,examYear:2026,pattern:L.pattern({...d,tasks:[t]},t.examType,t.specialty)});C.addItem(e,t);return {d,e,t:e.items[0].task};
 }
 test('source editing groups wrapped and indented continuations while separating points, headings and columns',()=>{
  assert.equal(typeof S.groups,'function');const {t}=fixture(),page=t.sourceLayout.pages[0],before=JSON.stringify(page),groups=S.groups(page);
@@ -32,10 +32,10 @@ test('AI reads and replaces a complete connected point without including its nei
  await session.checkStatus();await session.generate();assert.equal(calls[1].payload.text,g.text);assert.equal(session.accept(),true);assert.equal(S.read(item.task,neighbour.id),neighbour.text);assert.equal(session.undo(),true);assert.equal(S.read(item.task,g.id),g.text);
 });
 test('current Zwischenprüfung inline source edits cannot turn an individual task into a combination',()=>{
- const {e,t}=fixture(),L=require('../src/planning.js');e.examType=t.examType='ZP';e.pattern={categoryCatalog:'zp-general-2026'};L.assignCategories(t,['harvest'],'Synthetisches Generalthema');
+ const {e,t}=fixture();L.assignCategories(t,['harvest'],'Synthetisches Generalthema');e.pattern.slots=['harvest','soil','propagation'].map(categoryId=>({categoryId,count:1}));
  const g=S.groups(t.sourceLayout.pages[0])[0],before=JSON.stringify(e);
  assert.throws(()=>W.edit(e,e.items[0].id,'source-block','Erntearbeiten und Aufbereitung',g.id),/Einzelaufgaben|Kombinationsaufgaben/);assert.equal(JSON.stringify(e),before);
- delete e.pattern;assert.equal(W.edit(e,e.items[0].id,'source-block','Erntearbeiten und Aufbereitung',g.id),true,'historical exam policy remains unchanged');
+ e.examYear=2025;delete e.pattern;delete e.structureRequirementVersion;assert.equal(W.edit(e,e.items[0].id,'source-block','Erntearbeiten und Aufbereitung',g.id),true,'historical exam policy remains unchanged');
 });
 test('source edits preserve unrelated literal blank lines and reject invalid point metadata',()=>{
  const {t}=fixture(),p=t.sourceLayout.pages[0];p.blocks.push(block('literal-lines','Abstand\n\nUnverändert',40,440));const g=S.groups(p)[1];S.edit(t,g.id,'Geänderter zusammenhängender Text.');assert.equal(p.blocks.at(-1).text,'Abstand\n\nUnverändert');

@@ -1,5 +1,10 @@
 # Gartenbaufachwerker – Abschlussprüfung
 
+Aktueller Prüfungsaufbau: **vier praktische Aufgaben und 180 Minuten** nach
+§ 11 GBFWVO Baden-Württemberg. Eine Pflicht zu vier verschiedenen Generalthemen
+besteht nicht. Die früher aus dem Pool vorgeschlagenen Kategoriequoten bestimmen
+die Aufgabenanzahl nicht mehr. Siehe [verbindliche Regeln und Quellenabgleich](exam-requirements.md).
+
 Die Fachwerker-Abschlussprüfung ist ein eigener Prüfungsbereich (`FW_AP`) für Gemüsebau und Zierpflanzenbau. Bestehende Gärtnerbereiche `AP` und `ZP` bleiben erhalten. UI, Aufgabenbank, Prüfungsmuster, Rotation, Quellenarchiv und Exporte unterscheiden den Bereich ausdrücklich. Andere Fachrichtungen und eine Fachwerker-Zwischenprüfung werden nicht angeboten.
 
 Der zusätzliche Bereich nutzt die bestehenden Fachrichtungsgruppen und deren temporäre Gerätefreigaben. Es entstehen keine zusätzlichen Zugangsdaten oder Exportrechte. Aufgaben verschiedener Prüfungsbereiche dürfen nicht in einer Prüfung vermischt werden; die Datenvalidierung und der Server prüfen dies unabhängig von der Oberfläche.

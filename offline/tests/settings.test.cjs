@@ -15,7 +15,7 @@ test('scoped settings rename without mutating matching rules or other catalogs; 
 test('custom categories validate, filter, suggest and export with explicit project context',()=>{
  const t=task(),d=project([t]),r=setting();r.categories=[{id:custom,label:'Spezielle Arbeit'}];d.settings=[r];L.assignCategories(t,[custom],'Manuell geprüft',L.projectContext(d,t));C.validate(d);assert.throws(()=>C.checkTask(t),/Kategorie/);
  assert.deepEqual(L.classify(t,{context:L.projectContext(d,t)}).ids,[custom]);assert.deepEqual(B.facets(d).categories.map(c=>c.id),[custom]);assert.equal(B.package(d,[t]).tasks[0].categories[0].label,'Spezielle Arbeit');
- const e=C.newExam({examType:'ZP',specialty:'Baumschule',pattern:snapshot(d,'ZP','Baumschule',[custom])});assert.deepEqual(L.propose(d,e).map(t=>t.id),['t']);C.addItem(e,t);d.exams.push(e);C.validate(d);assert.equal(L.coverage(e).complete,true);
+ const e=C.newExam({examType:'ZP',specialty:'Baumschule',pattern:snapshot(d,'ZP','Baumschule',[custom])});assert.deepEqual(L.propose(d,e).map(t=>t.id),['t']);C.addItem(e,t);d.exams.push(e);C.validate(d);assert.equal(L.coverage(e).complete,false);assert.match(L.coverage(e).issues.join(' '),/1 von 3/);
 });
 test('new exam definitions freeze labels while legacy snapshots retain original labels',()=>{
  const d=project([task()]),r=setting();r.categories=[{id:'propagation',label:'Stand A'}];d.settings=[r];const e=C.newExam({examType:'ZP',specialty:'Baumschule',pattern:snapshot(d)});C.addItem(e,d.tasks[0]);d.exams.push(e);const old=JSON.stringify(e);r.categories[0].label='Stand B';r.revision++;
@@ -24,7 +24,7 @@ test('new exam definitions freeze labels while legacy snapshots retain original 
 });
 test('hidden IDs remain valid in bank and saved exams but disappear from new choices and suggestions',()=>{
  const t=task(),d=project([t]),r=setting();d.settings=[r];const e=C.newExam({examType:'ZP',specialty:'Baumschule',pattern:snapshot(d)});C.addItem(e,t);d.exams.push(e);r.categories=[{id:'propagation',hidden:true}];r.revision++;
- C.validate(d);assert.ok(!L.categories(d,'ZP','Baumschule').some(c=>c.id==='propagation'));assert.equal(L.coverage(e).complete,true);assert.deepEqual(L.rank(d,'ZP','Baumschule','propagation'),[]);
+ C.validate(d);assert.ok(!L.categories(d,'ZP','Baumschule').some(c=>c.id==='propagation'));assert.equal(L.coverage(e).complete,false);assert.match(L.coverage(e).issues.join(' '),/1 von 3/);assert.deepEqual(L.rank(d,'ZP','Baumschule','propagation'),[]);
  const fresh=C.newExam({examType:'ZP',specialty:'Baumschule',pattern:snapshot(d)});assert.throws(()=>C.addItem(fresh,t),/aktiven Generalthemen/);assert.deepEqual(L.propose(d,fresh),[]);fresh.items=[structuredClone(e.items[0])];assert.equal(L.coverage(fresh).complete,false);
 });
 test('settings cannot erase referenced custom IDs, inject unsupported rules, or use malformed IDs',()=>{

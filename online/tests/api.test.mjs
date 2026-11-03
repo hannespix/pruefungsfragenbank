@@ -33,21 +33,23 @@ test('approval grants only the invited specialty and removes source archives',as
 test('closing and reopening a meeting revokes approved devices and previous invitations',async()=>{const t=await setup(),g=await group(t);assert.equal((await t.req('/api/access/close',{meetingId:'meeting'},t.admin)).status,200);assert.equal((await t.req('/api/project',undefined,g.token)).status,401);await t.req('/api/access/open',{meetingId:'meeting',expires:Date.now()+3600000},t.admin);assert.equal((await t.req('/api/join',{invitation:g.invite,label:'Old'})).status,401);assert.equal((await t.req('/api/project',undefined,g.token)).status,401);});
 test('expiry and explicit logout invalidate server sessions',async()=>{const t=await setup(),g=await group(t);t.DB.db.prepare('UPDATE access SET expires=?').run(Date.now()-1);assert.equal((await t.req('/api/session',undefined,g.token)).status,401);await t.req('/api/logout',{},t.admin);assert.equal((await t.req('/api/project',undefined,t.admin)).status,401);});
 test('group saves its own draft but cannot change patterns, other specialties or approve work',async()=>{const t=await setup(),g=await group(t),e=workflowExam(t.seed);const save=changes=>t.req('/api/save',{changes},g.token);assert.equal((await save([{kind:'exams',id:e.id,version:0,value:e}])).status,200);assert.equal((await save([{kind:'patterns',id:'bad',version:0,value:{id:'bad'}}])).status,403);assert.equal((await save([{kind:'exams',id:'other',version:0,value:{...e,id:'other',specialty:'Obstbau'}}])).status,403);const approved=structuredClone(e);approved.status='used';assert.equal((await save([{kind:'exams',id:e.id,version:1,value:approved}])).status,403);});
-test('Excel category patterns round-trip through the server and groups can use but not alter them',async()=>{
+test('stored Excel category patterns remain readable while new AP exams use fixed requirements',async()=>{
  const t=await setup(),specialty='Garten- und Landschaftsbau',pattern={id:'excel-pattern',version:1,examType:'AP',specialty,status:'confirmed',categoryCatalog:'excel-ap-2026',slots:[{categoryId:'drainage',count:1}]};
  assert.equal((await t.req('/api/save',{changes:[{kind:'patterns',id:pattern.id,version:0,value:pattern}]},t.admin)).status,200);
  const g=await group(t,specialty),p=(await t.req('/api/project',undefined,g.token)).body.project.patterns.find(p=>p.id===pattern.id);
  assert.deepEqual(p,pattern);
  const e=C.newExam({examType:'AP',specialty,examYear:2027,workshopId:'meeting'});e.pattern=P.snapshotPattern({settings:[]},p);
+ assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:0,value:e}]},g.token)).status,403);
+ const project=(await t.req('/api/project',undefined,g.token)).body.project;e.pattern=P.snapshotPattern(project,P.pattern(project,'AP',specialty));
  assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:0,value:e}]},g.token)).status,200);
  const altered=structuredClone(e);delete altered.pattern.categoryCatalog;
  assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:1,value:altered}]},g.token)).status,403);
 });
 test('optimistic revisions preserve another editor changes and reject stale overwrites atomically',async()=>{const t=await setup(),e=C.newExam({examType:'ZP',specialty:'Baumschule',examYear:2027,workshopId:'meeting'}),save=changes=>t.req('/api/save',{changes},t.admin);assert.equal((await save([{kind:'exams',id:e.id,version:0,value:e}])).status,200);assert.equal((await save([{kind:'exams',id:e.id,version:1,value:{...e,title:'Winner'}}])).status,200);const second={...e,id:'second'};assert.equal((await save([{kind:'exams',id:second.id,version:0,value:second},{kind:'exams',id:e.id,version:1,value:{...e,title:'Stale'}}])).status,409);const p=(await t.req('/api/project',undefined,t.admin)).body.project;assert.equal(p.exams.find(x=>x.id===e.id).title,'Winner');assert.ok(!p.exams.some(x=>x.id==='second'));});
-test('group cannot fetch unassigned assets or attach foreign tasks',async()=>{const t=await setup(),g=await group(t);const foreign=t.seed.tasks.find(x=>x.specialty!=='Baumschule');const e=C.newExam({examType:'ZP',specialty:'Baumschule',examYear:2027,workshopId:'meeting'});C.addItem(e,foreign);assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:0,value:e}]},g.token)).status,403);t.DB.db.prepare('INSERT INTO records VALUES(?,?,?,1)').run('assets','secret',JSON.stringify({id:'secret',mime:'image/png',name:'secret.png',data:''}));t.DB.db.prepare('INSERT INTO assets VALUES(?,?)').run('secret','c2VjcmV0');assert.equal((await t.req('/api/assets?ids=secret',undefined,g.token)).status,404);});
+test('group cannot fetch unassigned assets or attach foreign tasks',async()=>{const t=await setup(),g=await group(t);const foreign=t.seed.tasks.find(x=>x.specialty!=='Baumschule');const e=C.newExam({examType:'ZP',specialty:'Baumschule',examYear:2027,workshopId:'meeting'});e.items=directItems([foreign]);assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:0,value:e}]},g.token)).status,403);t.DB.db.prepare('INSERT INTO records VALUES(?,?,?,1)').run('assets','secret',JSON.stringify({id:'secret',mime:'image/png',name:'secret.png',data:''}));t.DB.db.prepare('INSERT INTO assets VALUES(?,?)').run('secret','c2VjcmV0');assert.equal((await t.req('/api/assets?ids=secret',undefined,g.token)).status,404);});
 test('login attempts are rate limited and malformed/oversized requests are denied',async()=>{const t=await setup();for(let i=0;i<5;i++)await t.req('/api/login',{password:'wrong'});assert.equal((await t.req('/api/login',{password:'wrong'})).status,429);const r=await handle(new Request('https://api.test/api/login',{method:'POST',headers:{Origin:t.env.ALLOWED_ORIGIN,'Content-Type':'application/json'},body:'x'.repeat(20000)}),t.env);assert.equal(r.status,413);});
 
-test('group can save and copy approved custom snapshots after source sanitization',async()=>{const t=await setup(),g=await group(t);const task=t.seed.tasks.find(x=>x.specialty==='Baumschule'&&x.kind==='practical');task.text='Aufgabe: Durchführen von Arbeiten an der Pflanze\nHier: Synthetisches Beispiel.\n'+task.text;assert.equal((await t.req('/api/save',{changes:[{kind:'tasks',id:task.id,version:1,value:task}]},t.admin)).status,200);const e=C.newExam({examType:task.examType,specialty:task.specialty,examYear:2027,workshopId:'meeting'});const P=(await import('../../offline/src/planning.js')).default;const pattern={...P.pattern(t.seed,e.examType,e.specialty),categoryCatalog:'excel-ap-2026',slots:[{categoryId:'propagation',count:1}]};t.DB.db.prepare('INSERT INTO records VALUES(?,?,?,1)').run('patterns',pattern.id,JSON.stringify(pattern));e.pattern=pattern;C.addItem(e,task);e.items[0].task.text+='\nFachlich angepasste Fassung';e.items[0].task.solution='Freigegebene Lösung';e.items[0].task.reviewStatus='approved';e.items[0].task.solutionStatus='approved';e.items[0].task.reviewedBy='Koordination';const asset=t.seed.assets[0];if(asset)e.items[0].task.assetLinks.push({assetId:asset.id,audience:'source',caption:'Original'});const saved=await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:0,value:e}]},t.admin);assert.equal(saved.status,200,JSON.stringify(saved.body));const p=(await t.req('/api/project',undefined,g.token)).body.project;const visible=p.exams.find(x=>x.id===e.id);visible.title+=' · Neuer Titel';assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:1,value:visible}]},g.token)).status,200);const copied={...structuredClone(visible),id:'copy-checked',basedOnExamId:e.id};copied.pattern=P.snapshotPattern(p,P.pattern(p,copied.examType,copied.specialty));copied.pattern.slots=[{categoryId:'plantwork',count:1}];const copiedResult=await t.req('/api/save',{changes:[{kind:'exams',id:copied.id,version:0,value:copied}]},g.token);assert.equal(copiedResult.status,200,JSON.stringify(copiedResult.body));visible.items[0].task.text+=' unerlaubt freigegeben';assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:2,value:visible}]},g.token)).status,403);});
+test('group can save and copy approved custom snapshots after source sanitization',async()=>{const t=await setup(),g=await group(t);const task=t.seed.tasks.find(x=>x.specialty==='Baumschule'&&x.kind==='practical');task.text='Aufgabe: Durchführen von Arbeiten an der Pflanze\nHier: Synthetisches Beispiel.\n'+task.text;assert.equal((await t.req('/api/save',{changes:[{kind:'tasks',id:task.id,version:1,value:task}]},t.admin)).status,200);const e=workflowExam(t.seed,task.examType,task.specialty);e.pattern.slots=[{categoryId:'plantwork',count:1}];C.addItem(e,task);e.items[0].task.text+='\nFachlich angepasste Fassung';e.items[0].task.solution='Freigegebene Lösung';e.items[0].task.reviewStatus='approved';e.items[0].task.solutionStatus='approved';e.items[0].task.reviewedBy='Koordination';const asset=t.seed.assets[0];if(asset)e.items[0].task.assetLinks.push({assetId:asset.id,audience:'source',caption:'Original'});const saved=await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:0,value:e}]},t.admin);assert.equal(saved.status,200,JSON.stringify(saved.body));const p=(await t.req('/api/project',undefined,g.token)).body.project;const visible=p.exams.find(x=>x.id===e.id);visible.title+=' · Neuer Titel';assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:1,value:visible}]},g.token)).status,200);const copied={...structuredClone(visible),id:'copy-checked',basedOnExamId:e.id};copied.pattern=P.snapshotPattern(p,P.pattern(p,copied.examType,copied.specialty));copied.pattern.slots=[{categoryId:'plantwork',count:1}];const copiedResult=await t.req('/api/save',{changes:[{kind:'exams',id:copied.id,version:0,value:copied}]},g.token);assert.equal(copiedResult.status,200,JSON.stringify(copiedResult.body));visible.items[0].task.text+=' unerlaubt freigegeben';assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:2,value:visible}]},g.token)).status,403);});
 
 test('large private assets are chunked and retrieved unchanged only after authorization',async()=>{const t=await setup(),data='YQ=='.repeat(160000),a={id:'large-private',name:'large.png',mime:'image/png',data:''};assert.equal((await t.req('/api/asset/upload',{asset:{id:a.id,data}},t.admin)).status,200);assert.ok(t.DB.db.prepare('SELECT count(*) AS n FROM asset_chunks WHERE id=?').get(a.id).n>1);assert.equal((await t.req('/api/save',{changes:[{kind:'assets',id:a.id,version:0,value:a}]},t.admin)).status,200);assert.equal((await t.req('/api/assets?ids='+a.id,undefined,t.admin)).body.assets[0].data,data);assert.equal((await t.req('/api/asset/upload',{asset:{id:a.id,data:'Yg=='}},t.admin)).status,409);});
 
@@ -60,7 +62,7 @@ test('48-hour invitations and approved devices can be revoked early',async()=>{
  assert.equal((await t.req('/api/access/approve',{requestId:pending.id},t.admin)).status,200);assert.equal((await t.req('/api/access/revoke',{requestId:pending.id},t.admin)).status,200);assert.equal((await t.req('/api/project',undefined,joined.body.token)).status,401);
  assert.equal((await t.req('/api/access/close',{meetingId:'meeting'},t.admin)).status,200);assert.equal((await t.req('/api/join',{invitation,label:'Again'})).status,401);
 });
-test('only admins can trash or restore drafts; groups cannot read or overwrite them',async()=>{const t=await setup(),g=await group(t),e=C.newExam({examType:'ZP',specialty:'Baumschule',examYear:2027,workshopId:'meeting'}),save=(value,version,token=t.admin)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},token);assert.equal((await save(e,0)).status,200);const deleted={...e,deletedAt:new Date().toISOString()};assert.equal((await save(deleted,1,g.token)).status,403);assert.equal((await save(deleted,1)).status,200);assert.ok(!(await t.req('/api/project',undefined,g.token)).body.project.exams.some(x=>x.id===e.id));assert.equal((await save(e,2,g.token)).status,403);assert.equal((await save(e,2)).status,200);const used={...e,status:'used'};assert.equal((await save(used,3)).status,200);assert.equal((await save({...used,deletedAt:deleted.deletedAt},4)).status,400);assert.equal((await save(null,4)).status,400);});
+test('only admins can trash or restore drafts; groups cannot read or overwrite them',async()=>{const t=await setup(),g=await group(t),e=await completeStructureExam(t),save=(value,version,token=t.admin)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},token);assert.equal((await save(e,0)).status,200);const deleted={...e,deletedAt:new Date().toISOString()};assert.equal((await save(deleted,1,g.token)).status,403);assert.equal((await save(deleted,1)).status,200);assert.ok(!(await t.req('/api/project',undefined,g.token)).body.project.exams.some(x=>x.id===e.id));assert.equal((await save(e,2,g.token)).status,403);assert.equal((await save(e,2)).status,200);const used={...e,status:'used'};assert.equal((await save(used,3)).status,200);assert.equal((await save({...used,deletedAt:deleted.deletedAt},4)).status,400);assert.equal((await save(null,4)).status,400);});
 test('historical PDF attachments stay private even when the group knows their identifier',async()=>{const t=await setup(),s=t.seed.sources.find(s=>t.seed.tasks.some(x=>x.specialty==='Baumschule'&&x.sourceIds.includes(s.id))),a={id:'historical-print-copy',name:'Archiv.pdf',mime:'application/pdf',data:'',archiveRole:'source-print-pdf',sourceSha256:'a'.repeat(64)};assert.ok(s);assert.equal((await t.req('/api/asset/upload',{asset:{id:a.id,data:'JVBERi0='}},t.admin)).status,200);assert.equal((await t.req('/api/save',{changes:[{kind:'assets',id:a.id,version:0,value:a},{kind:'sources',id:s.id,version:1,value:{...s,attachmentIds:[...s.attachmentIds,a.id]}}]},t.admin)).status,200);const g=await group(t),project=(await t.req('/api/project',undefined,g.token)).body.project;assert.ok(!project.assets.some(x=>x.id===a.id));assert.ok(project.sources.every(s=>!s.attachmentIds.includes(a.id)));assert.equal((await t.req('/api/assets?ids='+a.id,undefined,g.token)).status,404);assert.equal((await t.req('/api/assets?ids='+a.id,undefined,t.admin)).status,200);});
 
 test('permanent deletion is admin-only, trash-only and rejects stale restore or save',async()=>{
@@ -174,12 +176,12 @@ test('new ZP patterns round-trip and reject group selections of combinations or 
  const save=(value,version)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},g.token);assert.equal((await save(e,0)).status,200);
  const invalid=structuredClone(e);invalid.items.push({id:'combined-item',originTaskId:combo.id,task:d.tasks.find(x=>x.id===combo.id)});assert.equal((await save(invalid,1)).status,400);
  invalid.items[1]={id:'same-theme',originTaskId:single.id,task:structuredClone(invalid.items[0].task)};assert.equal((await save(invalid,1)).status,400);
- const changed=structuredClone(e);changed.items[0].task.planningCategories=['plantwork','propagation'];assert.equal((await save(changed,1)).status,400);
+ const changed=structuredClone(e);changed.items[0].task.planningCategories=['plantwork','propagation'];changed.items[0].task.reviewStatus='review';changed.items[0].task.solutionStatus='draft';assert.equal((await save(changed,1)).status,400);
  e.title+=' · bearbeitet';assert.equal((await save(e,1)).status,200);
 });
 
 test('internal exam remarks round-trip within group permissions and reject malformed values',async()=>{
- const t=await setup(),g=await group(t),e=workflowExam(t.seed);e.internalNotes='Ausschuss an Koordination:\n<Material> & Termin klären.';const save=(value,version,token=g.token)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},token);
+ const t=await setup(),g=await group(t),e=await completeStructureExam(t);e.internalNotes='Ausschuss an Koordination:\n<Material> & Termin klären.';const save=(value,version,token=g.token)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},token);
  assert.equal((await save(e,0)).status,200);for(const token of [g.token,t.admin])assert.equal((await t.req('/api/project',undefined,token)).body.project.exams.find(x=>x.id===e.id).internalNotes,e.internalNotes);
  for(const internalNotes of [null,{},42,'x'.repeat(20001)])assert.equal((await save({...e,internalNotes},1)).status,400);
  const foreign=await group(t,'Obstbau');assert.ok(!(await t.req('/api/project',undefined,foreign.token)).body.project.exams.some(x=>x.id===e.id));assert.equal((await save({...e,internalNotes:'Fremde Änderung'},1,foreign.token)).status,403);
@@ -187,7 +189,7 @@ test('internal exam remarks round-trip within group permissions and reject malfo
 });
 
 test('group draft handoff timestamps round-trip without marking use or approval',async()=>{
- const t=await setup(),g=await group(t),e=workflowExam(t.seed);e.submittedAt=e.updatedAt='2026-11-03T12:34:56.000Z';const save=(value,version)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},g.token);assert.equal((await save(e,0)).status,200);
+ const t=await setup(),g=await group(t),e=await completeStructureExam(t);e.submittedAt=e.updatedAt='2026-11-03T12:34:56.000Z';const save=(value,version)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},g.token);assert.equal((await save(e,0)).status,200);
  const d=(await t.req('/api/project',undefined,t.admin)).body.project,saved=d.exams.find(x=>x.id===e.id);assert.equal(saved.submittedAt,e.submittedAt);assert.equal(saved.status,'draft');assert.ok(!d.uses.some(u=>u.examId===e.id));for(const submittedAt of [null,42,{},'yesterday','2026-11-03'])assert.equal((await save({...e,submittedAt},1)).status,400);
 });
 
@@ -211,7 +213,7 @@ test('new group ZP snapshots allow active theme subsets but reject omitted or fo
 });
 
 test('legacy ZP drafts remain editable but legacy copies must adopt a snapshot and reject combined tasks',async()=>{
- const t=await setup(),[combo]=await workflowTasks(t,[{id:'legacy-combination',text:'Aufgabe: Erntearbeiten und Aufbereitung\nHier: Synthetisches Beispiel.'}]),legacy=C.newExam({examType:'ZP',specialty:'Baumschule',examYear:2027,workshopId:'meeting'});C.addItem(legacy,combo);const save=(value,version,token)=>t.req('/api/save',{changes:[{kind:'exams',id:value.id,version,value}]},token);assert.equal((await save(legacy,0,t.admin)).status,200);const g=await group(t),d=(await t.req('/api/project',undefined,g.token)).body.project;legacy.title+=' bearbeitet';assert.equal((await save(legacy,1,g.token)).status,200);
+ const t=await setup(),[combo]=await workflowTasks(t,[{id:'legacy-combination',text:'Aufgabe: Erntearbeiten und Aufbereitung\nHier: Synthetisches Beispiel.'}]),legacy=C.newExam({examType:'ZP',specialty:'Baumschule',examYear:2027,workshopId:'meeting'});legacy.items=directItems([combo]);delete legacy.structureRequirementVersion;t.DB.db.prepare('INSERT INTO records VALUES(?,?,?,1)').run('exams',legacy.id,JSON.stringify(legacy));const save=(value,version,token)=>t.req('/api/save',{changes:[{kind:'exams',id:value.id,version,value}]},token);const g=await group(t),d=(await t.req('/api/project',undefined,g.token)).body.project;legacy.title+=' bearbeitet';assert.equal((await save(legacy,1,g.token)).status,200);
  const copied={...structuredClone(legacy),id:'legacy-copy',basedOnExamId:legacy.id};assert.equal((await save(copied,0,g.token)).status,403);copied.pattern=workflowExam(d).pattern;assert.equal((await save(copied,0,g.token)).status,400);
 });
 
@@ -245,7 +247,7 @@ test('referenced custom settings categories cannot be removed by deleting the se
 });
 
 test('trusted historical admin imports stay legacy while new drafts and group copies derive current requirements',async()=>{
- const t=await setup(),legacy=C.newExam({examType:'AP',specialty:'Baumschule',examYear:2026});delete legacy.oralRequirementVersion;delete legacy.materialRequirementVersion;legacy.status='used';const save=(value,version,token=t.admin)=>t.req('/api/save',{changes:[{kind:'exams',id:value.id,version,value}]},token);const imported=await save(legacy,0);assert.equal(imported.status,200,JSON.stringify(imported.body));const oldYear={...structuredClone(legacy),id:'pre-2026-archive',status:'draft',examYear:2025};assert.equal((await save(oldYear,0)).status,200);
+ const t=await setup(),legacy=C.newExam({examType:'AP',specialty:'Baumschule',examYear:2026});delete legacy.oralRequirementVersion;delete legacy.materialRequirementVersion;delete legacy.structureRequirementVersion;legacy.status='used';const save=(value,version,token=t.admin)=>t.req('/api/save',{changes:[{kind:'exams',id:value.id,version,value}]},token);const imported=await save(legacy,0);assert.equal(imported.status,200,JSON.stringify(imported.body));const oldYear={...structuredClone(legacy),id:'pre-2026-archive',status:'draft',examYear:2025};assert.equal((await save(oldYear,0)).status,200);
  let d=(await t.req('/api/project',undefined,t.admin)).body.project;for(const id of [legacy.id,oldYear.id]){const stored=d.exams.find(e=>e.id===id);assert.equal(stored.oralRequirementVersion,undefined);assert.equal(stored.materialRequirementVersion,undefined);}
  const current={...structuredClone(oldYear),id:'current-admin-draft',examYear:2027};assert.equal((await save(current,0)).status,200);d=(await t.req('/api/project',undefined,t.admin)).body.project;assert.equal(d.exams.find(e=>e.id===current.id).oralRequirementVersion,1);
  const assignedArchive={...structuredClone(legacy),id:'assigned-historical-archive',examYear:2027,workshopId:'meeting'};assert.equal((await save(assignedArchive,0)).status,200);const g=await group(t),visible=(await t.req('/api/project',undefined,g.token)).body.project,copy={...structuredClone(assignedArchive),id:'legacy-group-copy',status:'draft',basedOnExamId:assignedArchive.id,pattern:P.snapshotPattern(visible,P.pattern(visible,'AP','Baumschule'))};const copied=await save(copy,0,g.token);assert.equal(copied.status,200,JSON.stringify(copied.body));d=(await t.req('/api/project',undefined,g.token)).body.project;assert.equal(d.exams.find(e=>e.id===copy.id).oralRequirementVersion,1);assert.equal(d.exams.find(e=>e.id===copy.id).materialRequirementVersion,1);
@@ -253,7 +255,7 @@ test('trusted historical admin imports stay legacy while new drafts and group co
 
 test('Fachwerker oral selection never borrows Gärtner oral tasks and remains optional until handoff',async()=>{
  const t=await setup(),tasks=await workflowTasks(t,[{id:'oral-fw',examType:'FW_AP',specialty:'Gemüsebau',kind:'oral'},{id:'oral-gardener',examType:'AP',specialty:'Gemüsebau',kind:'oral'},{id:'practical-fw',examType:'FW_AP',specialty:'Gemüsebau',text:'Aufgabe: Durchführen von Bodenbearbeitungsmaßnahmen\nHier: Synthetische Tätigkeit.'}]),g=await group(t,'Gemüsebau'),d=(await t.req('/api/project',undefined,g.token)).body.project,e=workflowExam(d,'FW_AP','Gemüsebau'),save=(value,version)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},g.token);assert.equal((await save(e,0)).status,200);
- const wrong={...e,oralItem:{id:'wrong-oral',originTaskId:tasks[1].id,task:tasks[1]}};assert.equal((await save(wrong,1)).status,403);C.setOralItem(e,d.tasks.find(t=>t.id===tasks[0].id));e.submittedAt=e.updatedAt='2026-11-03T16:00:00.000Z';assert.equal((await save(e,1)).status,200);const stored=(await t.req('/api/project',undefined,g.token)).body.project.exams.find(x=>x.id===e.id);assert.equal(stored.oralItem.originTaskId,tasks[0].id);assert.equal(stored.status,'draft');
+ const wrong={...e,oralItem:{id:'wrong-oral',originTaskId:tasks[1].id,task:tasks[1]}};assert.equal((await save(wrong,1)).status,403);C.setOralItem(e,d.tasks.find(t=>t.id===tasks[0].id));e.submittedAt=e.updatedAt='2026-11-03T16:00:00.000Z';assert.equal((await save(e,1)).status,400);e.items=(await completeStructureExam(t,'FW_AP','Gemüsebau')).items;assert.equal((await save(e,1)).status,200);const stored=(await t.req('/api/project',undefined,g.token)).body.project.exams.find(x=>x.id===e.id);assert.equal(stored.oralItem.originTaskId,tasks[0].id);assert.equal(stored.status,'draft');
 });
 
 
@@ -319,4 +321,90 @@ test('specialty ZP settings are isolated and an explicit additional theme is ava
  assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:0,value:e}]},g.token)).status,200);
  const other=await group(t,'Garten- und Landschaftsbau'),foreign=(await t.req('/api/project',undefined,other.token)).body.project;
  assert.ok(!foreign.settings.some(r=>r.id===record.id));assert.ok(!P.categories(foreign,'ZP','Garten- und Landschaftsbau').some(c=>c.id==='preparation'));
+});
+
+
+function directItems(tasks){return tasks.map((task,index)=>({id:'structure-item-'+index,originTaskId:task.id,task:structuredClone(task)}));}
+async function completeStructureExam(t,examType='ZP',specialty='Baumschule'){
+ const count=examType==='ZP'?3:examType==='AP'?5:4,headings=examType==='ZP'?['Durchführen von Arbeiten an der Pflanze','Vermehren von Pflanzen','Durchführen von Bodenbearbeitungsmaßnahmen']:Array(count).fill('Durchführen von Arbeiten an der Pflanze');
+ const tasks=await workflowTasks(t,headings.map((heading,index)=>({id:'complete-'+examType+'-'+index,examType,specialty,minutes:examType==='FW_AP'?45:60,text:'Aufgabe: '+heading+'\nHier: Synthetischer Arbeitsauftrag.'})));
+ if(examType==='AP')for(const [index,task] of tasks.entries())task.practicalUnits=[{title:'Komplexe Aufgabe '+(index+1),areaId:index<3?'area1':'area2',reason:'Auftrag fachlich zugeordnet.'}];
+ const e=workflowExam(t.seed,examType,specialty);if(examType==='ZP')e.pattern.slots=['plantwork','propagation','soil'].map(categoryId=>({categoryId,count:1}));e.items=directItems(tasks);
+ if(examType!=='ZP'){const [oral]=await workflowTasks(t,[{id:'complete-oral-'+examType,examType,specialty,kind:'oral',minutes:15}]);e.oralItem={id:'structure-oral',originTaskId:oral.id,task:oral};}
+ return e;
+}
+
+test('current structure limits reject tampered task counts for groups and admins without trusting the marker',async()=>{
+ for(const [examType,specialty,count] of [['ZP','Baumschule',3],['AP','Baumschule',5],['FW_AP','Gemüsebau',4]]){
+  const t=await setup(),e=await completeStructureExam(t,examType,specialty),g=await group(t,specialty),save=(value,version,token)=>t.req('/api/save',{changes:[{kind:'exams',id:value.id,version,value}]},token);
+  delete e.structureRequirementVersion;assert.equal((await save(e,0,g.token)).status,200);const stored=(await t.req('/api/project',undefined,t.admin)).body.project.exams.find(x=>x.id===e.id);assert.equal(stored.structureRequirementVersion,1);
+  const tooMany=structuredClone(e);if(examType==='AP')tooMany.items[0].task.practicalUnits.push({title:'Zusätzliche komplexe Aufgabe',areaId:'area1',reason:'Zusätzlich gezählter eigenständiger Auftrag.'});else {const [extra]=await workflowTasks(t,[{id:'extra-structure-task',examType,specialty,minutes:10}]);tooMany.items.push({id:'extra-structure-item',originTaskId:extra.id,task:extra});for(const item of tooMany.items)item.task.minutes=10;}delete tooMany.structureRequirementVersion;
+  for(const token of [g.token,t.admin]){const r=await save(tooMany,1,token);assert.equal(r.status,400,JSON.stringify(r.body));assert.match(r.body.error,/Aufgabe|höchstens|maximal|Struktur/i);}
+  const persisted=(await t.req('/api/project',undefined,t.admin)).body.project.exams.find(x=>x.id===e.id);assert.equal(persisted.items.length,count);assert.equal(persisted.structureRequirementVersion,1);
+ }
+});
+
+test('structure requirements block incomplete handoff and mark-used after client markers are removed',async()=>{
+ const t=await setup(),g=await group(t),e=workflowExam(t.seed),save=(value,version,token=g.token)=>t.req('/api/save',{changes:[{kind:'exams',id:value.id,version,value}]},token);
+ delete e.structureRequirementVersion;assert.equal((await save(e,0)).status,200);
+ for(const token of [g.token,t.admin])assert.equal((await save({...e,submittedAt:'2026-11-03T18:00:00.000Z',updatedAt:'2026-11-03T18:00:00.000Z'},1,token)).status,400);
+ assert.equal((await save({...e,status:'used'},1,t.admin)).status,400);
+ const complete=await completeStructureExam(t);complete.submittedAt=complete.updatedAt='2026-11-03T18:00:00.000Z';assert.equal((await save(complete,0)).status,200);assert.equal((await save({...complete,status:'used'},1,t.admin)).status,200);
+});
+
+test('current structure enforces time ceilings and AP area feasibility on both save roles',async()=>{
+ for(const [examType,specialty] of [['ZP','Baumschule'],['AP','Baumschule'],['FW_AP','Gemüsebau']]){
+  const t=await setup(),e=await completeStructureExam(t,examType,specialty),g=await group(t,specialty),save=(value,version,token)=>t.req('/api/save',{changes:[{kind:'exams',id:value.id,version,value}]},token);assert.equal((await save(e,0,g.token)).status,200);
+  const over=structuredClone(e);over.items[0].task.minutes++;delete over.structureRequirementVersion;for(const token of [g.token,t.admin])assert.equal((await save(over,1,token)).status,400);
+  if(examType==='AP'){const impossible=structuredClone(e);for(const item of impossible.items)item.task.practicalUnits[0].areaId='area2';for(const token of [g.token,t.admin])assert.equal((await save(impossible,1,token)).status,400);}
+ }
+});
+
+test('new ZP drafts allow at most three selected themes even without client structure markers',async()=>{
+ const t=await setup(),g=await group(t),e=workflowExam(t.seed);e.pattern.slots=['plantwork','propagation','soil','maintenance'].map(categoryId=>({categoryId,count:1}));delete e.structureRequirementVersion;
+ for(const token of [g.token,t.admin])assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:0,value:e}]},token)).status,400);
+ e.pattern.slots.pop();assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:0,value:e}]},g.token)).status,200);
+});
+
+test('legacy invalid current drafts remain readable and autosave only when violations do not worsen',async()=>{
+ const t=await setup(),e=await completeStructureExam(t);delete e.structureRequirementVersion;e.items.push({...structuredClone(e.items[0]),id:'legacy-extra-item'});e.pattern.slots.push({categoryId:'maintenance',count:1});t.DB.db.prepare('INSERT INTO records VALUES(?,?,?,1)').run('exams',e.id,JSON.stringify(e));const g=await group(t),save=(value,version,token=g.token)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},token);
+ const loaded=(await t.req('/api/project',undefined,g.token)).body.project.exams.find(x=>x.id===e.id);assert.deepEqual(loaded.items,e.items);e.internalNotes='Unveränderten Altentwurf ergänzen.';assert.equal((await save(e,1)).status,200);
+ const worse=structuredClone(e);worse.items.push({...structuredClone(e.items[0]),id:'another-legacy-extra'});for(const token of [g.token,t.admin])assert.equal((await save(worse,2,token)).status,400);
+ assert.equal((await save({...e,submittedAt:'2026-11-03T19:00:00.000Z',updatedAt:'2026-11-03T19:00:00.000Z'},2)).status,400);assert.equal((await save({...e,status:'used'},2,t.admin)).status,400);
+ e.items.pop();e.pattern.slots.pop();assert.equal((await save(e,2)).status,200);assert.equal((await save({...e,submittedAt:'2026-11-03T19:01:00.000Z',updatedAt:'2026-11-03T19:01:00.000Z'},3)).status,200);
+});
+
+test('unmodified historical used exams survive unrelated saves without structure migration',async()=>{
+ const t=await setup(),legacy=workflowExam(t.seed);delete legacy.structureRequirementVersion;delete legacy.materialRequirementVersion;legacy.status='used';legacy.items=[];t.DB.db.prepare('INSERT INTO records VALUES(?,?,?,1)').run('exams',legacy.id,JSON.stringify(legacy));
+ const fresh=workflowExam(t.seed),changes=[{kind:'exams',id:legacy.id,version:1,value:legacy},{kind:'exams',id:fresh.id,version:0,value:fresh}];assert.equal((await t.req('/api/save',{changes},t.admin)).status,200);const stored=(await t.req('/api/project',undefined,t.admin)).body.project.exams.find(e=>e.id===legacy.id);assert.deepEqual(stored,legacy);
+});
+
+
+test('AP and Fachwerker handoff needs every practical task even when the oral task is selected',async()=>{
+ for(const [examType,specialty] of [['AP','Baumschule'],['FW_AP','Gemüsebau']]){
+  const t=await setup(),e=await completeStructureExam(t,examType,specialty),g=await group(t,specialty),save=(value,version,token)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},token),last=e.items.pop();delete e.structureRequirementVersion;assert.equal((await save(e,0,g.token)).status,200);
+  const submitted={...e,submittedAt:'2026-11-03T20:00:00.000Z',updatedAt:'2026-11-03T20:00:00.000Z'};for(const token of [g.token,t.admin])assert.equal((await save(submitted,1,token)).status,400);assert.equal((await save({...e,status:'used'},1,t.admin)).status,400);
+  e.items.push(last);const completed={...e,submittedAt:submitted.submittedAt,updatedAt:submitted.updatedAt};assert.equal((await save(completed,1,g.token)).status,200);assert.equal((await save({...completed,status:'used'},2,t.admin)).status,200);
+ }
+});
+
+test('Fachwerker drafts may plan less time but handoff requires the full 180 practical minutes',async()=>{
+ const t=await setup(),e=await completeStructureExam(t,'FW_AP','Gemüsebau'),g=await group(t,'Gemüsebau'),save=(value,version,token)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},token);e.items[0].task.minutes=44;assert.equal((await save(e,0,g.token)).status,200);
+ const submitted={...e,submittedAt:'2026-11-03T20:30:00.000Z',updatedAt:'2026-11-03T20:30:00.000Z'};for(const token of [g.token,t.admin])assert.equal((await save(submitted,1,token)).status,400);e.items[0].task.minutes=45;assert.equal((await save({...e,submittedAt:submitted.submittedAt,updatedAt:submitted.updatedAt},1,g.token)).status,200);
+});
+
+
+test('server-derived markers do not turn repeated legacy autosaves into a fresh handoff',async()=>{
+ const t=await setup(),e=workflowExam(t.seed);delete e.structureRequirementVersion;e.submittedAt=e.updatedAt='2026-11-02T20:30:00.000Z';t.DB.db.prepare('INSERT INTO records VALUES(?,?,?,1)').run('exams',e.id,JSON.stringify(e));
+ const g=await group(t),save=version=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value:e}]},g.token);assert.equal((await save(1)).status,200);assert.equal((await save(2)).status,200);const stored=(await t.req('/api/project',undefined,g.token)).body.project.exams.find(x=>x.id===e.id);assert.equal(stored.submittedAt,e.submittedAt);assert.equal(stored.structureRequirementVersion,1);
+});
+
+test('AP handoff rejects hidden snapshot categories without blocking legacy note autosaves',async()=>{
+ const t=await setup(),e=await completeStructureExam(t,'AP','Baumschule');
+ const category=P.classify(e.items[0].task,{context:P.examContext(e)}).ids[0];assert.ok(category);e.pattern.categoryDefinitions.find(c=>c.id===category).hidden=true;
+ t.DB.db.prepare('INSERT INTO records VALUES(?,?,?,1)').run('exams',e.id,JSON.stringify(e));const g=await group(t),save=(value,version,token)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},token);
+ e.internalNotes='Notiz zum bestehenden Entwurf';assert.equal((await save(e,1,g.token)).status,200);
+ const submitted={...e,submittedAt:'2026-11-03T21:00:00.000Z',updatedAt:'2026-11-03T21:00:00.000Z'};
+ for(const token of [g.token,t.admin])assert.equal((await save(submitted,2,token)).status,400);
+ assert.equal((await save({...e,status:'used'},2,t.admin)).status,400);
 });

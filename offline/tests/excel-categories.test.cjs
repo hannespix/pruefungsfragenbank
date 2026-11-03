@@ -45,7 +45,7 @@ test('ZP recognizes general source headings and preserves old pattern interpreta
  assert.equal(B.search(d,{examType:'ZP',category:'maintenance'}).length,1);
  const manual={...legacy,planningCategories:['maintenance']};assert.deepEqual(P.classify(manual).ids,['maintenance']);
  const pattern={id:'old-zp',examType:'ZP',specialty:'Baumschule',version:1,status:'confirmed',slots:[{categoryId:'maintenance',count:1}]};
- assert.equal(P.coverage({examType:'ZP',specialty:'Baumschule',pattern,items:[{task:legacy}]}).complete,true);
+ assert.equal(P.coverage({examType:'ZP',specialty:'Baumschule',pattern,items:[{task:legacy}]}).complete,false);
  assert.equal(B.search(d,{examType:'ZP',category:'maintenance',pattern}).length,1);
  const seed=task('Baumschule','Vermehren von Pflanzen',{examType:'ZP'});
  assert.equal(P.inferPattern(db([seed]),'ZP','Baumschule').categoryCatalog,'zp-general-2026');

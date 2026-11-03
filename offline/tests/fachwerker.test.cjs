@@ -59,7 +59,7 @@ test('FW inference uses available tasks and combines legacy harvest with plant w
  assert.deepEqual(L.classify(legacy).ids,['plantwork']);
  assert.deepEqual(L.inferPattern(d,'FW_AP','Gemüsebau').slots,[{categoryId:'plantwork',count:1}]);
  const e=exam(legacy);e.pattern=L.inferPattern(d,'FW_AP','Gemüsebau');e.pattern.status='confirmed';
- assert.equal(L.coverage(e).complete,true);e.items=[];assert.deepEqual(L.propose(d,e).map(t=>t.id),['fw']);
+ assert.equal(L.coverage(e).complete,false);assert.match(L.coverage(e).issues.join(' '),/4/);e.items=[];assert.deepEqual(L.propose(d,e).map(t=>t.id),['fw']);
  assert.deepEqual(d,before);
 });
 test('FW validation accepts legacy harvest tags with or without a catalog marker and preserves stored data',()=>{
@@ -73,18 +73,18 @@ test('FW legacy harvest ranking stays available while current plant-work ranking
  assert.deepEqual(L.rank(d,'FW_AP','Gemüsebau','harvest').map(row=>row.task.id),['fw']);
  assert.deepEqual(L.rank(d,'FW_AP','Gemüsebau','plantwork').map(row=>row.task.id),['fw','plant']);
 });
-test('FW multi-category tasks do not create a legal seven-task or duration requirement',()=>{
+test('FW multi-category source sheets still count as one task and cannot bypass four tasks or 180 minutes',()=>{
  const d=fixture();Object.assign(d.tasks[0],{planningCategories:['soil','plantwork','materials','substrates','machinery','propagation','maintenance'],planningCategoryCatalog:'fw-sources-2026',minutes:900});
  const e=exam(d.tasks[0]);e.pattern=L.inferPattern(d,'FW_AP','Gemüsebau');e.pattern.status='confirmed';
- assert.equal(L.coverage(e).complete,true);assert.equal(e.items.length,1);assert.equal(L.regulationProfile(e),null);
- e.items=[];assert.deepEqual(L.propose(d,e).map(t=>t.id),['fw']);
+ assert.equal(L.coverage(e).complete,false);assert.match(L.coverage(e).issues.join(' '),/4/);assert.equal(e.items.length,1);assert.equal(L.regulationProfile(e),null);
+ e.items=[];assert.deepEqual(L.propose(d,e),[]);
 });
 test('FW legacy harvest assignments and stored patterns remain valid and keep separate legacy coverage',()=>{
  assert.equal(typeof L.fachwerkerMainCategory,'function');assert.equal(L.fachwerkerMainCategory('harvest'),'plantwork');assert.equal(L.fachwerkerMainCategory('soil'),'soil');
  const harvest=task({text:'Aufgabe:\nDurchführen von Arbeiten an und mit der Pflanze - Ernten und Aufbereitung\nHier: Test'}),plant=task({id:'plant',familyId:'plant-family',text:'Aufgabe:\nBeet bepflanzen\nHier: Test'}),d=fixture();d.tasks=[harvest,plant];
  const p={id:'old-fw',examType:'FW_AP',specialty:'Gemüsebau',version:1,status:'confirmed',categoryCatalog:'fw-sources-2026',slots:[{categoryId:'harvest',count:1},{categoryId:'plantwork',count:1}]},e={...exam(harvest),pattern:p};
  assert.doesNotThrow(()=>L.checkPattern(p));assert.deepEqual(L.patternClassify(harvest,p).ids,['harvest']);assert.deepEqual(L.patternClassify(plant,p).ids,['plantwork']);
- assert.deepEqual(L.propose(d,e).map(t=>t.id),['plant']);e.items.push({id:'plant-item',task:C.clone(plant)});assert.equal(L.coverage(e).complete,true);
+ assert.deepEqual(L.propose(d,e).map(t=>t.id),['plant']);e.items.push({id:'plant-item',task:C.clone(plant)});assert.equal(L.coverage(e).complete,false);assert.match(L.coverage(e).issues.join(' '),/4/);
  assert.equal(L.label('harvest',e),'Ernten und Aufbereitung');assert.deepEqual(L.fachwerkerTopics(harvest,'harvest'),L.fachwerkerTopics(harvest,'plantwork'));
  const before=C.clone(e);L.labels(harvest,p);L.coverage(e);assert.deepEqual(e,before);
 });
