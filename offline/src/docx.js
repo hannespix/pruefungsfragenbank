@@ -4,6 +4,7 @@ const C=root.HortiCore||(typeof require==='function'?require('./core.js'):null);
 const S=root.HortiSourceLayout||(typeof require==='function'?require('./source-layout.js'):null);
 const P=root.HortiPrint||(typeof require==='function'?require('./print.js'):null);
 const A=root.HortiDocxAssets||(typeof require==='function'?require('./docx-assets.js'):null);
+const O=root.HortiOrganization||(typeof require==='function'?require('./organization.js'):null);
 const X=root.docx||(typeof require==='function'?require('../vendor/docx.umd.min.js'):null);
 const Zip=root.JSZip||(typeof require==='function'?require('../vendor/jszip.min.js'):null);
 const tw=pt=>Math.round(pt*20),mm=n=>Math.round(n*1440/25.4),px=pt=>pt*4/3;
@@ -238,5 +239,20 @@ async function documentFile(e,input,examiner=false){
  const body=await z.file('word/document.xml').async('string');z.file('word/document.xml',body.replace(/<w:p><w:pPr><w:sectPr>/g,'<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/><w:rPr><w:sz w:val="2"/></w:rPr><w:sectPr>'));await A.embedFonts(z,fonts);
  return z.generateAsync({type:'uint8array',compression:'DEFLATE'});
 }
-const api={document:documentFile,prepareLogoMargins,requiredAssetIds:A.requiredAssetIds,fontAssets:A.fontAssets};root.HortiDocx=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
+async function organizationDocument(e,input,kind){
+ const r=O.report(e,input,kind),link=O.logoLink(e),brandExam={items:[{task:{assetLinks:link?[link]:[]}}]},d=await A.wordImages(brandExam,input,false),fonts=A.fontAssets(d),sans=fonts.find(a=>a.docxFontKey==='sansRegular')?.fontFamily||'Arial',heading=fonts.find(a=>a.docxFontKey==='serifBold')?.fontFamily||'Georgia';
+ const p=(text,style='OrgBody',extra={})=>new X.Paragraph({style,children:[new X.TextRun({text:clean(text)})],...extra});
+ const paragraphs=text=>String(text??'').replace(/\r\n?/g,'\n').split('\n').map(line=>p(line));
+ const children=[];
+ if(link){const logo=A.requireAsset(d,link.assetId),[w,h]=A.imageSize(logo),scale=Math.min(210/w,85/h);children.push(new X.Paragraph({children:[new X.ImageRun({type:{'image/png':'png','image/jpeg':'jpg','image/gif':'gif'}[logo.mime],data:A.bytes(logo.data),transformation:{width:w*scale,height:h*scale},altText:{title:'Briefkopf',description:'Briefkopf der Prüfung',name:'Briefkopf'}})],spacing:{after:180}}));}
+ children.push(p(r.confidential,'OrgSmall'),p(r.title,'OrgTitle'));
+ for(const [label,value]of r.metadata)children.push(new X.Paragraph({style:'OrgMeta',children:[new X.TextRun({text:clean(label)+': ',bold:true}),new X.TextRun({text:clean(value)})]}));
+ children.push(p(r.intro,'OrgIntro'));
+ for(const s of r.sections){children.push(p(s.label,'OrgLabel'),p(s.title,'OrgHeading'));if(s.status)children.push(p(s.status,'OrgStatus'));children.push(...paragraphs(s.text));if(s.origin)children.push(p(s.origin,'OrgSmall'));}
+ if(!r.sections.length)children.push(p(r.empty));
+ const style=(id,font,size,paragraph={},run={})=>({id,name:id,basedOn:'Normal',next:'OrgBody',quickFormat:true,run:{font,size,color:ink,...run},paragraph});
+ const doc=new X.Document({title:clean(r.title+' · '+e.title),creator:'Prüfungswerkstatt Gartenbau',description:r.confidential,features:{updateFields:true},styles:{default:{document:{run:{font:sans,size:22,color:ink,language:{value:'de-DE'}},paragraph:{spacing:{line:300,after:100},widowControl:true}}},paragraphStyles:[style('OrgBody',sans,22,{keepLines:false,spacing:{line:300,after:80}}),style('OrgTitle',heading,48,{keepNext:true,spacing:{before:120,after:260}},{bold:true}),style('OrgHeading',sans,28,{keepNext:true,spacing:{after:100}},{bold:true}),style('OrgMeta',sans,20,{spacing:{after:80}}),style('OrgIntro',sans,22,{spacing:{before:240,after:140}}),style('OrgLabel',sans,18,{keepNext:true,spacing:{before:260,after:60}},{color:muted}),style('OrgStatus',sans,20,{keepNext:true,spacing:{after:100}},{bold:true}),style('OrgSmall',sans,18,{spacing:{after:100}},{color:muted})]},sections:[{properties:{page:{size:{width:mm(210),height:mm(297)},margin:{top:mm(18),bottom:mm(22),left:mm(18),right:mm(18),footer:mm(10)}}},footers:{default:new X.Footer({children:[p(r.footer,'OrgSmall'),new X.Paragraph({style:'OrgSmall',alignment:X.AlignmentType.RIGHT,children:[new X.TextRun({children:['Seite ',X.PageNumber.CURRENT,' / ',X.PageNumber.TOTAL_PAGES]})]})]})},children}]});
+ const z=await Zip.loadAsync(await X.Packer.toArrayBuffer(doc));await A.embedFonts(z,fonts);return z.generateAsync({type:'uint8array',compression:'DEFLATE'});
+}
+const api={organization:organizationDocument,document:documentFile,prepareLogoMargins,requiredAssetIds:A.requiredAssetIds,fontAssets:A.fontAssets};root.HortiDocx=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(globalThis);

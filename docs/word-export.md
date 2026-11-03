@@ -17,3 +17,20 @@ The legacy image path requires the browser's `CompressionStream` and `Decompress
 Render QA uses the documents skill renderer with the protected fonts available locally. Private source examples and generated exam documents are kept outside the repository; no private questions, drawings or fonts are added to public fixtures.
 
 Private corpus verification covered 245 source documents, 497 pages and 183 distinct PNG backgrounds with no decoding failures or detached-label cases. Representative original fronts/reverses, complex tasks, solutions, ordinary illustrated tasks and a long edit were generated and rendered. The focused DOCX suite contains 25 passing tests.
+
+
+## Complete coordinator package
+
+`Word & Druck` builds five matching native DOCX/HTML pairs: participant paper,
+solutions and scoring, organizational material lists, internal remarks, and a saved time plan.
+An index (`00_Paketuebersicht.html`) links every pair and separate attachment.
+The selected oral task remains included in the first two documents.
+
+Organizational output uses the saved examination snapshot. Material status
+(confirmed, proposal, missing) remains explicit; no new materials are inferred
+during export. Missing remarks receive an explicit empty-state sentence.
+Examination metadata and the selected specialty's recorded committee accompany
+the organizational documents. Remarks and material lists never enter participant
+or solution documents. Long text flows in ordinary paragraphs, with no textboxes.
+The coordinator must save successfully and pass the existing export permission
+check. Group access still has no export action.
