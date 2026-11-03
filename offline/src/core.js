@@ -4,6 +4,9 @@
 const SCHEMA=1;
 const specialties=['Baumschule','Friedhofsgärtnerei','Garten- und Landschaftsbau','Gemüsebau','Obstbau','Staudengärtnerei','Zierpflanzenbau'];
 const Planning=typeof module!=='undefined'&&module.exports?require('./planning.js'):root.HortiPlanning;
+const fachwerkerSpecialties=Planning.fachwerkerSpecialties;
+const examTypeLabel=type=>({AP:'Abschlussprüfung',ZP:'Zwischenprüfung',FW_AP:'Fachwerker · Abschlussprüfung'}[type]||String(type||'Prüfungsart offen'));
+const examTypesFor=specialty=>['ZP','AP',...(fachwerkerSpecialties.includes(specialty)?['FW_AP']:[])];
 const clone=v=>JSON.parse(JSON.stringify(v));
 const id=prefix=>prefix+'-'+(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
 const now=()=>new Date().toISOString();
@@ -14,16 +17,19 @@ const collectionNames=['families','tasks','sources','assets','uses','exams','pat
 const number=(v,name)=>{if(v!==null&&v!==undefined&&(!Number.isFinite(v)||v<0))throw Error(name+' muss eine nichtnegative Zahl oder unbekannt sein.');};
 const string=(v,label)=>{if(typeof v!=='string')throw Error('Ungültiges Textfeld: '+label);};
 const strings=(v,label)=>{if(!Array.isArray(v)||v.some(x=>typeof x!=='string'))throw Error('Ungültige Textliste: '+label);};
-const examType=v=>{if(!['AP','ZP'].includes(v))throw Error('Ungültige Prüfungsart.');};
+const examType=v=>{if(!['AP','ZP','FW_AP'].includes(v))throw Error('Ungültige Prüfungsart.');};
+function checkExamScope(type,specialty){examType(type);if(type==='FW_AP'&&!fachwerkerSpecialties.includes(specialty))throw Error('Fachwerker-Abschlussprüfungen sind nur für Gemüsebau und Zierpflanzenbau vorgesehen.');}
+function sameFachwerkerScope(a,b){if((a.examType==='FW_AP'||b.examType==='FW_AP')&&(a.examType!==b.examType||a.specialty!==b.specialty))throw Error('Fachwerker-Aufgabe gehört zu einem anderen Prüfungsbereich.');}
 const SourceLayout=typeof module!=='undefined'&&module.exports?require('./source-layout.js'):root.HortiSourceLayout;
 const checkTask=t=>{
  if(!t||typeof t.title!=='string'||!t.title.trim()||typeof t.text!=='string')throw Error('Aufgabe ohne Titel oder Text.');
  for(const k of ['tags','sourceIds','assetLinks','criteria','flags'])if(!Array.isArray(t[k]))throw Error('Ungültiges Aufgabenfeld: '+k);
  if(!['missing','draft','approved'].includes(t.solutionStatus))throw Error('Ungültiger Lösungsstatus.');
- for(const k of ['specialty','category','solution'])string(t[k],k);for(const k of ['tags','sourceIds','flags'])strings(t[k],k);examType(t.examType);if(!['review','approved'].includes(t.reviewStatus))throw Error('Ungültiger Prüfstatus.');if(t.kind!==undefined&&!['practical','oral','other'].includes(t.kind))throw Error('Ungültiger Aufgabenbestandsteil.');
+ for(const k of ['specialty','category','solution'])string(t[k],k);for(const k of ['tags','sourceIds','flags'])strings(t[k],k);checkExamScope(t.examType,t.specialty);if(!['review','approved'].includes(t.reviewStatus))throw Error('Ungültiger Prüfstatus.');if(t.kind!==undefined&&!['practical','oral','other'].includes(t.kind))throw Error('Ungültiger Aufgabenbestandsteil.');
  if(t.planningCategoryEvidence!==undefined)string(t.planningCategoryEvidence,'Kategoriebegründung');
- if(t.planningCategoryCatalog!==undefined){if(t.planningCategoryCatalog!=='excel-ap-2026')throw Error('Unbekannter Kategorienkatalog.');const scope=Planning.workbookScope(t);if(!scope||!Array.isArray(t.planningCategories)||t.planningCategories.some(id=>!scope.some(c=>c.id===id)))throw Error('Kategorie gehört nicht zum Fachrichtungskatalog.');}
+ if(t.planningCategoryCatalog!==undefined){if(!['excel-ap-2026','fw-sources-2026'].includes(t.planningCategoryCatalog))throw Error('Unbekannter Kategorienkatalog.');const scope=t.planningCategoryCatalog==='fw-sources-2026'?Planning.fachwerkerScope(t):Planning.workbookScope(t);if(!scope||!Array.isArray(t.planningCategories)||t.planningCategories.some(id=>!scope.some(c=>c.id===id)))throw Error('Kategorie gehört nicht zum Fachrichtungskatalog.');}
  if(t.planningCategories!==undefined){strings(t.planningCategories,'Prüfungskategorien');if(!t.planningCategories.length&&!t.planningCategoryCatalog||new Set(t.planningCategories).size!==t.planningCategories.length||t.planningCategories.some(id=>!Planning.catalog.some(c=>c.id===id)))throw Error('Ungültige Prüfungskategorie.');}
+ if(t.examType==='FW_AP'&&t.planningCategories?.some(id=>!Planning.fachwerkerScope(t).some(c=>c.id===id)))throw Error('Kategorie gehört nicht zum Fachwerker-Katalog der Fachrichtung.');
  if(t.timing!==undefined){const x=t.timing;if(!x||!['unknown','explicit','phase-sum','conflict'].includes(x.method)||!Array.isArray(x.phases)||!Array.isArray(x.evidence))throw Error('Ungültige Zeitangaben.');number(x.totalMinutes,'Zeit');for(const p of x.phases){if(!p||typeof p.label!=='string'||!Number.isFinite(p.minutes)||p.minutes<0)throw Error('Ungültige Zeitphase.');number(p.maxMinutes,'Zeitgrenze');}for(const q of x.evidence){if(!q||typeof q.sourceId!=='string'||q.reference!==undefined&&typeof q.reference!=='string')throw Error('Ungültige Zeitquelle.');strings(q.quotes,'Zeitbelege');}}
  SourceLayout.validate(t);
  number(t.points,'Punkte');number(t.minutes,'Minuten');
@@ -38,12 +44,13 @@ function validate(d){
  d.families.forEach(f=>{string(f.title,'Familientitel');});
  const sets=Object.fromEntries(collectionNames.map(k=>[k,new Set(d[k].map(x=>x.id))]));
  const ref=(kind,x)=>{if(!sets[kind].has(x))throw Error('Fehlender Verweis: '+kind+' / '+x);};
- const links=t=>{checkTask(t);ref('families',t.familyId);t.sourceIds.forEach(x=>ref('sources',x));t.assetLinks.forEach(x=>ref('assets',x.assetId));};
+ const familyScopes=new Map();
+ const links=t=>{checkTask(t);ref('families',t.familyId);const scopes=familyScopes.get(t.familyId)||[];if(scopes.some(s=>(s.examType==='FW_AP'||t.examType==='FW_AP')&&(s.examType!==t.examType||s.specialty!==t.specialty)))throw Error('Fachwerker-Aufgabenfamilie darf nicht mit anderen Prüfungsbereichen geteilt werden.');scopes.push(t);familyScopes.set(t.familyId,scopes);t.sourceIds.forEach(x=>{ref('sources',x);sameFachwerkerScope(t,d.sources.find(s=>s.id===x));});t.assetLinks.forEach(x=>ref('assets',x.assetId));};
  d.tasks.forEach(links);d.patterns.forEach(Planning.checkPattern);const patternScopes=new Set();for(const p of d.patterns){const key=JSON.stringify([p.examType,p.specialty]);if(patternScopes.has(key))throw Error('Mehrere Prüfungsmuster für denselben Prüfungsbereich.');patternScopes.add(key);}
- d.sources.forEach(s=>{for(const k of ['name','specialty','role','text'])string(s[k],k);if(s.flags!==undefined)strings(s.flags,'Quellenhinweise');if(s.year!=null&&(!Number.isInteger(s.year)||s.year<1900||s.year>2200))throw Error('Ungültiges Quelljahr.');examType(s.examType);if(s.assetId)ref('assets',s.assetId);if(!Array.isArray(s.attachmentIds))throw Error('Ungültige Quellenanlagen.');s.attachmentIds.forEach(x=>ref('assets',x));});
+ d.sources.forEach(s=>{for(const k of ['name','specialty','role','text'])string(s[k],k);if(s.flags!==undefined)strings(s.flags,'Quellenhinweise');if(s.year!=null&&(!Number.isInteger(s.year)||s.year<1900||s.year>2200))throw Error('Ungültiges Quelljahr.');checkExamScope(s.examType,s.specialty);if(s.assetId)ref('assets',s.assetId);if(!Array.isArray(s.attachmentIds))throw Error('Ungültige Quellenanlagen.');s.attachmentIds.forEach(x=>ref('assets',x));});
  d.assets.forEach(a=>{if(typeof a.data!=='string'||typeof a.mime!=='string'||typeof a.name!=='string'||!/^[-\w.+]+\/[-\w.+]+$/.test(a.mime)||!/^[A-Za-z0-9+/=\s]*$/.test(a.data))throw Error('Ungültige Anlagendaten.');});
  d.workshops.forEach(checkWorkshop);
- d.exams.forEach(e=>{if(e.deletedAt!==undefined&&(typeof e.deletedAt!=='string'||!Number.isFinite(Date.parse(e.deletedAt))||e.status==='used'||d.uses.some(u=>u.examId===e.id)))throw Error('Ungültiger Papierkorb-Eintrag oder dokumentierter Einsatz.');checkExamWorkshop(d,e);examType(e.examType);for(const k of ['specialty','date','notes'])string(e[k],k);if(e.pattern)Planning.checkPattern(e.pattern);if(typeof e.title!=='string'||!Array.isArray(e.items))throw Error('Ungültige Prüfung.');const seen=new Set();e.items.forEach(i=>{if(!i.id||seen.has(i.id))throw Error('Doppelte Prüfungsposition.');seen.add(i.id);if(typeof i.originTaskId!=='string')throw Error('Fehlende Aufgabenherkunft.');links(i.task);});});
+ d.exams.forEach(e=>{if(e.deletedAt!==undefined&&(typeof e.deletedAt!=='string'||!Number.isFinite(Date.parse(e.deletedAt))||e.status==='used'||d.uses.some(u=>u.examId===e.id)))throw Error('Ungültiger Papierkorb-Eintrag oder dokumentierter Einsatz.');checkExamWorkshop(d,e);checkExamScope(e.examType,e.specialty);for(const k of ['specialty','date','notes'])string(e[k],k);if(e.pattern){Planning.checkPattern(e.pattern);if((e.examType==='FW_AP'||e.pattern.examType==='FW_AP')&&(e.pattern.examType!==e.examType||e.pattern.specialty!==e.specialty))throw Error('Prüfungsmuster passt nicht zum Prüfungsbereich.');}if(typeof e.title!=='string'||!Array.isArray(e.items))throw Error('Ungültige Prüfung.');const seen=new Set();e.items.forEach(i=>{if(!i.id||seen.has(i.id))throw Error('Doppelte Prüfungsposition.');seen.add(i.id);if(typeof i.originTaskId!=='string')throw Error('Fehlende Aufgabenherkunft.');sameFachwerkerScope(e,i.task);links(i.task);});});
  d.uses.forEach(u=>{ref('exams',u.examId);strings(u.taskIds,'Einsatzaufgaben');strings(u.familyIds,'Einsatzfamilien');if(!validDate(u.date))throw Error('Ungültiger Einsatztermin.');});
  return d;
 }
@@ -63,11 +70,11 @@ function workshopExams(d,workshopId,specialty){return d.exams.filter(e=>!e.delet
 function trashExam(d,id){const e=d.exams.find(x=>x.id===id);if(!e)throw Error('Prüfung fehlt.');if(e.status==='used'||d.uses.some(u=>u.examId===id))throw Error('Bereits eingesetzte Prüfungen bleiben für die Einsatzhistorie erhalten.');e.deletedAt=e.updatedAt=now();return e;}
 function purgeExam(d,id){const e=d.exams.find(x=>x.id===id);if(!e?.deletedAt)throw Error('Prüfung ist nicht im Papierkorb.');if(e.status==='used'||d.uses.some(u=>u.examId===id))throw Error('Bereits eingesetzte Prüfungen bleiben für die Einsatzhistorie erhalten.');d.exams=d.exams.filter(x=>x.id!==id);}
 function restoreExam(d,id){const e=d.exams.find(x=>x.id===id);if(!e?.deletedAt)throw Error('Prüfung ist nicht im Papierkorb.');delete e.deletedAt;e.updatedAt=now();return e;}
-function newExam(fields={}){return {id:id('exam'),title:fields.title||'Neue praktische Prüfung',examType:fields.examType||'ZP',specialty:fields.specialty||'',date:fields.date||'',notes:'',status:'draft',createdAt:now(),updatedAt:now(),items:[],...(fields.examYear!==undefined?{examYear:fields.examYear}:{}),...(fields.workshopId?{workshopId:fields.workshopId}:{}),...(fields.pattern?{pattern:clone(fields.pattern)}:{})};}
-function addItem(e,t){checkTask(t);const item={id:id('item'),originTaskId:t.id,task:clone(t)};e.items.push(item);e.updatedAt=now();return item;}
+function newExam(fields={}){checkExamScope(fields.examType||'ZP',fields.specialty||'');return {id:id('exam'),title:fields.title||'Neue praktische Prüfung',examType:fields.examType||'ZP',specialty:fields.specialty||'',date:fields.date||'',notes:'',status:'draft',createdAt:now(),updatedAt:now(),items:[],...(fields.examYear!==undefined?{examYear:fields.examYear}:{}),...(fields.workshopId?{workshopId:fields.workshopId}:{}),...(fields.pattern?{pattern:clone(fields.pattern)}:{})};}
+function addItem(e,t){checkTask(t);checkExamScope(e.examType,e.specialty);sameFachwerkerScope(e,t);const item={id:id('item'),originTaskId:t.id,task:clone(t)};e.items.push(item);e.updatedAt=now();return item;}
 function revise(d,taskId,patch){const old=d.tasks.find(t=>t.id===taskId);if(!old)throw Error('Aufgabe nicht gefunden.');const next={...clone(old),...clone(patch),id:id('task'),previousId:old.id,createdAt:now()};delete next.supersededBy;
  if(old.solutionStatus==='approved'&&['text','points','criteria','assetLinks'].some(k=>k in patch&&!equal(patch[k],old[k])))next.solutionStatus=next.solution?.trim()?'draft':'missing';
- checkTask(next);old.supersededBy=next.id;d.tasks.push(next);return next;}
+ checkTask(next);sameFachwerkerScope(old,next);old.supersededBy=next.id;d.tasks.push(next);return next;}
 // Proposed working scale, never an assertion about official examination rules.
 function proposePoints(task){
  checkTask(task);const t=clone(task);if(t.points!=null)return t;
@@ -128,6 +135,6 @@ function extractTiming(text){
 }
 function durationSummary(t){return t.unknownMinutes?(t.minutes?`Bearbeitungszeit: ${t.minutes} Minuten bekannt · ${t.unknownMinutes} Aufgaben noch offen`:'Bearbeitungszeit noch festzulegen'):`Bearbeitungszeit gesamt: ${t.minutes} Minuten`;}
 
-const api={trashExam,restoreExam,purgeExam,extractTiming,durationSummary,proposePoints,pointsLabel,SCHEMA,specialties,checkWorkshop,checkExamWorkshop,saveWorkshop,workshopExams,clone,id,now,empty,equal,validate,newExam,addItem,revise,totals,readiness,validDate,recordUse,merge,subset,checkTask};
+const api={examTypeLabel,examTypesFor,fachwerkerSpecialties,checkExamScope,trashExam,restoreExam,purgeExam,extractTiming,durationSummary,proposePoints,pointsLabel,SCHEMA,specialties,checkWorkshop,checkExamWorkshop,saveWorkshop,workshopExams,clone,id,now,empty,equal,validate,newExam,addItem,revise,totals,readiness,validDate,recordUse,merge,subset,checkTask};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;root.HortiCore=api;
 })(globalThis);

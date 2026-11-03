@@ -67,6 +67,11 @@ test('shared source grid borders enclose every row as native table content',asyn
 test('source labels overlapping a drawing fail clearly instead of changing their association',async()=>{
  const f=source(fixture(),1),page=f.e.items[0].task.sourceLayout.pages[0];page.rules=[];page.graphics=[{assetId:'plan',x:45,y:110,width:490,height:100}];await assert.rejects(()=>unpack(f),/Beschriftete Originalzeichnung/);
 });
+test('source bullet glyphs share their list paragraph despite different font bounding boxes',async()=>{
+ const f=source(fixture(),1),page=f.e.items[0].task.sourceLayout.pages[0],base=page.blocks[0];page.graphics=[];page.rules=[];
+ page.blocks=[{...base,id:'bullet',x:86.4,y:203.228,width:5.11,height:11,fontSize:10,lineHeight:10,text:'•',originalText:'•',lines:[{text:'•',runs:[{text:'•',bold:false,italic:false}]}]},{...base,id:'list-text',x:104.4,y:200,width:180,height:14.392,fontSize:12,lineHeight:13.392,text:'Synthetisches Material',originalText:'Synthetisches Material',lines:[{text:'Synthetisches Material',runs:[{text:'Synthetisches Material',bold:false,italic:false}]}]}];
+ const xml=await (await unpack(f)).file('word/document.xml').async('string'),paragraphs=[...xml.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)].map(m=>m[0]);assert.ok(paragraphs.some(p=>p.includes('•')&&p.includes('Synthetisches Material')));assert.equal(paragraphs.filter(p=>p.includes('Synthetisches Material')).length,1);
+});
 test('legacy multirow grid and a known logo cut in Name/Datum frame stay native',async()=>{
  const f=source(fixture(),1),page=f.e.items[0].task.sourceLayout.pages[0],base=page.blocks[0];page.width=400;page.height=500;page.logos=[{x:270,y:120,width:80,height:40}];
  f.e.items[0].task.assetLinks=f.e.items[0].task.assetLinks.filter(l=>l.role==='source-page');f.e.items[0].task.assetLinks.push({assetId:'plan',role:'letterhead',audience:'candidate',design:'bw-2024'});const font=f.d.assets.find(a=>a.docxFontKey);for(const key of ['sansBold','serifBold'])f.d.assets.push({...font,id:key,docxFontKey:key});
