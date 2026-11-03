@@ -24,7 +24,8 @@ const catalog=[
  ['sowing','Ansaatflächen vorbereiten & ansäen',/flächen für ansaaten vorbereiten und ansäen/i]
 ].map(([id,label,re])=>({id,label,re}));
 // Exact Gärtner AP titles from the supplied grading workbook, sheet Aufgaben.
-// ZP uses the same specialty catalog by coordinator instruction; GBF remains separate.
+// Historical ZP assignments may still reference this catalog; current ZP themes
+// have their own catalog below and never replace the original source headings.
 const workbookCategories={
  "Zierpflanzenbau": [
   {
@@ -678,8 +679,22 @@ function qualificationInfo(value){
 }
 function qualificationLabel(value){const info=qualificationInfo(value);return info?`${info.qualification}${info.specialty==='allgemein'?' (allgemein)':' · '+info.specialty} (${info.code})`:String(value??'');}
 function workbookScope(t){return ['AP','ZP'].includes(t?.examType)&&!/gartenbaufachwerk|\bGBF\b|\b17[1-7]\b/i.test(t.qualification||'')?workbookCategories[t.specialty]:null;}
+const zwischenpruefungCatalog='zp-general-2026';
+const zwischenpruefungCategories=[
+ {id:'plantwork',label:'Durchführen von Arbeiten an der Pflanze',re:/arbeiten an (?:und mit )?der pflanze/i},
+ {id:'machinery',label:'Einsatz von Werkzeug und Geräten',re:/einsatz von (?:maschinen|werkzeug(?:en)?|geräten)/i},
+ {id:'propagation',label:'Vermehren von Pflanzen',re:/vermehren von|vermehrung/i},
+ {id:'materials',label:'Be- und Verarbeiten von Materialien und Werkstoffen',re:/be- und verarbeit(?:en|ung) von materialien/i},
+ {id:'soil',label:'Durchführen von Bodenbearbeitungsmaßnahmen',re:/bodenbearbeit|boden bearbeiten/i},
+ {id:'maintenance',label:'Durchführen von Pflegemaßnahmen an Maschinen, Geräten oder baulichen Anlagen',re:/pflegemaßnahmen an (?:maschinen|geräten|baulichen anlagen)/i},
+ {id:'harvest',label:'Erntearbeiten',re:/ernte|ernten/i},
+ {id:'preparation',label:'Aufbereitung',re:/aufbereit/i},
+ {id:'plantuse',label:'Verwendung der Pflanzen',re:/verwendung (?:der|von) pflanzen/i}
+];
+function zwischenpruefungScope(context){return context?.examType==='ZP'&&qualificationSpecialties.includes(context.specialty)&&!/gartenbaufachwerk|\b(?:GBF|FW)\b|\b17[0-7]\b/i.test(context.qualification||'')?zwischenpruefungCategories.map(({id,label})=>({id,label})):null;}
+function currentZwischenpruefung(context){return !!zwischenpruefungScope(context)&&context.pattern?.categoryCatalog===zwischenpruefungCatalog;}
 for(const c of [...Object.values(workbookCategories).flat(),...fachwerkerMainCategories])if(!catalog.some(x=>x.id===c.id))catalog.push({id:c.id,label:c.label,re:/$^/});
-function label(id,context){const legacy=['AP','ZP'].includes(context?.pattern?.examType)&&!context.pattern.categoryCatalog;return (id==='harvest'&&fachwerkerScope(context)?'Ernten und Aufbereitung':fachwerkerScope(context)?.find(c=>c.id===id)?.label)||(!legacy&&workbookScope(context)?.find(c=>c.id===id)?.label)||catalog.find(c=>c.id===id)?.label||'Kategorie noch zuordnen';}
+function label(id,context){const legacy=['AP','ZP'].includes(context?.pattern?.examType)&&!context.pattern.categoryCatalog,zp=zwischenpruefungScope(context)&&(!context.pattern||currentZwischenpruefung(context));return (zp?zwischenpruefungCategories.find(c=>c.id===id)?.label:null)||(id==='harvest'&&fachwerkerScope(context)?'Ernten und Aufbereitung':fachwerkerScope(context)?.find(c=>c.id===id)?.label)||(!zp&&!legacy&&workbookScope(context)?.find(c=>c.id===id)?.label)||catalog.find(c=>c.id===id)?.label||'Kategorie noch zuordnen';}
 const labels=(t,pattern)=>patternClassify(t,pattern).ids.map(id=>label(id,pattern?{...t,pattern}:t));
 const normalizeHeading=s=>s.toLocaleLowerCase('de').replace(/\bu\./g,'und').replace(/\s+/g,' ').trim();
 
@@ -696,7 +711,29 @@ const archiveScopes={
  'Zierpflanzenbau':{ZP:['soil','propagation','plantwork','harvest','machinery','maintenance','materials','plantuse'],AP:['propagation','plantwork','harvest','protection','nutrition','planting','containers','advice','presentation','indoor']}
 };
 function applies(id,t){return id!=='gravecare'||t.specialty==='Friedhofsgärtnerei';}
-function classify(t,{legacy=false,legacyFachwerker=false}={}){const official=legacy?null:workbookScope(t),fw=fachwerkerScope(t);const validIds=ids=>[...new Set(ids.map(id=>{const main=t.examType==='FW_AP'?fachwerkerMainCategory(id):id;return (t.examType==='ZP'&&official&&!official.some(c=>c.id===id)||t.examType==='FW_AP'&&!fw?.some(c=>c.id===main))?'unassigned':t.examType==='FW_AP'&&!legacyFachwerker?main:id;}))];if((t.planningCategories?.length||['excel-ap-2026','fw-sources-2026'].includes(t.planningCategoryCatalog))&&!(legacy&&t.planningCategoryCatalog==='excel-ap-2026')){const ids=validIds(t.planningCategories.filter(id=>applies(id,t)));return {ids:ids.length?ids:['unassigned'],evidence:t.planningCategoryEvidence||'Manuell zugeordnet',manual:true};}
+function classifyZwischenpruefung(t){
+ const evidence=heading(t);
+ if(t.planningCategoryCatalog===zwischenpruefungCatalog){const ids=[...new Set((t.planningCategories||[]).filter(id=>zwischenpruefungCategories.some(c=>c.id===id)))];return {ids:ids.length?ids:['unassigned'],evidence:t.planningCategoryEvidence||'Manuell zugeordnet',manual:true};}
+ // Old Excel assignments describe AP-specific activities, not these general
+ // themes. Re-read the source heading, including previously unmatched headings.
+ const ids=zwischenpruefungCategories.filter(c=>c.re.test(evidence)).map(c=>c.id);
+ return {ids:ids.length?ids:['unassigned'],evidence:evidence||'Kein eindeutiger Aufgabenkopf',manual:false};
+}
+function eligibleZwischenpruefungTask(t){
+ if(!zwischenpruefungScope(t)||t.kind!=='practical'||t.practicalUnits?.length>1)return false;
+ const ids=classifyZwischenpruefung(t).ids,sourceIds=zwischenpruefungCategories.filter(c=>c.re.test(heading(t))).map(c=>c.id);
+ return ids.length===1&&ids[0]!=='unassigned'&&sourceIds.length<=1&&!/\bkombiniert\b|\bkombinationsaufgabe\b|\bkombination\s+(?:aus|von|mit)\b/i.test(`${t.title||''}\n${heading(t)}`);
+}
+function zwischenpruefungSelectionIssue(e,t,replaceItemId){
+ if(!currentZwischenpruefung(e))return '';
+ if(t.examType!==e.examType||t.specialty!==e.specialty)return 'Aufgabe gehört zu einem anderen Prüfungsbereich.';
+ if(!eligibleZwischenpruefungTask(t))return 'Für die Zwischenprüfung sind nur Einzelaufgaben mit genau einem Generalthema zulässig; Kombinationsaufgaben sind ausgeschlossen.';
+ const categoryId=classifyZwischenpruefung(t).ids[0],others=(e.items||[]).filter(i=>replaceItemId===undefined||i.id!==replaceItemId);
+ if(others.some(i=>classifyZwischenpruefung(i.task).ids.includes(categoryId)))return `${label(categoryId,e)}: höchstens eine Aufgabe je Generalthema.`;
+ if(others.some(i=>i.task.familyId===t.familyId))return 'Aufgabenfamilie mehrfach ausgewählt.';
+ return '';
+}
+function classify(t,{legacy=false,legacyFachwerker=false,legacyZwischenpruefung=false}={}){if(zwischenpruefungScope(t)&&!legacy&&!legacyZwischenpruefung)return classifyZwischenpruefung(t);const official=legacy?null:workbookScope(t),fw=fachwerkerScope(t);const validIds=ids=>[...new Set(ids.map(id=>{const main=t.examType==='FW_AP'?fachwerkerMainCategory(id):id;return (t.examType==='ZP'&&official&&!official.some(c=>c.id===id)||t.examType==='FW_AP'&&!fw?.some(c=>c.id===main))?'unassigned':t.examType==='FW_AP'&&!legacyFachwerker?main:id;}))];if((t.planningCategories?.length||['excel-ap-2026','fw-sources-2026'].includes(t.planningCategoryCatalog))&&t.planningCategoryCatalog!==zwischenpruefungCatalog&&!(legacy&&t.planningCategoryCatalog==='excel-ap-2026')){const ids=validIds(t.planningCategories.filter(id=>applies(id,t)));return {ids:ids.length?ids:['unassigned'],evidence:t.planningCategoryEvidence||'Manuell zugeordnet',manual:true};}
  let evidence=heading(t);
  if(t.examType==='FW_AP'){
   const tests={soil:/bodenbearbeit|boden bearbeiten/i,plantwork:/arbeiten an (?:und mit )?der pflanze|beet bepflanzen|pflanzung durchführen|ernte|ernten|aufbereitung/i,materials:/be- und verarbeit(?:ung|en)/i,substrates:/verwendung von böden, erden und substraten/i,machinery:/einsatz von (?:maschinen|werkzeug|geräten)|geräte und einsatz/i,propagation:/vermehren von|vermehrung/i,maintenance:/wartungs?[-/ ]|instandsetzungsarbeiten/i};
@@ -731,20 +768,70 @@ function classify(t,{legacy=false,legacyFachwerker=false}={}){const official=leg
 }
 // Explicit workbook assignments belong to the current catalog only. Stored legacy
 // exam patterns keep their original heading-based interpretation.
-function assignCategories(t,ids,evidence){const catalog=fachwerkerScope(t)?'fw-sources-2026':workbookScope(t)?'excel-ap-2026':undefined,same=t.planningCategoryCatalog===catalog&&Array.isArray(t.planningCategories)&&t.planningCategories.length===ids.length&&ids.every(id=>t.planningCategories.includes(id));if(!ids.length&&!catalog){delete t.planningCategories;delete t.planningCategoryEvidence;delete t.planningCategoryCatalog;return;}t.planningCategories=[...ids];if(!same||!t.planningCategoryEvidence)t.planningCategoryEvidence=evidence;if(catalog)t.planningCategoryCatalog=catalog;else delete t.planningCategoryCatalog;}
-function categories(d,type,specialty,context={}){const scope={examType:type,specialty,...context},official=workbookScope(scope);if(type==='FW_AP')return (fachwerkerScope(scope)||[]).map(c=>({...c}));if(official)return official.map(c=>({...c}));const ids=new Set([...(archiveScopes[specialty]?.[type]||[]),...scoped(d,type,specialty,true).flatMap(t=>classify(t).ids)]);return catalog.filter(c=>ids.has(c.id)&&applies(c.id,scope)).map(c=>({...c,label:label(c.id,scope)}));}
+function assignCategories(t,ids,evidence){const catalog=zwischenpruefungScope(t)?zwischenpruefungCatalog:fachwerkerScope(t)?'fw-sources-2026':workbookScope(t)?'excel-ap-2026':undefined,same=t.planningCategoryCatalog===catalog&&Array.isArray(t.planningCategories)&&t.planningCategories.length===ids.length&&ids.every(id=>t.planningCategories.includes(id));if(!ids.length&&!catalog){delete t.planningCategories;delete t.planningCategoryEvidence;delete t.planningCategoryCatalog;return;}t.planningCategories=[...ids];if(!same||!t.planningCategoryEvidence)t.planningCategoryEvidence=evidence;if(catalog)t.planningCategoryCatalog=catalog;else delete t.planningCategoryCatalog;}
+function categories(d,type,specialty,context={}){const scope={examType:type,specialty,...context},zp=zwischenpruefungScope(scope),official=workbookScope(scope);if(zp&&(!scope.pattern||currentZwischenpruefung(scope)))return zp;if(type==='FW_AP')return (fachwerkerScope(scope)||[]).map(c=>({...c}));if(official)return official.map(c=>({...c}));const ids=new Set([...(archiveScopes[specialty]?.[type]||[]),...scoped(d,type,specialty,true).flatMap(t=>classify(t).ids)]);return catalog.filter(c=>ids.has(c.id)&&applies(c.id,scope)).map(c=>({...c,label:label(c.id,scope)}));}
 function scoped(d,type,specialty,all=false){return d.tasks.filter(t=>t.examType===type&&t.specialty===specialty&&t.kind==='practical'&&(all||!t.supersededBy));}
-function inferPattern(d,type,specialty){const tasks=scoped(d,type,specialty),ids=new Set(tasks.flatMap(t=>classify(t).ids));return {id:`pattern:${type}:${specialty}`,examType:type,specialty,status:'proposed',version:1,...(['AP','ZP'].includes(type)?{categoryCatalog:'excel-ap-2026'}:type==='FW_AP'?{categoryCatalog:'fw-sources-2026'}:{}),slots:(type==='FW_AP'?fachwerkerScope({examType:type,specialty})||[]:catalog).filter(c=>ids.has(c.id)).map(c=>({categoryId:c.id,count:1})),note:'Aus vorhandenen Aufgabenköpfen abgeleitet. Anzahl und Pflichtkategorien fachlich bestätigen; kein Nachweis eines vollständigen Prüfungsjahres.'};}
-function checkPattern(p){if(p?.ruleSet!==undefined){if(p.ruleSet!==regulationRuleSet||!regulationProfile(p)||p.categoryCatalog!=='excel-ap-2026'||!Number.isInteger(p.version)||p.version<1||!['proposed','confirmed'].includes(p.status)||!Array.isArray(p.slots)||p.slots.length)throw Error('Ungültiges Prüfungsmuster zur Gärtner-Prüfungsverordnung.');return p;}if(p?.categoryCatalog!==undefined&&p.categoryCatalog!==(p.examType==='FW_AP'?'fw-sources-2026':'excel-ap-2026'))throw Error('Unbekannter oder nicht zum Prüfungsbereich passender Kategorienstand.');if(p?.examType==='FW_AP'&&!fachwerkerScope(p))throw Error('Fachwerker-Prüfungsmuster ist nur für Gemüsebau und Zierpflanzenbau vorgesehen.');if(!p||!Number.isInteger(p.version)||p.version<1||!['AP','ZP','FW_AP'].includes(p.examType)||typeof p.specialty!=='string'||!['proposed','confirmed'].includes(p.status)||!Array.isArray(p.slots)||!p.slots.length)throw Error('Prüfungsmuster benötigt mindestens eine Kategorie.');const seen=new Set(),choices=p.examType==='FW_AP'?fachwerkerScope(p):catalog;for(const s of p.slots){if(!choices.some(c=>c.id===(p.examType==='FW_AP'?fachwerkerMainCategory(s.categoryId):s.categoryId))||seen.has(s.categoryId)||!Number.isInteger(s.count)||s.count<1||s.count>10)throw Error('Ungültige Kategorie oder Anzahl im Prüfungsmuster.');seen.add(s.categoryId);}return p;}
-function pattern(d,type,specialty){return d.patterns?.find(p=>p.examType===type&&p.specialty===specialty)||regulationPattern(type,specialty)||inferPattern(d,type,specialty);}
+function inferPattern(d,type,specialty){const zp=zwischenpruefungScope({examType:type,specialty}),tasks=scoped(d,type,specialty).filter(t=>!zp||eligibleZwischenpruefungTask(t)),ids=new Set(tasks.flatMap(t=>classify(t).ids));return {id:`pattern:${type}:${specialty}`,examType:type,specialty,status:'proposed',version:1,...(zp?{categoryCatalog:zwischenpruefungCatalog}:['AP','ZP'].includes(type)?{categoryCatalog:'excel-ap-2026'}:type==='FW_AP'?{categoryCatalog:'fw-sources-2026'}:{}),slots:(zp||(type==='FW_AP'?fachwerkerScope({examType:type,specialty})||[]:catalog)).filter(c=>ids.has(c.id)).map(c=>({categoryId:c.id,count:1})),note:zp?'Aus vorhandenen Einzelaufgaben abgeleitet. Generalthemen auswählen und bestätigen; höchstens eine Aufgabe je Generalthema, keine Kombinationsaufgaben. Die neun Themen sind keine vorgeschriebene Aufgabenanzahl.':'Aus vorhandenen Aufgabenköpfen abgeleitet. Anzahl und Pflichtkategorien fachlich bestätigen; kein Nachweis eines vollständigen Prüfungsjahres.'};}
+function checkPattern(p){
+ if(p?.ruleSet!==undefined){if(p.ruleSet!==regulationRuleSet||!regulationProfile(p)||p.categoryCatalog!=='excel-ap-2026'||!Number.isInteger(p.version)||p.version<1||!['proposed','confirmed'].includes(p.status)||!Array.isArray(p.slots)||p.slots.length)throw Error('Ungültiges Prüfungsmuster zur Gärtner-Prüfungsverordnung.');return p;}
+ const zp=p?.categoryCatalog===zwischenpruefungCatalog;
+ if(p?.categoryCatalog!==undefined&&(zp?!zwischenpruefungScope(p):p.categoryCatalog!==(p.examType==='FW_AP'?'fw-sources-2026':'excel-ap-2026')))throw Error('Unbekannter oder nicht zum Prüfungsbereich passender Kategorienstand.');
+ if(p?.examType==='FW_AP'&&!fachwerkerScope(p))throw Error('Fachwerker-Prüfungsmuster ist nur für Gemüsebau und Zierpflanzenbau vorgesehen.');
+ if(!p||!Number.isInteger(p.version)||p.version<1||!['AP','ZP','FW_AP'].includes(p.examType)||typeof p.specialty!=='string'||!['proposed','confirmed'].includes(p.status)||!Array.isArray(p.slots)||!p.slots.length&&!(zp&&p.status==='proposed'))throw Error('Prüfungsmuster benötigt mindestens eine Kategorie.');
+ const seen=new Set(),choices=zp?zwischenpruefungScope(p):p.examType==='FW_AP'?fachwerkerScope(p):catalog;
+ for(const s of p.slots){if(!choices.some(c=>c.id===(p.examType==='FW_AP'?fachwerkerMainCategory(s.categoryId):s.categoryId))||seen.has(s.categoryId)||!Number.isInteger(s.count)||s.count<1||s.count>(zp?1:10))throw Error(zp?'Zwischenprüfung: nur Generalthemen mit jeweils genau einer Aufgabe zulässig.':'Ungültige Kategorie oder Anzahl im Prüfungsmuster.');seen.add(s.categoryId);}return p;
+}
+function pattern(d,type,specialty){
+ const stored=d.patterns?.find(p=>p.examType===type&&p.specialty===specialty),zp=zwischenpruefungScope({examType:type,specialty});
+ if(!zp||stored?.categoryCatalog===zwischenpruefungCatalog)return stored||regulationPattern(type,specialty)||inferPattern(d,type,specialty);
+ const current=inferPattern(d,type,specialty);if(!stored)return current;
+ // The old harvest bucket included preparation. It cannot be mapped to one
+ // current theme without a source review; other shared IDs are unambiguous.
+ const slots=(stored.slots||[]).filter(s=>s.categoryId!=='harvest'&&zp.some(c=>c.id===s.categoryId)).map(s=>({categoryId:s.categoryId,count:1}));
+ return {...current,id:stored.id,version:stored.version+1,slots:slots.length?slots:current.slots,note:current.note+' Bisheriges Muster für neue Prüfungen auf Generalthemen umgestellt; Auswahl erneut bestätigen.'};
+}
 function history(d,t){const variants=scoped(d,t.examType,t.specialty,true).filter(v=>v.familyId===t.familyId),sourceIds=new Set(variants.flatMap(v=>v.sourceIds)),years=d.sources.filter(s=>sourceIds.has(s.id)&&Number.isInteger(s.year)&&s.year<=new Date().getFullYear()).map(s=>s.year),uses=d.uses.filter(u=>{const e=d.exams.find(e=>e.id===u.examId);return e?.examType===t.examType&&e?.specialty===t.specialty&&(u.familyIds.includes(t.familyId)||variants.some(v=>u.taskIds.includes(v.id)))&&u.date<=new Date().toISOString().slice(0,10);}).map(u=>u.date).sort();const confirmed=uses.at(-1)||null,sourceYear=years.length?Math.max(...years):null,year=Math.max(sourceYear||0,confirmed?Number(confirmed.slice(0,4)):0)||null;const sortDate=sourceYear&&(!confirmed||sourceYear>Number(confirmed.slice(0,4)))?sourceYear+'-12-31':confirmed;return {confirmed,sourceYear,year,sortDate,unknown:year===null};}
-function rank(d,type,specialty,categoryId,excluded=[]){const skip=new Set(excluded);return scoped(d,type,specialty).filter(t=>!skip.has(t.familyId)&&classify(t,{legacyFachwerker:type==='FW_AP'&&categoryId==='harvest'}).ids.includes(categoryId)).map(task=>({task,history:history(d,task)})).sort((a,b)=>(a.history.sortDate||'9999').localeCompare(b.history.sortDate||'9999')||a.task.familyId.localeCompare(b.task.familyId)||a.task.id.localeCompare(b.task.id));}
-function patternClassify(t,p){return classify(t,{legacy:['AP','ZP'].includes(p?.examType)&&!p.categoryCatalog,legacyFachwerker:p?.examType==='FW_AP'&&p.slots?.some(s=>s.categoryId==='harvest')});}
-function coverage(e){const regulation=regulationCoverage(e);if(regulation){if(e.pattern){try{checkPattern(e.pattern);}catch{regulation.issues.push('Prüfungsmuster ist ungültig.');}if(e.pattern.examType!==e.examType||e.pattern.specialty!==e.specialty)regulation.issues.push('Prüfungsmuster passt nicht zum Prüfungsbereich.');}return {...regulation,slots:[],complete:regulation.issues.length===0};}const issues=[],p=e.pattern;try{checkPattern(p);}catch{ return {complete:false,slots:[],issues:['Prüfungsmuster fehlt oder hat noch keine Kategorien.']};}if(p.examType!==e.examType||p.specialty!==e.specialty)issues.push('Prüfungsmuster passt nicht zum Prüfungsbereich.');if(p.status!=='confirmed')issues.push('Prüfungsmuster noch nicht bestätigt.');const families=new Set();for(const i of e.items){if(i.task.examType!==e.examType||i.task.specialty!==e.specialty)issues.push('Aufgabe gehört zu einem anderen Prüfungsbereich.');if(families.has(i.task.familyId))issues.push('Aufgabenfamilie mehrfach ausgewählt.');families.add(i.task.familyId);if(patternClassify(i.task,p).ids.some(id=>!p.slots.some(s=>s.categoryId===id)))issues.push('Aufgabe deckt eine Kategorie außerhalb des Musters ab.');if(patternClassify(i.task,p).ids.includes('unassigned'))issues.push('Aufgabe ohne bestätigbare Kategorie.');}
+function rank(d,type,specialty,categoryId,excluded=[]){const skip=new Set(excluded),zp=zwischenpruefungScope({examType:type,specialty});return scoped(d,type,specialty).filter(t=>!skip.has(t.familyId)&&(!zp||eligibleZwischenpruefungTask(t))&&classify(t,{legacyFachwerker:type==='FW_AP'&&categoryId==='harvest'}).ids.includes(categoryId)).map(task=>({task,history:history(d,task)})).sort((a,b)=>(a.history.sortDate||'9999').localeCompare(b.history.sortDate||'9999')||a.task.familyId.localeCompare(b.task.familyId)||a.task.id.localeCompare(b.task.id));}
+function patternClassify(t,p){return classify(t,{legacy:['AP','ZP'].includes(p?.examType)&&!p.categoryCatalog,legacyZwischenpruefung:p?.examType==='ZP'&&p.categoryCatalog!==zwischenpruefungCatalog,legacyFachwerker:p?.examType==='FW_AP'&&p.slots?.some(s=>s.categoryId==='harvest')});}
+function coverage(e){const regulation=regulationCoverage(e);if(regulation){if(e.pattern){try{checkPattern(e.pattern);}catch{regulation.issues.push('Prüfungsmuster ist ungültig.');}if(e.pattern.examType!==e.examType||e.pattern.specialty!==e.specialty)regulation.issues.push('Prüfungsmuster passt nicht zum Prüfungsbereich.');}return {...regulation,slots:[],complete:regulation.issues.length===0};}const issues=[],p=e.pattern;try{checkPattern(p);}catch{ return {complete:false,slots:[],issues:['Prüfungsmuster fehlt oder hat noch keine Kategorien.']};}if(p.examType!==e.examType||p.specialty!==e.specialty)issues.push('Prüfungsmuster passt nicht zum Prüfungsbereich.');if(p.status!=='confirmed')issues.push('Prüfungsmuster noch nicht bestätigt.');if(currentZwischenpruefung(e)&&!p.slots.length)issues.push('Noch keine Generalthemen für die Zwischenprüfung ausgewählt.');const families=new Set(),themes=new Set();for(const i of e.items){if(i.task.examType!==e.examType||i.task.specialty!==e.specialty)issues.push('Aufgabe gehört zu einem anderen Prüfungsbereich.');if(families.has(i.task.familyId))issues.push('Aufgabenfamilie mehrfach ausgewählt.');families.add(i.task.familyId);const ids=patternClassify(i.task,p).ids;if(currentZwischenpruefung(e)){if(!eligibleZwischenpruefungTask(i.task))issues.push('Zwischenprüfung: nur Einzelaufgaben mit genau einem Generalthema; keine Kombinationsaufgaben.');for(const id of ids){if(themes.has(id))issues.push(`${label(id,e)}: höchstens eine Aufgabe je Generalthema.`);themes.add(id);}}if(ids.some(id=>!p.slots.some(s=>s.categoryId===id)))issues.push('Aufgabe deckt eine Kategorie außerhalb des Musters ab.');if(ids.includes('unassigned'))issues.push('Aufgabe ohne bestätigbare Kategorie.');}
  const slots=p.slots.map(s=>({...s,actual:e.items.filter(i=>patternClassify(i.task,p).ids.includes(s.categoryId)).length}));for(const s of slots)if(s.actual!==s.count)issues.push(`${label(s.categoryId,e)}: ${s.actual} von ${s.count} vorgesehenen Aufgaben.`);return {complete:issues.length===0,slots,issues};}
+// Track suggestion recency for families and variants in this database session.
+// Source tasks, saved patterns, and confirmed usage history are never modified.
+const previousZwischenpruefungProposals=new WeakMap();
+function proposeZwischenpruefung(d,e){
+ const usedFamilies=new Set(e.items.map(i=>i.task.familyId)),usedThemes=new Set(e.items.flatMap(i=>classifyZwischenpruefung(i.task).ids)),missing=e.pattern.slots.filter(s=>!usedThemes.has(s.categoryId)).map(s=>s.categoryId);
+ if(!missing.length)return [];
+ const key=JSON.stringify([e.examType,e.specialty,missing,[...usedFamilies].sort()]),memory=previousZwischenpruefungProposals.get(d)||new Map(),rotation=memory.get(key)||{previous:'',previousTasks:'',lastSuggested:new Map(),lastSuggestedTask:new Map(),sequence:0};
+ const candidates=scoped(d,e.examType,e.specialty).filter(t=>eligibleZwischenpruefungTask(t)&&!usedFamilies.has(t.familyId)).map(task=>({task,categoryId:classifyZwischenpruefung(task).ids[0],history:history(d,task)})).filter(c=>missing.includes(c.categoryId)).sort((a,b)=>(rotation.lastSuggested.get(a.task.familyId)||0)-(rotation.lastSuggested.get(b.task.familyId)||0)||(a.history.sortDate||'9999').localeCompare(b.history.sortDate||'9999')||a.task.familyId.localeCompare(b.task.familyId)||(rotation.lastSuggestedTask.get(a.task.id)||0)-(rotation.lastSuggestedTask.get(b.task.id)||0)||a.task.id.localeCompare(b.task.id));
+ const byTheme=new Map(missing.map(id=>[id,candidates.filter(c=>c.categoryId===id)]));
+ // Each task covers one theme. Bipartite matching fills every feasible theme
+ // while allowing a family with several variants only once across the exam.
+ function match(excludedFamily,excludedTask){
+  const familyOwners=new Map(),chosen=new Map();
+  function assign(theme,seen){for(const c of byTheme.get(theme)){const family=c.task.familyId;if(family===excludedFamily||c.task.id===excludedTask||seen.has(family))continue;seen.add(family);const previous=familyOwners.get(family);if(previous===undefined||assign(previous,seen)){familyOwners.set(family,theme);chosen.set(theme,c);return true;}}return false;}
+  for(const theme of [...missing].sort((a,b)=>byTheme.get(a).length-byTheme.get(b).length))assign(theme,new Set());
+  return missing.flatMap(id=>chosen.has(id)?[chosen.get(id)]:[]);
+ }
+ const signature=rows=>rows.map(c=>c.task.familyId).sort().join('\n'),taskSignature=rows=>rows.map(c=>c.task.id).sort().join('\n'),quality=rows=>rows.map(c=>`${c.history.sortDate||'9999'}:${c.task.familyId}:${c.task.id}`).sort().join('\n'),previous=rotation.previous;
+ let chosen=match();
+ if(chosen.length&&signature(chosen)===previous){
+  const alternatives=chosen.map(c=>match(c.task.familyId)).filter(rows=>rows.length===chosen.length&&signature(rows)!==previous);
+  // Prefer the longest-unused alternative; unknown history remains explicit
+  // and sorts behind dated evidence, as in the existing family ranking.
+  alternatives.sort((a,b)=>quality(a).localeCompare(quality(b)));if(alternatives.length)chosen=alternatives[0];
+ }
+ if(chosen.length&&taskSignature(chosen)===rotation.previousTasks){
+  // A different solution can use the same families for different themes.
+  // Excluding each selected task in turn also finds these alternate matchings.
+  const alternatives=chosen.map(c=>match(undefined,c.task.id)).filter(rows=>rows.length===chosen.length&&taskSignature(rows)!==rotation.previousTasks);
+  alternatives.sort((a,b)=>quality(a).localeCompare(quality(b)));if(alternatives.length)chosen=alternatives[0];
+ }
+ rotation.previous=signature(chosen);rotation.previousTasks=taskSignature(chosen);rotation.sequence++;for(const c of chosen){rotation.lastSuggested.set(c.task.familyId,rotation.sequence);rotation.lastSuggestedTask.set(c.task.id,rotation.sequence);}memory.set(key,rotation);previousZwischenpruefungProposals.set(d,memory);return chosen.map(c=>c.task);
+}
 function propose(d,e){
  if(regulationProfile(e)){if(e.pattern&&(e.pattern.examType!==e.examType||e.pattern.specialty!==e.specialty))throw Error('Prüfungsmuster passt nicht zum Prüfungsbereich.');return proposeRegulation(d,e);}
  checkPattern(e.pattern);if(e.pattern.examType!==e.examType||e.pattern.specialty!==e.specialty)throw Error('Prüfungsmuster passt nicht zum Prüfungsbereich.');
+ if(currentZwischenpruefung(e))return proposeZwischenpruefung(d,e);
  const slots=e.pattern.slots,required=new Map(slots.map(s=>[s.categoryId,s.count])),counts=new Map(slots.map(s=>[s.categoryId,e.items.filter(i=>patternClassify(i.task,e.pattern).ids.includes(s.categoryId)).length])),used=new Set(e.items.map(i=>i.task.familyId));
  const candidates=scoped(d,e.examType,e.specialty).map(task=>({task,ids:patternClassify(task,e.pattern).ids,h:history(d,task)})).filter(c=>c.ids.every(id=>required.has(id))&&!used.has(c.task.familyId)).sort((a,b)=>(a.h.sortDate||'9999').localeCompare(b.h.sortDate||'9999')||a.task.id.localeCompare(b.task.id));
  let best=[],bestScore=0,visits=0;
@@ -758,5 +845,5 @@ function propose(d,e){
  search([]);return best;
 }
 
-const api={regulationProfile,regulationCategory,regulationTask,regulationCoverage,regulationChecklist,regulationReviewKey,regulationPattern,checkPracticalUnits,checkRegulationReview,fachwerkerSpecialties,fachwerkerCategories,fachwerkerScope,fachwerkerMainCategory,fachwerkerTopics,qualificationInfo,qualificationLabel,assignCategories,workbookCategories,workbookSource,workbookScope,patternClassify,labels,catalog,categories,archiveScopes,label,heading,classify,scoped,inferPattern,pattern,checkPattern,history,rank,coverage,propose};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.HortiPlanning=api;
+const api={zwischenpruefungScope,eligibleZwischenpruefungTask,zwischenpruefungSelectionIssue,regulationProfile,regulationCategory,regulationTask,regulationCoverage,regulationChecklist,regulationReviewKey,regulationPattern,checkPracticalUnits,checkRegulationReview,fachwerkerSpecialties,fachwerkerCategories,fachwerkerScope,fachwerkerMainCategory,fachwerkerTopics,qualificationInfo,qualificationLabel,assignCategories,workbookCategories,workbookSource,workbookScope,patternClassify,labels,catalog,categories,archiveScopes,label,heading,classify,scoped,inferPattern,pattern,checkPattern,history,rank,coverage,propose};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.HortiPlanning=api;
 })(globalThis);

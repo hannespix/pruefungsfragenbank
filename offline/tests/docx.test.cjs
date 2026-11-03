@@ -72,6 +72,21 @@ test('source bullet glyphs share their list paragraph despite different font bou
  page.blocks=[{...base,id:'bullet',x:86.4,y:203.228,width:5.11,height:11,fontSize:10,lineHeight:10,text:'•',originalText:'•',lines:[{text:'•',runs:[{text:'•',bold:false,italic:false}]}]},{...base,id:'list-text',x:104.4,y:200,width:180,height:14.392,fontSize:12,lineHeight:13.392,text:'Synthetisches Material',originalText:'Synthetisches Material',lines:[{text:'Synthetisches Material',runs:[{text:'Synthetisches Material',bold:false,italic:false}]}]}];
  const xml=await (await unpack(f)).file('word/document.xml').async('string'),paragraphs=[...xml.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)].map(m=>m[0]);assert.ok(paragraphs.some(p=>p.includes('•')&&p.includes('Synthetisches Material')));assert.equal(paragraphs.filter(p=>p.includes('Synthetisches Material')).length,1);
 });
+test('edited connected points stay in one flowing Word paragraph and preserve adjacent points and reverse pages',async()=>{
+ const f=source(fixture(),2),S=require('../src/source-layout.js'),t=f.e.items[0].task,page=t.sourceLayout.pages[0],base=page.blocks[0],make=(id,text,x,y)=>({...structuredClone(base),id,text,originalText:text,x,y,width:420,height:15,lineHeight:14,lines:[{text,runs:[{text,bold:false,italic:false}]}]});
+ page.blocks=[make('first','1. Ordnen Sie die Materialien den vorgesehenen',50,120),make('continuation','Bereichen zu und begründen Sie die Auswahl.',68,134),make('second','2. Dokumentieren Sie die Kontrolle.',50,162)];
+ const target=S.groups(page)[0];S.edit(t,target.id,'1. Ordnen Sie alle Materialien zu und erläutern Sie die Auswahl.');
+ const xml=await (await unpack(f)).file('word/document.xml').async('string'),paragraphs=[...xml.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)].map(m=>m[0]);
+ assert.equal(paragraphs.filter(p=>p.includes('Ordnen Sie alle Materialien')).length,1);assert.ok(paragraphs.some(p=>p.includes('2. Dokumentieren Sie die Kontrolle.')));assert.match(xml,/Rückseite ORIGINAL/);assert.doesNotMatch(xml,/v:textbox|w:txbxContent|<wp:anchor/);assert.doesNotMatch(xml,/Bereichen zu und begründen/);
+ assert.match(paragraphs.find(p=>p.includes('Ordnen Sie alle Materialien')),/w:lineRule="atLeast"/);
+});
+test('a grouped bullet edit uses the body font in Word and does not leave marker and continuation text cells',async()=>{
+ const f=source(fixture(),1),S=require('../src/source-layout.js'),t=f.e.items[0].task,page=t.sourceLayout.pages[0],base=page.blocks[0];page.graphics=[];page.rules=[];
+ const make=(id,text,x,y,width,fontSize=12)=>({...structuredClone(base),id,text,originalText:text,x,y,width,height:14,lineHeight:14,fontSize,lines:[{text,runs:[{text,bold:false,italic:false}]}]});
+ page.blocks=[make('marker','•',40,122,6,10),make('body','Beschriften Sie die Bauteile und ordnen Sie',58,120,420),make('wrap','sie danach zu.',58,134,420)];S.edit(t,S.groups(page)[0].id,'• Beschriften Sie die Bauteile und ordnen Sie diese anschließend zu.');
+ const xml=await (await unpack(f)).file('word/document.xml').async('string'),paragraph=[...xml.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)].map(m=>m[0]).find(p=>p.includes('anschließend zu.'));
+ assert.match(paragraph,/<w:sz w:val="24"/);assert.doesNotMatch(paragraph,/<w:tab\/>/);assert.doesNotMatch(xml,/sie danach zu\./);
+});
 test('legacy multirow grid and a known logo cut in Name/Datum frame stay native',async()=>{
  const f=source(fixture(),1),page=f.e.items[0].task.sourceLayout.pages[0],base=page.blocks[0];page.width=400;page.height=500;page.logos=[{x:270,y:120,width:80,height:40}];
  f.e.items[0].task.assetLinks=f.e.items[0].task.assetLinks.filter(l=>l.role==='source-page');f.e.items[0].task.assetLinks.push({assetId:'plan',role:'letterhead',audience:'candidate',design:'bw-2024'});const font=f.d.assets.find(a=>a.docxFontKey);for(const key of ['sansBold','serifBold'])f.d.assets.push({...font,id:key,docxFontKey:key});
