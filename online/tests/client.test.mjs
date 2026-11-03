@@ -25,7 +25,7 @@ test('a rejected central save preserves revisions for retry and includes only ch
 async function ui(role='group',memoryOnly=false,{specialty='Baumschule',configure=()=>{}}={}){
  const data=demo();for(const t of data.tasks)if(L.zwischenpruefungScope(t))t.text='Aufgabe: Durchführen von Arbeiten an der Pflanze\nHier: Synthetisches Beispiel\n'+t.text;
  data.workshops=[{id:'meeting',title:'Termin',examYear:2027,meetingDate:'',specialties:[specialty]}];configure(data);
- const elements=new Map(),listeners={};for(const id of ['#app','#toast','#dialog','#project-input','#docx-input','#asset-input'])elements.set(id,{innerHTML:'',textContent:'',inert:false,addEventListener(){},classList:{values:new Set(),add(...xs){xs.forEach(x=>this.values.add(x));},remove(...xs){xs.forEach(x=>this.values.delete(x));},contains(x){return this.values.has(x);}},close(){this.open=false;},showModal(){this.open=true;}});
+ const elements=new Map(),listeners={};for(const id of ['#app','#toast','#dialog','#project-input','#docx-input','#asset-input'])elements.set(id,{innerHTML:'',textContent:'',inert:false,addEventListener(name,fn){(this.handlers??={})[name]=fn;},click(){},classList:{values:new Set(),add(...xs){xs.forEach(x=>this.values.add(x));},remove(...xs){xs.forEach(x=>this.values.delete(x));},contains(x){return this.values.has(x);}},close(){this.open=false;},showModal(){this.open=true;}});
  if(memoryOnly){elements.set('#seed',{textContent:JSON.stringify(data)});elements.set('meta[name=hortiexam-storage]',{content:'memory'});}
  const online={role,session:{specialty,meetingId:'meeting'},start:async()=>data,save:async()=>{},load:async()=>structuredClone(data),board:{meetings:[],requests:[]}};
  let timer=0,themeHtml='',themeInputs=[];const timers=new Map();
@@ -635,4 +635,15 @@ test('explicit coordinator task reapproval updates an existing content fingerpri
  const u=await ui('admin');await u.click('action','open-group','Baumschule');await createDraft(u,'ZP');const d=u.sandbox.testUI.getDb(),e=d.exams.at(-1),base=d.tasks.find(t=>t.examType==='ZP'&&t.specialty==='Baumschule');await u.click('action','add',base.id);const item=e.items[0];item.task.reviewStatus='approved';item.task.reviewKey=C.taskReviewKey(item.task);const oldKey=item.task.reviewKey;
  const reviewField={value:'approved',handlers:{},addEventListener(name,fn){this.handlers[name]=fn;}};u.elements.set('#task-review',reviewField);await u.click('action','item-edit',item.id);const confirmReview=reviewField.handlers.change;taskFormValues(u,item.task);u.elements.get('#task-text').value+=' Neuer Auftrag.';u.elements.get('#task-review').value='approved';u.elements.get('#task-reviewer').value='Testprüfung';confirmReview();await u.click('action','save-task');
  const saved=d.exams.find(x=>x.id===e.id).items[0].task;assert.equal(C.taskReviewCurrent(saved),true,u.elements.get('#toast').textContent);assert.notEqual(saved.reviewKey,oldKey);assert.match(saved.text,/Neuer Auftrag/);
+});
+
+test('online project merge is applied only after the central save accepted it',async()=>{
+ const u=await ui('admin'),db=()=>u.sandbox.testUI.getDb();u.online.ensureAssets=async()=>{};
+ const base=db().tasks[0],incoming=C.empty(),t={...structuredClone(base),id:'merge-import-task',familyId:'merge-import-family',title:'Importierte Aufgabe'};delete t.previousId;delete t.supersededBy;t.sourceIds=[];t.assetLinks=[];delete t.sourceLayout;incoming.tasks.push(t);incoming.families.push({id:t.familyId,title:t.title,reviewStatus:'review'});
+ const before=db().tasks.length,file={size:100,text:async()=>JSON.stringify(incoming)},change=()=>u.elements.get('#project-input').handlers.change({target:{files:[file],value:''}});
+ let saved=0;u.online.save=async()=>{saved++;throw Object.assign(Error('Zu viele Änderungen auf einmal. Bitte kleinere Importpakete verwenden.'),{status:400});};
+ await u.click('action','merge-project');await change();
+ assert.equal(saved,1,u.elements.get('#toast').textContent);assert.equal(db().tasks.length,before);assert.match(u.elements.get('#toast').textContent,/Import nicht übernommen/);
+ let accepted=null;u.online.save=async p=>{accepted=p;};await change();
+ assert.ok(accepted?.tasks.some(x=>x.id==='merge-import-task'));assert.ok(db().tasks.some(x=>x.id==='merge-import-task'));
 });
