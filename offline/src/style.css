@@ -63,3 +63,26 @@ button:focus-visible,summary:focus-visible{outline:3px solid #73985d;outline-off
 
 /* Three examination tracks stay readable on desktop and stack on phones. */
 .exam-tracks,.scope-types{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}
+
+/* Practical AP requirements stay visible without obscuring the paper editor. */
+.regulation-status{background:#fff;border:1px solid var(--line,#d9e2d5);border-radius:16px;padding:14px 18px;margin:0 0 18px;min-width:0}
+.regulation-title{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px}
+.regulation-metrics{display:grid;grid-template-columns:.9fr 1.15fr 1.25fr 1fr;gap:12px}
+.regulation-metrics>div{padding:10px 12px;background:#f4f5ef;border-radius:10px;min-width:0;display:flex;flex-direction:column;gap:3px;border-left:3px solid #c6cbbd}
+.regulation-metrics>div.is-complete{background:#edf5e9;border-color:#377453}
+.regulation-metrics b{font-size:20px;line-height:1.35;font-variant-numeric:tabular-nums}
+.regulation-metrics b small{font-size:12px;font-weight:500}
+.regulation-metrics span{font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+.regulation-status>p{margin:9px 0 0;color:#55634f}
+.regulation-dots{display:flex;gap:4px;margin-top:3px}.regulation-dots i{height:4px;width:22px;border-radius:3px;background:#dce2d5}.regulation-dots i.filled{background:#397651}
+.regulation-category-group{margin-top:14px}.regulation-category-group h3{font-size:12px;line-height:1.5;margin:0 0 8px;color:#36523d}.regulation-category-group h3 span{display:block;font-size:11px;color:#697763;font-weight:400}
+.regulation-category-group .paper-category{width:100%;margin-bottom:5px}
+.regulation-topic-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px}.regulation-topic-grid button{text-align:left}.regulation-topic-grid .tiny{display:block;margin-top:6px}
+.paper-new-task{display:flex;align-items:center;gap:6px;margin:14px 0}.paper-new-task>.wide{flex:1}
+.regulation-quote{border-left:3px solid #8ca179;padding:12px 16px;margin:16px 0;background:#f5f7f0}.regulation-quote blockquote{margin:7px 0;font-size:14px;line-height:1.65}.regulation-quote a{font-size:12px}
+.regulation-review{padding:16px;border:1px solid #dce5d6;border-radius:12px;margin:18px 0}.regulation-review h3{margin-top:0}.regulation-review-row{display:flex;gap:8px;align-items:center;margin:8px 0}.regulation-check{flex:1;display:flex;gap:9px;text-align:left;align-items:center;padding:12px;white-space:normal}.regulation-check.checked{background:#eaf4e6;border-color:#8baa79}.regulation-check>span{flex:0 0 19px;font-size:18px}
+.task-regulation{padding:16px;border:1px solid #d8e2d1;border-radius:12px;margin:16px 0;background:#f7f9f3}.task-regulation h3{margin:0 0 8px}.task-regulation label,.practical-unit label{display:block;margin:9px 0 5px;font-size:13px}.task-regulation select,.task-regulation input{width:100%}
+.task-complex-units{margin-top:14px}.task-complex-units summary,.task-topic-options summary,.task-writing summary{cursor:pointer;padding:9px 0;font-weight:600}.practical-unit{border:1px solid #d5dfcc;border-radius:8px;padding:12px;margin:12px 0;min-width:0}.practical-unit legend{font-size:13px;font-weight:600}.practical-unit button{margin-top:8px}
+.task-topic-options{border-bottom:1px solid #e0e6d9;padding:4px 0;margin:4px 0 14px}.task-writing{margin:12px 0}.task-writing details{padding:0 12px;background:#f6f7f1;border-radius:8px}.task-writing details:not([open]){display:none}.task-writing li{margin-bottom:8px}
+@media(max-width:850px){.regulation-metrics{grid-template-columns:1fr 1fr}.regulation-title{align-items:flex-start}.regulation-title>strong{font-size:14px}.regulation-title>.small{font-size:11px}.regulation-status{padding:12px}.regulation-metrics b{font-size:18px}}
+@media(max-width:430px){.regulation-title{flex-wrap:wrap;gap:4px}.regulation-metrics{gap:7px}.regulation-metrics>div{padding:8px}.regulation-review{padding:10px}.regulation-check{font-size:13px}.regulation-title .tiny{display:block}.task-regulation{padding:12px}}

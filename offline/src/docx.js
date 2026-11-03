@@ -182,6 +182,13 @@ async function documentFile(e,input,examiner=false){
   }
  }
  for(const [n,{task:t}] of e.items.entries())if(t.sourceLayout)for(const l of graphics(t,'candidate'))section([p('Zusätzliche Anlage · Aufgabe '+(n+1),'TaskTitle'),...graphic(l)],{task:t});
+ if(examiner){const g=P.regulationGuidance(e);if(g){
+  const compact=text=>p(text,'ExamMeta',{spacing:{line:260,after:100}}),children=[p(g.title,'TaskTitle'),compact(g.status),compact(g.areas),...g.rules.map(compact)];
+  if(g.units.length)children.push(p('Ausdrücklich erklärte komplexe Prüfungsaufgaben','ExamHeading'),table([{header:true,cells:['Aufgabenblatt','Komplexe Prüfungsaufgabe','Bereich / Begründung'].map(v=>p(v,'ExamTable',{run:{bold:true}}))},...g.units.map(u=>({keepTogether:false,cells:[compact(u.document),compact(u.title),compact(u.area+(u.reason?'\n'+u.reason:'') )]}))],[mm(28),mm(62),paperWidth-mm(90)],{padding:100}));
+  if(g.review.length)children.push(p('Fachliche Bestätigungen','ExamHeading'),...g.review.map(compact));
+  children.push(compact(g.caution),p(g.source,'ExamSmall'),new X.Paragraph({style:'ExamSmall',children:[new X.ExternalHyperlink({link:g.url,children:[run('Amtlicher Verordnungstext',{style:'Hyperlink'})]})]}));
+  section(children);
+ }}
  if(examiner)for(const [n,{task:t}] of e.items.entries()){
   const criteria=t.criteria.length?t.criteria:[{text:'Gesamtbewertung',answer:'Bewertungskriterien ergänzen',points:t.points}];
   const rows=[{header:true,cells:['Kriterium / Teilaufgabe','Erwartete Leistung','Max.','Erreicht'].map(v=>p(v,'ExamTable',{run:{bold:true}}))},...criteria.map(c=>({keepTogether:false,cells:[p(c.text,'ExamTable'),p(c.answer||'Erwartung ergänzen','ExamTable'),p(c.points??'offen','ExamTable'),p('','ExamTable')]}))];

@@ -40,6 +40,14 @@ fachrichtungsspezifischen Bezeichnungen.
 Der Worker validiert dieselben Kategorie-IDs wie der Client. Bei Veröffentlichung
 muss daher auch der Worker aktualisiert werden; eine Datenmigration ist nicht nötig.
 
+Seit dem Verordnungsabgleich vom 03.11.2026 werden die gesetzlichen Bereiche und
+Mindestanzahlen für die Gärtner-Abschlussprüfung unabhängig von den Excel-Spalten
+geprüft. Insbesondere werden die Bereichsabweichungen bei Baumschule und
+Zierpflanzenbau nicht als rechtliche Regeln übernommen. Siehe
+[Praktischer AP-Aufbau](ap-regulation.md). Die Kategorienamen und ihre Excel-Belege
+bleiben erhalten; die alte Aussage über reine Kategorieabdeckung beschreibt nur
+die gespeicherten historischen Muster, nicht die aktuelle AP-Aufbauprüfung.
+
 Ältere ZP-Zuordnungen außerhalb des gemeinsamen Fachrichtungskatalogs bleiben als
 „Kategorie noch zuordnen“ sichtbar. Sie werden nicht automatisch einer fachlich
 unpassenden Kategorie zugewiesen. Unversionierte historische ZP-Muster behalten
