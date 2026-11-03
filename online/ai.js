@@ -31,16 +31,47 @@ export function validateAIInput(value){
  return {text:value.text,mode:value.mode,field:value.field};
 }
 
-async function readProviderJSON(response){
- if(Number(response.headers.get('content-length')||0)>RESPONSE_BYTES){await response.body?.cancel();fail(502,'Die Sprachhilfe hat eine zu große Antwort geliefert. Bitte kürzeren Text versuchen.');}
+async function readProviderJSON(response,byteLimit=RESPONSE_BYTES){
+ if(Number(response.headers.get('content-length')||0)>byteLimit){await response.body?.cancel();fail(502,'Die Sprachhilfe hat eine zu große Antwort geliefert. Bitte kürzeren Text versuchen.');}
  const reader=response.body?.getReader();
  if(!reader)fail(502,'Die Sprachhilfe hat keine verwertbare Antwort geliefert.');
  const parts=[];let size=0;
  try{
-  for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>RESPONSE_BYTES){await reader.cancel();fail(502,'Die Sprachhilfe hat eine zu große Antwort geliefert. Bitte kürzeren Text versuchen.');}parts.push(value);}
+  for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>byteLimit){await reader.cancel();fail(502,'Die Sprachhilfe hat eine zu große Antwort geliefert. Bitte kürzeren Text versuchen.');}parts.push(value);}
  }finally{reader.releaseLock();}
  const bytes=new Uint8Array(size);let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.byteLength;}
  try{return JSON.parse(new TextDecoder().decode(bytes));}catch{fail(502,'Die Sprachhilfe hat keine verwertbare Antwort geliefert.');}
+}
+
+async function providerFailure(response){
+ // HTTP 400 and 429 also cover billing/workspace problems. Read at most 8 KiB
+ // only to recognize documented categories. Never return or log provider text,
+ // identifiers, or unknown error fields: they may repeat the selected text/key.
+ let error;
+ if([400,404,429].includes(response.status)){
+  try{const body=await readProviderJSON(response,8*1024);if(body?.type==='error')error=body.error;}catch{/* The HTTP status remains useful if the body is unreadable. */}
+ }else{try{await response.body?.cancel();}catch{/* Preserve the known HTTP status even if transport cleanup fails. */}}
+ const message=typeof error?.message==='string'?error.message:'';
+ const spendLimit=error?.type==='rate_limit_error'&&error?.details?.error_code==='enforced_spend_limit_reached';
+ if(response.status>=300&&response.status<400)fail(502,'Anthropic hat eine unerwartete Weiterleitung geliefert. Die zuständige Stelle muss die Verbindung prüfen.');
+ if(response.status===401)fail(503,'Anthropic hat den API-Schlüssel abgewiesen. Die zuständige Stelle muss den Schlüssel prüfen und die Einrichtung erneut ausführen.');
+ if(response.status===403)fail(503,'Dem Anthropic-API-Schlüssel fehlt die Berechtigung für das Modell oder den Arbeitsbereich. Bitte die zuständige Stelle informieren.');
+ if(response.status===402)fail(503,'Anthropic hat die Abrechnung abgewiesen. Die zuständige Stelle muss Zahlungsdaten und API-Guthaben prüfen.');
+ if(response.status===400&&error?.type==='invalid_request_error'){
+  if(message.startsWith('Your credit balance is too low to access the Anthropic API.'))fail(503,'Das Anthropic-API-Guthaben ist aufgebraucht. Die zuständige Stelle muss das Guthaben in der Claude Console prüfen und auffüllen.');
+  if(/^You have reached your specified (?:workspace )?API usage limits[.: ]/.test(message))fail(503,'Das Anthropic-Ausgabenlimit wurde erreicht. Die zuständige Stelle muss das Limit in der Claude Console prüfen.');
+  if(message.startsWith('This API key is not scoped to a workspace,')||message.startsWith('anthropic-workspace-id header must be a valid workspace ID.'))fail(503,'Anthropic verlangt einen zugeordneten Arbeitsbereich. Die zuständige Stelle muss einen auf diesen Arbeitsbereich begrenzten API-Schlüssel einrichten.');
+  if(message.startsWith('model: '))fail(503,'Das konfigurierte Anthropic-Modell ist nicht verfügbar. Die zuständige Stelle muss Modellname und Modellzugriff prüfen.');
+ }
+ if(response.status===404){
+  if(error?.type==='not_found_error'&&/^Workspace [`'"]?wrkspc_[A-Za-z0-9_]+[`'"]? not found\./.test(message))fail(503,'Der Anthropic-Arbeitsbereich ist nicht verfügbar. Die zuständige Stelle muss Arbeitsbereich und API-Schlüssel prüfen.');
+  fail(503,'Das konfigurierte Anthropic-Modell ist nicht verfügbar. Die zuständige Stelle muss Modellname und Modellzugriff prüfen.');
+ }
+ if(response.status===429&&spendLimit)fail(503,'Das Anthropic-Ausgabenlimit wurde erreicht. Die zuständige Stelle muss das Limit in der Claude Console prüfen.');
+ if(response.status===429)fail(429,'Anthropic hat das Anfragelimit erreicht. Bitte später erneut versuchen.');
+ if(response.status===400)fail(502,'Anthropic hat das Anfrageformat abgelehnt. Die zuständige Stelle muss die Konfiguration der Sprachhilfe prüfen.');
+ if(response.status===529)fail(503,'Anthropic ist vorübergehend überlastet. Bitte später erneut versuchen.');
+ fail(502,`Anthropic ist vorübergehend nicht erreichbar (HTTP ${response.status}). Bitte später erneut versuchen.`);
 }
 
 function validatedResult(message,model){
@@ -59,12 +90,14 @@ function validatedResult(message,model){
 export async function suggestAI(env,input){
  const {enabled,model}=aiStatus(env);
  if(!enabled)fail(503,'Die Sprachhilfe ist noch nicht eingerichtet. Sie können den Text weiterhin manuell bearbeiten.');
- const controller=new AbortController();let timer;
+ const controller=new AbortController();let timer,receivedResponse=false;
  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(new AIFailure(504,'Die Sprachhilfe hat zu lange gebraucht. Bitte später erneut versuchen.'));},TIMEOUT_MS);});
  try{
   const operation=(async()=>{
    const response=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',redirect:'error',signal:controller.signal,
+    // Workers supports manual/follow, not error. Reject 3xx in providerFailure
+    // so neither the key nor the selected text can follow a redirect.
+    method:'POST',redirect:'manual',signal:controller.signal,
     headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':env.ANTHROPIC_API_KEY.trim()},
     body:JSON.stringify({
      model,max_tokens:4096,
@@ -75,14 +108,14 @@ export async function suggestAI(env,input){
      output_config:{format:{type:'json_schema',schema:{type:'object',properties:{text:{type:'string',description:'Vollständiger sprachlicher Vorschlag, 1 bis 8000 Zeichen.'},notes:{type:'array',items:{type:'string'},description:'Höchstens fünf kurze Hinweise, jeweils höchstens 300 Zeichen.'}},required:['text','notes'],additionalProperties:false}}}
     })
    });
-   // Never parse or expose provider error bodies, which may repeat input data.
-   if(!response.ok){await response.body?.cancel();fail(502,'Die Sprachhilfe ist vorübergehend nicht erreichbar. Bitte später erneut versuchen.');}
+   receivedResponse=true;
+   if(!response.ok)await providerFailure(response);
    return validatedResult(await readProviderJSON(response),model);
   })();
   return await Promise.race([operation,timeout]);
  }catch(error){
   if(error instanceof AIFailure)throw error;
   if(controller.signal.aborted)fail(504,'Die Sprachhilfe hat zu lange gebraucht. Bitte später erneut versuchen.');
-  fail(502,'Die Sprachhilfe ist vorübergehend nicht erreichbar. Bitte später erneut versuchen.');
+  fail(502,receivedResponse?'Die Antwort von Anthropic konnte nicht vollständig gelesen werden. Bitte später erneut versuchen.':'Die Verbindung zu Anthropic konnte nicht hergestellt werden. Bitte später erneut versuchen.');
  }finally{clearTimeout(timer);controller.abort();}
 }

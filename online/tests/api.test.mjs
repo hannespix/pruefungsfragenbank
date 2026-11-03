@@ -302,3 +302,21 @@ for(const action of ['close','reopen'])test('recovery never returns stale codes 
 test('a corrupt cached specialty prevents partial legacy supplementation',async()=>{
  const t=await setup();await group(t);const rows=t.DB.db.prepare('SELECT * FROM invitation_codes ORDER BY specialty').all();t.DB.db.prepare('DELETE FROM invitation_codes WHERE specialty=?').run(rows[0].specialty);t.DB.db.prepare('UPDATE invitation_codes SET envelope=? WHERE specialty=?').run('{}',rows[1].specialty);const before=invitationState(t);assert.equal((await invitationRead(t)).status,503);assert.deepEqual(invitationState(t),before);
 });
+
+test('groups cannot reactivate an unsupported specialty theme through a legacy nine-theme snapshot',async()=>{
+ const t=await setup(),specialty='Garten- und Landschaftsbau',g=await group(t,specialty),d=(await t.req('/api/project',undefined,g.token)).body.project,e=workflowExam(d,'ZP',specialty);
+ delete e.pattern.specialtyThemesVersion;e.pattern.categoryDefinitions=P.resolveCatalog(null,{examType:'ZP',specialty:'*'});e.pattern.slots=[{categoryId:'soil',count:1}];
+ assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:0,value:e}]},t.admin)).status,200);
+ const tampered=structuredClone(e);tampered.pattern.slots.push({categoryId:'harvest',count:1});
+ assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:1,value:tampered}]},g.token)).status,400);
+ e.internalNotes='Bestehenden Entwurf weiter bearbeiten';assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:1,value:e}]},g.token)).status,200);
+});
+
+test('specialty ZP settings are isolated and an explicit additional theme is available only to that group',async()=>{
+ const t=await setup(),specialty='Gemüsebau',record=workflowSettings('ZP',specialty,[{id:'preparation',hidden:false}]);
+ assert.equal((await t.req('/api/save',{changes:[{kind:'settings',id:record.id,version:0,value:record}]},t.admin)).status,200);
+ const g=await group(t,specialty),d=(await t.req('/api/project',undefined,g.token)).body.project,e=workflowExam(d,'ZP',specialty);e.pattern.slots=[{categoryId:'preparation',count:1}];
+ assert.equal((await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:0,value:e}]},g.token)).status,200);
+ const other=await group(t,'Garten- und Landschaftsbau'),foreign=(await t.req('/api/project',undefined,other.token)).body.project;
+ assert.ok(!foreign.settings.some(r=>r.id===record.id));assert.ok(!P.categories(foreign,'ZP','Garten- und Landschaftsbau').some(c=>c.id==='preparation'));
+});

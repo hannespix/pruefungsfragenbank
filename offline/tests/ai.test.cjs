@@ -10,6 +10,15 @@ function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve
 function target(text='Original',field='task'){let value=text,live=true;return {label:'Aufgabenstellung',field,read:()=>value,write:v=>{value=v;},valid:()=>live,change:v=>{value=v;},detach:()=>{live=false;}};}
 const enabled={enabled:true,model:'test-sonnet'};
 
+test('known safe provider diagnostics reach the dialog but arbitrary details stay hidden',async()=>{
+ const message='Das Anthropic-API-Guthaben ist aufgebraucht. Die zuständige Stelle muss das Guthaben in der Claude Console prüfen und auffüllen.';
+ let error=Object.assign(new Error(message),{status:503});
+ const session=AI.createSession({targets:[target()],request:async path=>{if(path.endsWith('status'))return enabled;throw error;}});
+ await session.checkStatus();await session.generate();assert.equal(session.snapshot().error,message);
+ error=Object.assign(new Error(message+' PRIVATE_TOKEN'),{status:503});await session.generate();assert.doesNotMatch(session.snapshot().error,/PRIVATE_TOKEN|Guthaben/);
+ error=Object.assign(new Error(message),{status:401});await session.generate();assert.match(session.snapshot().error,/Zugang/);
+});
+
 test('opening checks availability without sending text; only explicit generation sends the selected field',async()=>{
  assert.equal(typeof AI.createSession,'function','AI session controller is available');
  const a=target('Erste Aufgabe'),b=target('Vertrauliche Lösung','solution'),calls=[],applied=[];

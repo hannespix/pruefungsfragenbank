@@ -52,6 +52,30 @@ Ein abgelaufener oder widerrufener Cloudflare-Token verhindert spätere Einricht
 - **Cloudflare hat die Änderung nicht bestätigt:** Token, Kontozuordnung, Berechtigung und Vorhandensein des Workers `hortiexam-access` prüfen. Nach einem Verbindungsabbruch kann die Änderung bereits erfolgt sein; den Zustand im Cloudflare-Dashboard prüfen und gegebenenfalls erneut starten.
 - **Einrichtung erfolgreich, Schreibhilfe trotzdem nicht nutzbar:** App neu laden und prüfen, ob die aktuelle Worker-Version veröffentlicht ist. Gültigkeit, Guthaben und Modellzugriff des Anthropic-Schlüssels beim Anbieter prüfen. Der aktuelle Worker verwendet standardmäßig `claude-sonnet-5-5`.
 
+Bei einer fehlgeschlagenen Nutzung nennt die App die erkannte Ursache, ohne den Schlüssel oder die Anbieter-Antwort anzuzeigen:
+
+| Meldung | Nächster Schritt der zuständigen Stelle |
+| --- | --- |
+| API-Schlüssel abgewiesen | Einen gültigen Anthropic-API-Schlüssel als GitHub Secret hinterlegen und den Einrichtungsworkflow erneut ausführen. |
+| Berechtigung für Modell oder Arbeitsbereich fehlt | Modellzugriff und Arbeitsbereich des Schlüssels in der Claude Console prüfen. |
+| API-Guthaben aufgebraucht oder Abrechnung abgewiesen | [Abrechnung und Guthaben](https://platform.claude.com/settings/billing) der zum Schlüssel gehörenden Organisation prüfen. Der grüne GitHub-Lauf prüft dieses Guthaben nicht. |
+| Ausgabenlimit erreicht | Das Organisations- oder Arbeitsbereichslimit in der Claude Console prüfen; wiederholte Versuche heben es nicht auf. |
+| Arbeitsbereich erforderlich oder nicht verfügbar | Einen API-Schlüssel verwenden, der auf den gewünschten Arbeitsbereich begrenzt ist, und die Einrichtung erneut ausführen. Organisationsweite Schlüssel benötigen bei Anthropic zusätzlich eine Arbeitsbereichsangabe; diese Anwendung verwendet einen auf einen Arbeitsbereich begrenzten Schlüssel. |
+| Modell nicht verfügbar | Modellname und Modellzugriff prüfen. Ohne eigene Worker-Variable `ANTHROPIC_MODEL` wird `claude-sonnet-5-5` verwendet. |
+| Anfragelimit erreicht oder Anbieter überlastet | Später erneut versuchen. Es gibt keine automatischen Wiederholungen. |
+| Anfrageformat abgelehnt | Die Worker-Konfiguration und ihre Kompatibilität mit der Anthropic-API prüfen; den Schlüssel nicht vorsorglich austauschen. |
+| Vorübergehend nicht erreichbar | Verbindung oder Anbieterbetrieb prüfen; diese Meldung allein belegt keinen ungültigen Schlüssel. |
+| Verbindung nicht hergestellt oder Antwort nicht vollständig gelesen | Verbindung vom Worker zum Anbieter prüfen; die Meldung unterscheidet den Verbindungsaufbau vom Lesen der Antwort. |
+| Unerwartete Weiterleitung | Die feste Anbieteradresse und Verbindung prüfen. Der Worker folgt keinen Weiterleitungen und gibt dabei weder Schlüssel noch Prüfungstext weiter. |
+
+Eine Anbieter-Ablehnung meldet die App als Dienstfehler, ohne die eigene HortiExam-Anmeldung zu beenden. Zur Einordnung bestimmter Fehler liest der Worker höchstens 8 KiB der Fehlerantwort und erkennt ausschließlich bekannte Fehlerarten und dokumentierte Meldungsanfänge. Er gibt nur eigene feste Meldungen zurück und protokolliert weder Anbietertext noch Schlüssel oder Prüfungstext.
+
+Die KI-Anfrage verwendet `redirect: 'manual'` und lehnt HTTP-Weiterleitungen ab.
+Cloudflare Workers unterstützt `redirect: 'error'` nicht; dieser Wert bricht
+bereits den Aufbau der Anfrage mit einem `TypeError` ab. Node-Tests allein
+erkennen diesen Unterschied nicht. Ein Regressionstest bildet die Einschränkung
+nach und prüft, dass auch mit `manual` keine Weiterleitung verfolgt wird.
+
 Die Einrichtung schreibt keine Schlüssel oder Anbieter-Antworten in Logs oder Artefakte. Sie übergibt Zugangsdaten ausschließlich als Umgebungsvariablen an das Skript und verwendet die Cloudflare-API für genau ein Secret. Worker-Code, Datenbankbindung und andere Secrets werden dabei erhalten. Ein Lauf dauert höchstens drei Minuten; die API-Anfrage hat ein Zeitlimit von 20 Sekunden und folgt keinen Weiterleitungen.
 
 ## Technische Referenzen
@@ -60,5 +84,10 @@ Die Einrichtung schreibt keine Schlüssel oder Anbieter-Antworten in Logs oder A
 - [Cloudflare: API-Token erstellen](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/)
 - [Cloudflare: einzelnes Worker-Secret setzen](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/secrets/methods/update/)
 - [Cloudflare: einzelnes Worker-Secret löschen](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/secrets/methods/delete/)
+- [Anthropic: API-Fehler](https://platform.claude.com/docs/en/api/errors)
+- [Anthropic: Authentifizierung und Arbeitsbereich](https://platform.claude.com/docs/en/manage-claude/authentication)
+- [Anthropic: Anfragen- und Ausgabenlimits](https://platform.claude.com/docs/en/api/rate-limits)
+- [Anthropic: Claude Sonnet 5.5](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)
+- [Cloudflare: unterstützte Request- und Redirect-Optionen](https://developers.cloudflare.com/workers/runtime-apis/request/)
 
 API-Endpunkte und Rechte geprüft am 3. November 2026. Lokale Tests mit synthetischen Werten: `node --test online/tests/ai-secret.test.mjs`.

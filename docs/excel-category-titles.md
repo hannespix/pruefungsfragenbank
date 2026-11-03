@@ -1,5 +1,10 @@
 # Kategorienamen aus der Excel-Notenberechnung
 
+Aktueller Stand: Gärtner-Zwischenprüfungen verwenden inzwischen einen eigenen
+Generalthemenkatalog mit fachrichtungsspezifischer Auswahl. Der unten beschriebene
+gemeinsame AP-/ZP-Stand dokumentiert die frühere Umsetzung und bleibt für
+historische Prüfungen lesbar. Siehe [ZP-Themen nach Fachrichtung](zp-specialty-themes.md).
+
 Die bereitgestellte Vorlage „Notenberechnung Gärtner AP S 2026“ ist die
 maßgebliche Quelle für die Bezeichnungen der praktischen Gärtner-Abschlussprüfung.
 Verwendet wird ausschließlich das Blatt **Aufgaben**, dort ausgewiesener
