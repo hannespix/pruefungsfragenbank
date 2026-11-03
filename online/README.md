@@ -7,6 +7,14 @@ has EU jurisdiction and read replication disabled. No runtime GitHub token is us
 The private `hannespix/fragenbank` repository is reserved for a possible future
 backup integration; it is not the active store.
 
+## Optional AI writing assistance
+
+**KI-Schreibhilfe** offers explicitly requested grammar, clear-language and examination-wording suggestions through the authenticated Worker. Users compare the original with an editable proposal and decide whether to apply it. Accepted task edits reset content approval and follow the normal save workflow. No selected text is sent while typing or merely opening the dialog.
+
+The Worker uses Claude Sonnet 5.5 (`claude-sonnet-5-5`, official model documentation checked 2026-11-03). `ANTHROPIC_API_KEY` is a Worker secret, never a public client variable. Without it, the writing helper explains that setup is missing; manual editing continues normally. Only the selected text, mode and field type go to Anthropic. No project, assets or committee roster is sent automatically. Prompts and suggestions are not stored in the service or its logs. Anthropic's handling follows the provider agreement/account configuration; this is external processing, not storage solely in D1 EU.
+
+Follow [the German setup instructions](../docs/ai-setup.md) to store `ANTHROPIC_API_KEY` and `CLOUDFLARE_API_TOKEN` as GitHub Actions repository secrets and manually run **KI-Schreibhilfe einrichten** on `main`. The workflow changes only the Worker secret, preserving code, D1 binding and administrator credentials. The same workflow can disable the feature. API validity/billing/model access can be checked only after an actual key is provided.
+
 ## Use
 
 1. Open the existing Pages URL and sign in with the coordinator password.
