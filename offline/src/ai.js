@@ -15,8 +15,33 @@
  const OFFLINE='Die KI-Schreibhilfe ist nur mit einer Verbindung zur Online-Version verfügbar. Du kannst den Text weiterhin selbst bearbeiten.';
  const DISABLED='Die KI-Schreibhilfe ist noch nicht eingerichtet oder derzeit deaktiviert. Du kannst den Text weiterhin selbst bearbeiten.';
  const STALE='Der Text wurde inzwischen geändert oder der Editor geschlossen. Bitte schließe die Schreibhilfe und öffne sie beim aktuellen Text erneut.';
+ // Only exact application-owned messages may pass through; never arbitrary provider details.
+ const SAFE_ERRORS=new Set([
+  "Anthropic hat das Anfrageformat abgelehnt. Die zuständige Stelle muss die Konfiguration der Sprachhilfe prüfen.",
+  "Anthropic hat das Anfragelimit erreicht. Bitte später erneut versuchen.",
+  "Anthropic hat den API-Schlüssel abgewiesen. Die zuständige Stelle muss den Schlüssel prüfen und die Einrichtung erneut ausführen.",
+  "Anthropic hat die Abrechnung abgewiesen. Die zuständige Stelle muss Zahlungsdaten und API-Guthaben prüfen.",
+  "Anthropic hat eine unerwartete Weiterleitung geliefert. Die zuständige Stelle muss die Verbindung prüfen.",
+  "Anthropic ist vorübergehend überlastet. Bitte später erneut versuchen.",
+  "Anthropic verlangt einen zugeordneten Arbeitsbereich. Die zuständige Stelle muss einen auf diesen Arbeitsbereich begrenzten API-Schlüssel einrichten.",
+  "Das Anthropic-API-Guthaben ist aufgebraucht. Die zuständige Stelle muss das Guthaben in der Claude Console prüfen und auffüllen.",
+  "Das Anthropic-Ausgabenlimit wurde erreicht. Die zuständige Stelle muss das Limit in der Claude Console prüfen.",
+  "Das konfigurierte Anthropic-Modell ist nicht verfügbar. Die zuständige Stelle muss Modellname und Modellzugriff prüfen.",
+  "Dem Anthropic-API-Schlüssel fehlt die Berechtigung für das Modell oder den Arbeitsbereich. Bitte die zuständige Stelle informieren.",
+  "Der Anthropic-Arbeitsbereich ist nicht verfügbar. Die zuständige Stelle muss Arbeitsbereich und API-Schlüssel prüfen.",
+  "Der Vorschlag wurde nicht vollständig erstellt. Bitte kürzeren Text versuchen.",
+  "Die Sprachhilfe hat eine zu große Antwort geliefert. Bitte kürzeren Text versuchen.",
+  "Die Sprachhilfe hat keine verwertbare Antwort geliefert.",
+  "Die Sprachhilfe hat keinen gültigen Vorschlag geliefert. Bitte erneut versuchen.",
+  "Die Sprachhilfe hat zu lange gebraucht. Bitte später erneut versuchen.",
+  "Die Sprachhilfe ist noch nicht eingerichtet. Sie können den Text weiterhin manuell bearbeiten.",
+  "Für diesen Text konnte die Sprachhilfe keinen Vorschlag erstellen. Bitte manuell bearbeiten.",
+  "Die Antwort von Anthropic konnte nicht vollständig gelesen werden. Bitte später erneut versuchen.",
+  "Die Verbindung zu Anthropic konnte nicht hergestellt werden. Bitte später erneut versuchen."
+]);
  function errorMessage(error){
   if(error?.status===401||error?.status===403)return 'Dein Zugang ist nicht mehr freigegeben. Bitte prüfe deine Anmeldung. Es wurde kein Text übernommen.';
+  if([422,429,502,503,504].includes(error?.status)&&SAFE_ERRORS.has(error?.message))return error.message;
   if(error?.status===429)return 'Zu viele Anfragen. Bitte warte einen Moment und versuche es erneut. Der Originaltext bleibt erhalten.';
   if(error?.status===503)return 'Die KI-Schreibhilfe ist momentan nicht verfügbar. Bitte versuche es später erneut oder bearbeite den Text selbst.';
   return 'Der Vorschlag konnte nicht geladen werden. Bitte prüfe die Verbindung und versuche es erneut. Du kannst den Text weiterhin selbst bearbeiten.';

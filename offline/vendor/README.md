@@ -5,4 +5,4 @@
 
 The Word renderer uses docx for native paragraphs, styles, headers, tables, images and DrawingML text boxes. Protected fonts and exam content are loaded from the authorized project at runtime; this directory contains neither. Full regular/bold font-family embedding is applied separately in `src/docx-assets.js`.
 
-- `pdf-lib.min.js`: pdf-lib 1.17.1, unmodified `dist/pdf-lib.min.js` browser distribution. MIT license in `pdf-lib.LICENSE.md`. Upstream: https://github.com/Hopding/pdf-lib. Used to copy historical PDF pages, retaining dimensions and rotation.
+- `pdf-lib.min.js`: pdf-lib 1.17.1, `dist/pdf-lib.min.js` browser distribution with unchanged library code. Only the unused trailing source-map directive is removed to avoid a debugger request blocked by the application's Content Security Policy. MIT license in `pdf-lib.LICENSE.md`. Upstream: https://github.com/Hopding/pdf-lib. Used to copy historical PDF pages, retaining dimensions and rotation.

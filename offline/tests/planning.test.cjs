@@ -66,7 +66,7 @@ test('AP workbook choices differ by specialty while current ZP has general theme
  assert.ok(!ids('ZP','Baumschule').includes('selection'));
  assert.ok(ids('AP','Zierpflanzenbau').includes('indoor'));
  assert.ok(!ids('AP','Obstbau').includes('indoor'));
- assert.deepEqual(ids('ZP','Friedhofsgärtnerei'),ids('ZP','Baumschule'));
+ assert.deepEqual(ids('ZP','Friedhofsgärtnerei'),['plantwork','machinery','propagation','materials','soil','maintenance']);
  assert.ok(ids('AP','Garten- und Landschaftsbau').includes('paving'));
 });
 test('AP retains nutrition and exclusive grave care without introducing them in ZP',()=>{

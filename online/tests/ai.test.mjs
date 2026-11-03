@@ -44,7 +44,7 @@ test('AI suggestions use the bounded provider contract and do not persist select
  assert.deepEqual((await x.req('/api/ai/status',undefined,x.admin.token)).body,{enabled:true,model:'claude-sonnet-5-5'});
  const response=await x.req('/api/ai/suggest',input,x.admin.token);
  assert.equal(response.status,200);assert.deepEqual(response.body,{...suggested,model:'claude-sonnet-5-5'});
- assert.equal(sent.url,'https://api.anthropic.com/v1/messages');assert.equal(sent.options.method,'POST');assert.equal(sent.options.redirect,'error');assert.equal(sent.options.headers['x-api-key'],'synthetic-provider-key');assert.equal(sent.options.headers['anthropic-version'],'2023-06-01');
+ assert.equal(sent.url,'https://api.anthropic.com/v1/messages');assert.equal(sent.options.method,'POST');assert.equal(sent.options.redirect,'manual');assert.equal(sent.options.headers['x-api-key'],'synthetic-provider-key');assert.equal(sent.options.headers['anthropic-version'],'2023-06-01');
  assert.equal(sent.data.model,'claude-sonnet-5-5');assert.equal(sent.data.max_tokens,4096);assert.deepEqual(sent.data.thinking,{type:'between_tools'});assert.equal(sent.data.temperature,undefined);assert.equal(sent.data.tools,undefined);assert.equal(sent.data.tool_choice,undefined);
  assert.equal(sent.data.output_config.format.type,'json_schema');assert.deepEqual(sent.data.output_config.format.schema.required,['text','notes']);assert.equal(sent.data.output_config.format.schema.additionalProperties,false);
  assert.deepEqual(sent.data.messages,[{role:'user',content:JSON.stringify(input)}]);assert.ok(sent.options.signal instanceof AbortSignal);
@@ -107,12 +107,62 @@ test('AI validates the entire result shape and local output limits',async t=>{
  }
 });
 
+test('AI uses a Workers-compatible request and never follows provider redirects',async t=>{
+ const x=await setup(t);
+ x.fetch.mock.mockImplementation(async(_url,options)=>{if(options.redirect==='error')throw new TypeError('Unsupported redirect mode: error');return provider();});
+ assert.equal((await x.req('/api/ai/suggest',input,x.admin.token)).status,200);
+ for(const status of [301,302,303,307,308]){
+  const before=x.fetch.mock.callCount();
+  x.fetch.mock.mockImplementation(async(url,options)=>{assert.equal(url,'https://api.anthropic.com/v1/messages');assert.equal(options.redirect,'manual');return new Response('PRIVATE_PROVIDER_BODY',{status,headers:{Location:'https://untrusted.test/collect'}});});
+  const result=await x.req('/api/ai/suggest',input,x.admin.token);assert.equal(result.status,502);assert.match(result.body.error,/Weiterleitung/);assert.ok(!JSON.stringify(result.body).includes('PRIVATE_PROVIDER_BODY'));assert.equal(x.fetch.mock.callCount(),before+1);
+ }
+});
+
+test('AI keeps a known provider failure when cancelling its body fails',async t=>{
+ const x=await setup(t);
+ x.fetch.mock.mockImplementation(async()=>new Response(new ReadableStream({cancel(){throw new Error('PRIVATE_CANCEL_ERROR');}}),{status:401}));
+ const result=await x.req('/api/ai/suggest',input,x.admin.token);assert.equal(result.status,503);assert.match(result.body.error,/API-Schlüssel.*abgewiesen/);assert.ok(!JSON.stringify(result.body).includes('PRIVATE_CANCEL_ERROR'));
+});
+
 test('AI upstream errors are redacted and failed attempts are not retried',async t=>{
  const x=await setup(t),logs=[];t.mock.method(console,'error',(...args)=>logs.push(args));
- for(const failure of [()=>Response.json({error:{message:'secret upstream details synthetic-provider-key'}},{status:401}),()=>{throw new Error('secret upstream details synthetic-provider-key');}]){
-  x.fetch.mock.mockImplementation(async()=>failure());const response=await x.req('/api/ai/suggest',input,x.admin.token);assert.equal(response.status,502);assert.ok(!JSON.stringify(response.body).includes('secret'));assert.ok(!JSON.stringify(response.body).includes('synthetic-provider-key'));
+ for(const [failure,status] of [[()=>Response.json({error:{message:'secret upstream details synthetic-provider-key'}},{status:401}),503],[()=>{throw new Error('secret upstream details synthetic-provider-key');},502]]){
+  x.fetch.mock.mockImplementation(async()=>failure());const response=await x.req('/api/ai/suggest',input,x.admin.token);assert.equal(response.status,status);assert.ok(!JSON.stringify(response.body).includes('secret'));assert.ok(!JSON.stringify(response.body).includes('synthetic-provider-key'));
  }
  assert.equal(x.fetch.mock.callCount(),2);assert.deepEqual(logs,[]);
+});
+
+const providerFailures=[
+ {status:401,type:'authentication_error',message:'invalid x-api-key',want:503,pattern:/API-Schlüssel.*abgewiesen/},
+ {status:403,type:'permission_error',message:'Permission denied',want:503,pattern:/Berechtigung.*Modell/},
+ {status:402,type:'billing_error',message:'Billing error',want:503,pattern:/Abrechnung.*Guthaben/},
+ {status:400,type:'invalid_request_error',message:'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.',want:503,pattern:/API-Guthaben.*aufgebraucht/},
+ {status:400,type:'invalid_request_error',message:'You have reached your specified API usage limits. You will regain access later.',want:503,pattern:/Ausgabenlimit.*erreicht/},
+ {status:400,type:'invalid_request_error',message:'You have reached your specified workspace API usage limits. You will regain access later.',want:503,pattern:/Ausgabenlimit.*erreicht/},
+ {status:400,type:'invalid_request_error',message:'This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header with the ID of the workspace to use.',want:503,pattern:/Arbeitsbereich.*API-Schlüssel/},
+ {status:400,type:'invalid_request_error',message:'anthropic-workspace-id header must be a valid workspace ID.',want:503,pattern:/Arbeitsbereich.*API-Schlüssel/},
+ {status:404,type:'not_found_error',message:'model: claude-sonnet-5-5',want:503,pattern:/Modell.*nicht verfügbar/},
+ {status:404,type:'not_found_error',message:'Workspace `wrkspc_synthetic` not found.',want:503,pattern:/Arbeitsbereich.*nicht verfügbar/},
+ {status:429,type:'rate_limit_error',message:'Rate limited',want:429,pattern:/Anfragelimit.*später/},
+ {status:429,type:'rate_limit_error',message:'Your organization has crossed its monthly API usage threshold.',details:{error_code:'enforced_spend_limit_reached'},want:503,pattern:/Ausgabenlimit.*erreicht/},
+ {status:400,type:'invalid_request_error',message:'output_config.format: unsupported request parameter',want:502,pattern:/Anfrageformat.*Konfiguration/},
+ {status:529,type:'overloaded_error',message:'Overloaded',want:503,pattern:/überlastet.*später/},
+ {status:500,type:'api_error',message:'Internal server failure',want:502,pattern:/vorübergehend nicht erreichbar/},
+ {status:400,type:'untrusted_type',message:'Your credit balance is too low to access the Anthropic API.',want:502,pattern:/Anfrageformat.*Konfiguration/}
+];
+for(const sample of providerFailures)test('AI classifies provider failure without exposing its body: '+sample.status+' '+sample.type+' '+sample.message.slice(0,45),async t=>{
+ const x=await setup(t),logs=[];t.mock.method(console,'error',(...args)=>logs.push(args));t.mock.method(console,'warn',(...args)=>logs.push(args));
+ x.fetch.mock.mockImplementation(async()=>Response.json({type:'error',error:{type:sample.type,message:sample.message+' PRIVATE_SELECTED_TEXT synthetic-provider-key',...(sample.details?{details:sample.details}:{})},request_id:'req_synthetic'}, {status:sample.status}));
+ const result=await x.req('/api/ai/suggest',input,x.admin.token);assert.equal(result.status,sample.want);assert.match(result.body.error,sample.pattern);assert.ok(!JSON.stringify(result.body).includes('PRIVATE_SELECTED_TEXT'));assert.ok(!JSON.stringify(result.body).includes('synthetic-provider-key'));assert.deepEqual(logs,[]);assert.equal(x.fetch.mock.callCount(),1);
+ // Provider configuration failures must not invalidate the user's own session.
+ assert.equal((await x.req('/api/ai/status',undefined,x.admin.token)).status,200);
+});
+
+test('AI malformed and oversized provider error bodies fall back safely and cancel unread data',async t=>{
+ const x=await setup(t);let cancelled=false;
+ const replies=[()=>new Response('<html>PRIVATE_SELECTED_TEXT</html>',{status:400}),()=>new Response(new ReadableStream({pull(c){c.enqueue(new TextEncoder().encode('PRIVATE_SELECTED_TEXT'.repeat(1000)));},cancel(){cancelled=true;}}),{status:400})];
+ for(const reply of replies){x.fetch.mock.mockImplementation(async()=>reply());const result=await x.req('/api/ai/suggest',input,x.admin.token);assert.equal(result.status,502);assert.match(result.body.error,/Anfrageformat.*Konfiguration/);assert.ok(!JSON.stringify(result.body).includes('PRIVATE_SELECTED_TEXT'));}
+ assert.equal(cancelled,true);
 });
 
 test('AI bounds streamed provider responses and cancels oversized bodies',async t=>{

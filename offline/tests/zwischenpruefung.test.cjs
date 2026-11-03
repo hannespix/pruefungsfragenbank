@@ -15,16 +15,16 @@ function task(id,categoryId='plantwork',extra={}){return {id,familyId:id,title:'
 function db(tasks=[]){return {...C.empty(),tasks,families:[...new Set(tasks.map(t=>t.familyId))].map(id=>({id,title:id}))};}
 function exam(d,ids){const pattern=P.inferPattern(d,'ZP','Baumschule');if(ids)pattern.slots=ids.map(categoryId=>({categoryId,count:1}));if(pattern.slots.length)pattern.status='confirmed';return C.newExam({examType:'ZP',specialty:'Baumschule',pattern});}
 
-test('all seven Gärtner specialties share the exact nine general themes; AP and Fachwerker stay separate',()=>{
+test('the nine-theme master retains exact names while specialties offer their evidenced subset; AP and Fachwerker stay separate',()=>{
  const expected=themes.map(([id,label])=>({id,label}));
- for(const specialty of C.specialties){assert.deepEqual(P.zwischenpruefungScope({examType:'ZP',specialty}),expected);assert.deepEqual(P.categories(db(),'ZP',specialty),expected);}
+ assert.deepEqual(P.resolveCatalog(db(),{examType:'ZP',specialty:'*'}).map(({id,label})=>({id,label})),expected);for(const specialty of C.specialties){const scoped=P.zwischenpruefungScope({examType:'ZP',specialty});assert.deepEqual(P.categories(db(),'ZP',specialty),scoped);assert.ok(scoped.every(c=>expected.some(x=>x.id===c.id&&x.label===c.label)));}
  for(const context of [{examType:'AP',specialty:'Baumschule'},{examType:'FW_AP',specialty:'Gemüsebau'},{examType:'ZP',specialty:'Gemüsebau',qualification:'Gartenbaufachwerker 172'},{examType:'ZP',specialty:'Gemüsebau',qualification:'170'},{examType:'ZP',specialty:'Gemüsebau',qualification:'FW'},{examType:'ZP',specialty:'GaLaBau'}])assert.equal(P.zwischenpruefungScope(context),null);
  assert.equal(P.label('propagation',{examType:'AP',specialty:'Baumschule'}),'Vermehren von Gehölzen');
  assert.equal(P.categories(db(),'FW_AP','Gemüsebau').length,7);
 });
 
 test('current ZP distinguishes harvest and preparation from headings and ignores body words and old AP assignments',()=>{
- for(const [id] of themes){const t=task(id,id,{planningCategories:[],planningCategoryCatalog:'excel-ap-2026',planningCategoryEvidence:'Historische Zuordnung'}),before=structuredClone(t);assert.deepEqual(P.classify(t).ids,[id]);assert.equal(P.eligibleZwischenpruefungTask(t),true);assert.deepEqual(t,before);}
+ for(const [id] of themes){const t=task(id,id,{planningCategories:[],planningCategoryCatalog:'excel-ap-2026',planningCategoryEvidence:'Historische Zuordnung'}),before=structuredClone(t);assert.deepEqual(P.classify(t).ids,[id]);assert.equal(P.eligibleZwischenpruefungTask(t),!['preparation','plantuse'].includes(id));assert.deepEqual(t,before);}
  const harvest=task('harvest','harvest',{planningCategories:['lifting'],planningCategoryCatalog:'excel-ap-2026'});assert.deepEqual(P.classify(harvest).ids,['harvest']);
  const t=task('plant','plantwork',{planningCategories:['harvest','preparation'],planningCategoryCatalog:'excel-ap-2026'});t.text+=' Danach die Aufbereitung und Erntearbeiten erläutern.';assert.deepEqual(P.classify(t).ids,['plantwork']);assert.equal(P.eligibleZwischenpruefungTask(t),true);
  assert.deepEqual(P.classify(task('maintenance','Durchführung von Pflegemaßnahmen an Maschinen, Geräten und baulichen Anlagen')).ids,['maintenance']);
@@ -45,7 +45,7 @@ test('new patterns infer eligible themes only, allow a chosen subset and never i
  assert.throws(()=>P.checkPattern({...p,slots:[{categoryId:'protection',count:1}]}),/Generalthemen/);
  assert.throws(()=>P.checkPattern({...p,examType:'AP'}),/Kategorienstand/);
  const empty=P.pattern(db(),'ZP','Baumschule');assert.equal(empty.categoryCatalog,'zp-general-2026');assert.deepEqual(empty.slots,[]);assert.doesNotThrow(()=>P.checkPattern(empty));assert.deepEqual(P.propose(db(),{examType:'ZP',specialty:'Baumschule',pattern:empty,items:[]}),[]);assert.match(P.coverage({examType:'ZP',specialty:'Baumschule',pattern:empty,items:[]}).issues.join(' '),/keine Generalthemen/);
- assert.throws(()=>P.checkPattern({...empty,status:'confirmed'}),/mindestens/);
+ assert.doesNotThrow(()=>P.checkPattern({...empty,status:'confirmed'}));assert.equal(P.coverage({examType:'ZP',specialty:'Baumschule',pattern:{...empty,status:'confirmed'},items:[]}).complete,false);
 });
 
 test('old pattern snapshots and Excel assignments retain their old labels, counts and classification',()=>{
@@ -77,7 +77,7 @@ test('single-theme matching avoids family dead ends, existing themes and combina
 });
 
 test('new manual general assignments validate without invalidating historical Excel records',()=>{
- const t=task('manual','Unbekannt');P.assignCategories(t,['preparation'],'Fachlich bestätigt');assert.equal(t.planningCategoryCatalog,'zp-general-2026');assert.doesNotThrow(()=>C.checkTask(t));assert.equal(P.eligibleZwischenpruefungTask(t),true);
+ const t=task('manual','Unbekannt');P.assignCategories(t,['preparation'],'Fachlich bestätigt');assert.equal(t.planningCategoryCatalog,'zp-general-2026');assert.doesNotThrow(()=>C.checkTask(t));assert.equal(P.eligibleZwischenpruefungTask(t),false);const context={examType:'ZP',specialty:'Baumschule',specialtyThemesVersion:1,categoryDefinitions:P.resolveCatalog(null,{examType:'ZP',specialty:'*'})};assert.equal(P.eligibleZwischenpruefungTask(t,context),true);
  assert.throws(()=>C.checkTask({...t,planningCategories:['lifting']}),/Kategorie/);assert.throws(()=>C.checkTask({...t,examType:'AP'}),/Kategorie/);
  const old=task('old','harvest',{planningCategories:['lifting'],planningCategoryCatalog:'excel-ap-2026'});assert.doesNotThrow(()=>C.checkTask(old));
 });

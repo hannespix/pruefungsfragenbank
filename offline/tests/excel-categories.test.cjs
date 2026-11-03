@@ -40,7 +40,7 @@ test('ZP uses general titles while AP, GBF and stored counts remain separate',()
 });
 test('ZP recognizes general source headings and preserves old pattern interpretation',()=>{
  const legacy=task('Baumschule','Durchführen von Pflegemaßnahmen an Maschinen, Geräten und baulichen Anlagen',{examType:'ZP'}),d=db([legacy]);
- for(const specialty of Object.keys(P.workbookCategories))assert.equal(P.categories(d,'ZP',specialty).length,9);
+ for(const specialty of Object.keys(P.workbookCategories))assert.deepEqual(P.categories(d,'ZP',specialty),P.zwischenpruefungScope({examType:'ZP',specialty}));
  assert.deepEqual(P.classify(legacy).ids,['maintenance']);
  assert.equal(B.search(d,{examType:'ZP',category:'maintenance'}).length,1);
  const manual={...legacy,planningCategories:['maintenance']};assert.deepEqual(P.classify(manual).ids,['maintenance']);
