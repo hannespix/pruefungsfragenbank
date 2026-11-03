@@ -173,7 +173,7 @@ async function documentFile(e,input,examiner=false){
  for(const [n,{task:t}] of e.items.entries()){
   if(t.sourceLayout){
    for(const [index,page] of t.sourceLayout.pages.entries()){
-    const flow=sourcePage({...page,...await sourceElements(page,d)},t);
+    const flow=sourcePage({...page,...await sourceElements(page,d),blocks:S.displayBlocks(page)},t);
     section(flow.children,{original:true,page,...flow,type:index?X.SectionType.NEXT_PAGE:X.SectionType.ODD_PAGE});
    }
    if(t.sourceLayout.pages.length%2)section([gap(0)],{original:true,page:t.sourceLayout.pages.at(-1)});
