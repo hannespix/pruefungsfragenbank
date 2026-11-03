@@ -13,6 +13,9 @@ import I from '../../offline/src/icons.js';
 import S from '../../offline/src/source-layout.js';
 import D from '../../offline/src/docx.js';
 import M from '../../offline/src/materials.js';
+import O from '../../offline/src/organization.js';
+import T from '../../offline/src/timing-plan.js';
+import Zip from '../../offline/vendor/jszip.min.js';
 const client=fs.readFileSync(new URL('../client.js',import.meta.url),'utf8');
 const app=fs.readFileSync(new URL('../../offline/src/app.js',import.meta.url),'utf8');
 const demo=()=>C.validate(JSON.parse(fs.readFileSync(new URL('../../offline/demo.json',import.meta.url))));
@@ -25,7 +28,7 @@ async function ui(role='group',memoryOnly=false,{specialty='Baumschule',configur
  const online={role,session:{specialty,meetingId:'meeting'},start:async()=>data,save:async()=>{},load:async()=>structuredClone(data),board:{meetings:[],requests:[]}};
  let timer=0,themeHtml='',themeInputs=[];const timers=new Map();
  const themes=()=>{const html=elements.get('#app').innerHTML;if(html!==themeHtml){themeHtml=html;themeInputs=[...html.matchAll(/<input[^>]*data-workflow-theme value="([^"]+)"([^>]*)>/g)].map(([,value,attrs])=>({value,checked:/\bchecked\b/.test(attrs),disabled:/\bdisabled\b/.test(attrs),handlers:{},addEventListener(name,fn){this.handlers[name]=fn;}}));}return themeInputs;};
- const sandbox={HortiMaterials:M,HortiSourceLayout:S,HortiIcons:I,HortiCatalog:B,HortiHelp:H,HortiDocx:D,HortiArchive:A,HortiPaper:W,HortiOnline:memoryOnly?null:online,HortiPlanning:L,HortiCore:C,HortiPrint:P,console,setTimeout:(fn,delay)=>{const id=++timer;timers.set(id,{fn,delay});return id;},clearTimeout:id=>timers.delete(id),confirm:()=>true,window:{addEventListener:(name,fn)=>listeners[name]=fn},document:{querySelector:q=>elements.get(q)||null,querySelectorAll:q=>q==='[data-workflow-theme]'?themes():[],addEventListener:(name,fn)=>listeners[name]=fn}};
+ const sandbox={HortiTimingPlan:T,HortiOrganization:O,HortiMaterials:M,HortiSourceLayout:S,HortiIcons:I,HortiCatalog:B,HortiHelp:H,HortiDocx:D,HortiArchive:A,HortiPaper:W,HortiOnline:memoryOnly?null:online,HortiPlanning:L,HortiCore:C,HortiPrint:P,console,setTimeout:(fn,delay)=>{const id=++timer;timers.set(id,{fn,delay});return id;},clearTimeout:id=>timers.delete(id),confirm:()=>true,window:{addEventListener:(name,fn)=>listeners[name]=fn},document:{querySelector:q=>elements.get(q)||null,querySelectorAll:q=>q==='[data-workflow-theme]'?themes():[],addEventListener:(name,fn)=>listeners[name]=fn}};
  await vm.runInNewContext(app.replace('await initStorage();','globalThis.testUI={reloadCentral,changed,bankResults,setBankFilters:v=>bankFilters=v,getDb:()=>db};await initStorage();'),sandbox);
  return {online,sandbox,elements,themes,timers,dispatch:(name,event)=>listeners[name](event),click:async(kind,value,id)=>listeners.click({target:{closest:selector=>selector===`[data-${kind}]`?{dataset:{[kind]:value,id}}:null}})};
 }
@@ -304,7 +307,7 @@ test('paper writing help receives complete source paragraphs and updates the sel
 
 test('internal remarks autosave from the group dialog and remain separate from printed instructions',async()=>{
  const u=await ui();await createDraft(u,'ZP');const d=u.sandbox.testUI.getDb(),e=d.exams.at(-1),handlers={},input={value:'',addEventListener:(name,fn)=>handlers[name]=fn};u.elements.set('#exam-internal-notes',input);
- assert.match(u.elements.get('#app').innerHTML,/data-action="internal-notes"/);await u.click('action','internal-notes',e.id);assert.match(u.elements.get('#dialog').innerHTML,/Interne Bemerkungen an die zuständige Stelle/);assert.match(u.elements.get('#dialog').innerHTML,/weder.*gedruckt.*nicht.*Word.*PDF/);assert.equal(typeof handlers.input,'function');
+ assert.match(u.elements.get('#app').innerHTML,/data-action="internal-notes"/);await u.click('action','internal-notes',e.id);assert.match(u.elements.get('#dialog').innerHTML,/Interne Bemerkungen an die zuständige Stelle/);assert.match(u.elements.get('#dialog').innerHTML,/separaten.*Dokument.*Word.*Druck/);assert.equal(typeof handlers.input,'function');
  input.value='Rückfrage an die Koordination.\n<Material> & Termin';handlers.input();assert.equal(e.internalNotes,input.value);assert.equal(e.notes,'');assert.match(u.elements.get('#app').innerHTML,/Interne Bemerkungen · vorhanden/);
  let saved;u.online.save=async project=>saved=project;await u.click('action','save-online');assert.equal(saved.exams.find(x=>x.id===e.id).internalNotes,input.value);
  await u.click('action','close');await u.click('route','group');assert.match(u.elements.get('#app').innerHTML,/Interne Bemerkungen · vorhanden/);await u.click('action','internal-notes',e.id);assert.match(u.elements.get('#dialog').innerHTML,/&lt;Material&gt; &amp; Termin/);
@@ -491,4 +494,67 @@ test('full AP documents disable sixth-task additions and reject a details edit t
 test('automatic choices are offered at each stage and preserve existing edited practical and oral tasks',async()=>{
  const u=await ui(),d=u.sandbox.testUI.getDb();await u.click('action','track-new','ZP');const e=d.exams.at(-1);assert.match(u.elements.get('#app').innerHTML,/data-action="suggest-themes"/);const t=practicalFixture(d,e,{id:'auto-preserved-zp',category:e.pattern.slots[0].categoryId});C.addItem(e,t);e.items[0].task.text+='\nVorhandene Ausschussänderung.';const before=JSON.stringify(e.items);await u.click('action','suggest-themes');assert.equal(e.pattern.slots.length,3);assert.ok(e.pattern.slots.some(s=>s.categoryId===t.planningCategories[0]));assert.equal(JSON.stringify(e.items),before);await u.click('action','workflow-step','2');assert.match(u.elements.get('#app').innerHTML,/Aufgaben automatisch ergänzen/);await u.click('action','suggest');await u.click('action','accept-suggestions');assert.equal(JSON.stringify(e.items[0]),JSON.stringify(JSON.parse(before)[0]));assert.ok(e.items.length<=3);await u.click('action','workflow-step','3');assert.match(u.elements.get('#app').innerHTML,/automatisch vorschlagen/);
  await u.click('route','group');await createDraft(u,'AP');const oral=addOralFixture(d,{id:'auto-oral'});await u.click('action','paper-reset');assert.match(u.elements.get('#app').innerHTML,/data-action="oral-suggest"/);await u.click('action','oral-suggest');const ap=d.exams.at(-1);assert.equal(ap.oralItem.originTaskId,oral.id);ap.oralItem.task.text+='\nBereits bearbeitet.';const saved=JSON.stringify(ap.oralItem);await u.click('action','oral-suggest');assert.equal(JSON.stringify(ap.oralItem),saved);C.validate(d);
+});
+
+
+test('Word and print exports contain every separate document, remarks, materials and oral task',async()=>{
+ const u=await ui('admin');await u.click('action','open-group','Baumschule');await createDraft(u,'AP');
+ const d=u.sandbox.testUI.getDb(),e=d.exams.at(-1),t=structuredClone(d.tasks.find(t=>t.kind==='practical'||!t.kind));Object.assign(t,{examType:'AP',specialty:'Baumschule'});delete t.planningCategories;delete t.planningCategoryCatalog;delete t.planningCategoryEvidence;e.items=[{id:'out-item',originTaskId:t.id,task:t}];
+ e.items[0].task=M.setMaterials(t,'PACKAGE_MATERIAL',{confirm:true});e.internalNotes='PACKAGE_REMARK';const oral={...structuredClone(t),id:'oral-output',familyId:'oral-output',kind:'oral',title:'PACKAGE_ORAL',solution:'PACKAGE_ORAL_SOLUTION'};delete oral.materials;e.oralItem={id:'oral-output-item',originTaskId:oral.id,task:oral};
+ let blob,authorizations=0;u.sandbox.JSZip=Zip;u.sandbox.URL={createObjectURL:b=>{blob=b;return 'blob:test';},revokeObjectURL(){}};u.elements.set('#ready-download',{addEventListener(){}});u.online.ensureAssets=async()=>{};u.online.request=async path=>{assert.equal(path,'/api/export');authorizations++;};
+ const before=JSON.stringify(d);await u.click('action','export-exam');assert.ok(blob,u.elements.get('#toast').textContent);assert.ok(authorizations>=1);const z=await Zip.loadAsync(await blob.arrayBuffer());
+ for(const stem of ['01_Teilnehmerfassung','02_Loesung_und_Bewertung','03_Materialliste','04_Interne_Bemerkungen','05_Zeitplan'])for(const ext of ['docx','html'])assert.ok(z.file(stem+'.'+ext),stem+ext);
+ const index=await z.file('00_Paketuebersicht.html').async('string');assert.match(index,/03_Materialliste.docx/);assert.match(index,/04_Interne_Bemerkungen.html/);
+ assert.match(await z.file('03_Materialliste.html').async('string'),/PACKAGE_MATERIAL/);assert.match(await z.file('04_Interne_Bemerkungen.html').async('string'),/PACKAGE_REMARK/);
+ for(const stem of ['01_Teilnehmerfassung','02_Loesung_und_Bewertung']){const h=await z.file(stem+'.html').async('string');assert.match(h,/PACKAGE_ORAL/);assert.doesNotMatch(h,/PACKAGE_MATERIAL|PACKAGE_REMARK/);}
+ assert.match(await z.file('02_Loesung_und_Bewertung.html').async('string'),/PACKAGE_ORAL_SOLUTION/);assert.equal(JSON.stringify(d),before);
+});
+test('complete package cannot bypass group export rights or a failed pending save',async()=>{
+ const g=await ui();await createDraft(g,'ZP');g.online.request=()=>{throw Error('Unexpected export authorization');};await g.click('action','export-exam');assert.equal(g.elements.get('#dialog').innerHTML,'');
+ const u=await ui('admin');await u.click('action','open-group','Baumschule');await createDraft(u,'ZP');u.online.save=async()=>{throw Error('SAVE_FAILED');};let called=false;u.online.request=async()=>{called=true;};await u.click('action','export-exam');assert.equal(called,false);assert.match(u.elements.get('#toast').textContent,/SAVE_FAILED/);
+});
+
+async function requiredFieldsDraft(u,{text='Pflanzen fachgerecht vorbereiten und das Ergebnis kontrollieren.',minutes=null,oral=false}={}){
+ const d=u.sandbox.testUI.getDb(),base=structuredClone(d.tasks[0]),t={...base,id:'required-practical',familyId:'required-practical-family',title:'Pflichtangaben Beispiel',text,examType:'AP',specialty:'Baumschule',kind:'practical',sourceIds:[],assetLinks:[],criteria:[],minutes,points:null,solution:'',solutionStatus:'missing',reviewStatus:'review',reviewedBy:'',flags:[],planningCategories:['propagation'],planningCategoryCatalog:'excel-ap-2026'};
+ delete t.timing;delete t.sourceLayout;delete t.practicalUnits;delete t.pointsProposal;d.families.push({id:t.familyId,title:t.title});d.tasks.push(t);
+ const e=C.newExam({specialty:'Baumschule',examType:'AP',examYear:2027,workshopId:'meeting',pattern:L.snapshotPattern(d,L.pattern(d,'AP','Baumschule'))});C.addItem(e,t);e.workflowStep=2;
+ if(oral){const o={...structuredClone(t),id:'required-oral',familyId:'required-oral-family',title:'Mündliches Gespräch',kind:'oral',planningCategories:undefined,planningCategoryCatalog:undefined};delete o.planningCategories;delete o.planningCategoryCatalog;d.families.push({id:o.familyId,title:o.title});d.tasks.push(o);C.setOralItem(e,o);}
+ d.exams.push(e);await u.click('action','select-exam',e.id);return {d,e,t};
+}
+test('required values and source-backed automatic time proposals are visible, applicable and centrally saved',async()=>{
+ const u=await ui('admin'),{d,e,t}=await requiredFieldsDraft(u,{text:'Bearbeitungszeit: 45 Minuten\nPflanzen fachgerecht vorbereiten und kontrollieren.'}),id=e.items[0].id,bank=JSON.stringify(t);
+ let html=u.elements.get('#app').innerHTML;assert.match(html,/Pflichtangaben/);assert.match(html,/Zeiten automatisch vorschlagen/);assert.match(html,/45 Min. vorgeschlagen/);assert.match(html,/data-action="required-field"/);
+ await u.click('action','timing-plan');html=u.elements.get('#dialog').innerHTML;assert.match(html,/Gesamtzeit aus Quelle/);assert.match(html,/Quellenbelege ansehen/);assert.match(html,/Bearbeitungszeit: 45 Minuten/);assert.match(html,/data-action="timing-apply"/);
+ await u.click('action','timing-apply');assert.equal(e.items[0].task.minutes,45,u.elements.get('#toast').textContent);assert.equal(d.exams.find(x=>x.id===e.id),e);assert.equal(e.items[0].id,id);assert.equal(e.items[0].task.timingProposal.method,'source-explicit');assert.equal(e.items[0].task.reviewStatus,'review');assert.equal(JSON.stringify(t),bank);C.validate(d);
+ let saved;u.online.save=async value=>{saved=structuredClone(value);};await u.click('action','save-online');assert.equal(saved.exams.find(x=>x.id===e.id).items[0].task.minutes,45);
+ await u.click('action','close');await u.click('action','workflow-step','3');assert.match(u.elements.get('#app').innerHTML,/Pflichtangaben/);assert.match(u.elements.get('#app').innerHTML,/Zeit: 45 Min/);
+});
+test('required-field controls focus time, points, solution, approval and materials directly',async()=>{
+ const u=await ui('admin'),{e}=await requiredFieldsDraft(u),id=e.items[0].id,calls=[];
+ for(const [field,selector]of [['minutes','#task-minutes'],['points','#task-points'],['solution','#task-solution'],['review','#task-review'],['materials','#task-materials']]){
+  const disclosure={tagName:'DETAILS',open:false,parentElement:null};u.elements.set(selector,{value:'',parentElement:disclosure,addEventListener(){},scrollIntoView:()=>calls.push('scroll:'+field),focus:()=>calls.push('focus:'+field)});
+  await u.click('action','required-field',JSON.stringify([id,field]));assert.ok(calls.includes('focus:'+field),field+' must receive focus');assert.ok(calls.includes('scroll:'+field));assert.equal(disclosure.open,true);assert.equal(u.elements.get('#dialog').open,true);await u.click('action','close');
+ }
+ const html=u.elements.get('#app').innerHTML;for(const label of ['Zeit:','Punkte:','Lösung:','Freigabe:','Material:'])assert.ok(html.includes(label));
+});
+test('group time planning preserves oral uncertainty and export restrictions',async()=>{
+ const u=await ui(),{d,e}=await requiredFieldsDraft(u,{oral:true});let html=u.elements.get('#app').innerHTML;assert.match(html,/Mündliches Gespräch/);assert.match(html,/Zeit: fehlt/);assert.doesNotMatch(html,/data-action="export-exam"/);
+ await u.click('action','timing-plan');html=u.elements.get('#dialog').innerHTML;assert.match(html,/Planungsvorschlag aus Prüfungsrahmen/);assert.match(html,/Mündliche Bearbeitungszeit offen/);assert.match(html,/Sichere Zeitvorschläge übernehmen/);
+ await u.click('action','timing-apply');assert.equal(e.items[0].task.minutes,60,u.elements.get('#toast').textContent);assert.equal(e.oralItem.task.minutes,null);assert.equal(e.oralItem.task.solutionStatus,'missing');assert.equal(e.items[0].task.reviewStatus,'review');C.validate(d);
+ await u.click('action','close');await u.click('action','workflow-step','3');html=u.elements.get('#app').innerHTML;assert.match(html,/Mündliches Gespräch/);assert.match(html,/Freigabe: zuständige Stelle/);assert.doesNotMatch(html,/data-action="export-exam"/);
+ const before=JSON.stringify(e);await u.click('action','export-exam');assert.equal(JSON.stringify(e),before);
+});
+test('existing source wording conflicts stay visible after applying other safe time proposals',async()=>{
+ const u=await ui('admin'),{d,e}=await requiredFieldsDraft(u,{text:'Zeit: 40 Minuten\nPflanzen vorbereiten.',minutes:50});
+ const extra={...structuredClone(e.items[0].task),id:'required-second',familyId:'required-second-family',minutes:null,text:'Arbeitsschritte ausführen und das Ergebnis kontrollieren.'};d.families.push({id:extra.familyId,title:extra.title});d.tasks.push(extra);C.addItem(e,extra);await u.click('action','select-exam',e.id);
+ assert.match(u.elements.get('#app').innerHTML,/Zeit: 50 Min. · Widerspruch/);await u.click('action','timing-plan');assert.match(u.elements.get('#dialog').innerHTML,/50 Minuten.*widersprechen/);assert.match(u.elements.get('#dialog').innerHTML,/Aufgabentext prüfen/);
+ await u.click('action','timing-apply');assert.equal(e.items[0].task.minutes,50);assert.ok(e.items[1].task.minutes>0);assert.match(u.elements.get('#dialog').innerHTML,/50 Minuten.*widersprechen/);assert.match(u.elements.get('#app').innerHTML,/Widerspruch/);
+});
+test('used exams expose a read-only time overview and cannot apply or directly edit required fields',async()=>{
+ const u=await ui('admin'),{e}=await requiredFieldsDraft(u);e.status='used';await u.click('action','select-exam',e.id);let html=u.elements.get('#app').innerHTML;assert.match(html,/Bearbeitungszeiten ansehen/);assert.doesNotMatch(html,/data-action="required-field"/);
+ const before=JSON.stringify(e);await u.click('action','timing-plan');html=u.elements.get('#dialog').innerHTML;assert.match(html,/schreibgeschützt/);assert.doesNotMatch(html,/data-action="timing-apply"|Zeit selbst festlegen/);await u.click('action','timing-apply');await u.click('action','required-field',JSON.stringify([e.items[0].id,'minutes']));assert.equal(JSON.stringify(e),before);assert.match(u.elements.get('#toast').textContent,/duplizieren/);
+});
+test('missing points have an explicit proposal control and never automatically approve a solution',async()=>{
+ const u=await ui('admin'),{e}=await requiredFieldsDraft(u),item=e.items[0];await u.click('action','required-field',JSON.stringify([item.id,'points']));assert.match(u.elements.get('#dialog').innerHTML,/Punkte automatisch vorschlagen/);
+ taskFormValues(u,item.task);await u.click('action','task-propose-points');assert.match(u.elements.get('#dialog').innerHTML,/value="100"/);assert.match(u.elements.get('#dialog').innerHTML,/Aus einem Punktevorschlag/);assert.equal(item.task.points,null);assert.equal(item.task.solution,'');assert.equal(item.task.reviewStatus,'review');
 });

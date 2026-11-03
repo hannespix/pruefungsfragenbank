@@ -1,3 +1,4 @@
+import TimingPlan from '../../offline/src/timing-plan.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
@@ -407,4 +408,14 @@ test('AP handoff rejects hidden snapshot categories without blocking legacy note
  const submitted={...e,submittedAt:'2026-11-03T21:00:00.000Z',updatedAt:'2026-11-03T21:00:00.000Z'};
  for(const token of [g.token,t.admin])assert.equal((await save(submitted,2,token)).status,400);
  assert.equal((await save({...e,status:'used'},2,t.admin)).status,400);
+});
+
+
+test('group time proposals persist their origin and invalidate approval without changing bank tasks',async()=>{
+ const t=await setup(),e=await completeStructureExam(t),g=await group(t);e.items[0].task.minutes=null;
+ const save=(value,version)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},g.token);
+ assert.equal((await save(e,0)).status,200);const loaded=(await t.req('/api/project',undefined,g.token)).body.project,old=loaded.exams.find(x=>x.id===e.id),before=JSON.stringify(loaded.tasks);
+ const next=TimingPlan.apply(old,loaded);assert.equal(next.items[0].task.minutes,60);assert.equal(next.items[0].task.timingProposal.method,'planning');assert.equal(next.items[0].task.reviewStatus,'review');
+ const saved=await save(next,1);assert.equal(saved.status,200,JSON.stringify(saved.body));const reloaded=(await t.req('/api/project',undefined,g.token)).body.project;
+ assert.equal(JSON.stringify(reloaded.tasks),before);assert.equal(reloaded.exams.find(x=>x.id===e.id).items[0].task.timingProposal.method,'planning');
 });

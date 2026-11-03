@@ -21,3 +21,11 @@ test('workshop scope configuration restricts new choices and preserves existing 
 test('markerless historical oral snapshots in the old items array still import unchanged',()=>{const t=task(),d=db([t]),e=C.newExam({examType:'AP',specialty:'Baumschule',examYear:2025});e.status='used';e.items=[{id:'old-position',originTaskId:t.id,task:structuredClone(t)}];d.exams=[e];const before=JSON.stringify(e);C.validate(d);assert.equal(JSON.stringify(e),before);const current=structuredClone(e);current.status='draft';current.oralRequirementVersion=1;d.exams=[current];assert.throws(()=>C.validate(d),/eigenen Prüfungsteil/);});
 
 test('catalog history cache distinguishes practical and oral tasks sharing one family',()=>{const practical=task('pr','practical'),oral={...task('oral'),familyId:practical.familyId},d=db([practical,oral]);d.families=[d.families[0]];d.exams=[{id:'past',examType:'AP',specialty:'Baumschule'}];d.uses=[{examId:'past',date:'2025-01-01',taskIds:[practical.id],familyIds:[practical.familyId]}];assert.deepEqual(B.search(d,{history:'confirmed'}).map(t=>t.id),['pr']);assert.deepEqual(B.search(d,{history:'unknown'}).map(t=>t.id),['oral']);});
+
+test('oral editing time remains a visible required field independent of practical totals',()=>{
+ const e=exam(),t=task();C.setOralItem(e,t);
+ for(const minutes of [null,0]){e.oralItem.task.minutes=minutes;assert.ok(C.readiness(e).issues.some(x=>/Mündliche.*Bearbeitungszeit/.test(x)));}
+ e.oralItem.task.minutes=30;assert.ok(!C.readiness(e).issues.some(x=>/Mündliche.*Bearbeitungszeit/.test(x)));
+ e.oralItem.task.timing={method:'conflict',totalMinutes:null,phases:[],evidence:[]};assert.ok(C.readiness(e).issues.some(x=>/Mündliche.*Zeitangaben/.test(x)));
+ e.oralItem.task.timing.manualTotalMinutes=30;assert.ok(!C.readiness(e).issues.some(x=>/Mündliche.*Zeitangaben/.test(x)));
+});
