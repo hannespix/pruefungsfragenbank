@@ -79,6 +79,7 @@ function checkGroupExam(p,s,value,old){
  if(old&&(old.specialty!==s.specialty||old.workshopId!==s.meeting_id||old.examType!==value.examType))fail(403,'Fremde Prüfung oder geänderte Prüfungsart.');
  if(!old&&!C.allowedExamTypes(p.workshops.find(w=>w.id===s.meeting_id),s.specialty).includes(value.examType))fail(403,'Diese Prüfungsart ist für den Vorbereitungstermin nicht freigegeben.');
  const priorExam=old||(value.basedOnExamId?p.exams.find(e=>e.id===value.basedOnExamId&&!e.deletedAt&&e.workshopId===s.meeting_id&&e.specialty===s.specialty&&e.examType===value.examType):null);
+ for(const key of ['releaseReview','regulationReview','regulationReviewKey'])if(value[key]!==undefined&&!C.equal(value[key],priorExam?.[key]))fail(403,'Freigaben und Prüfbestätigungen sind der zuständigen Stelle vorbehalten.');
  if(!old&&value.basedOnExamId&&!priorExam)fail(403,'Kopiervorlage ist nicht freigegeben.');
  if(!old&&(!value.pattern?.categoryDefinitions||value.examType==='ZP'&&value.pattern.categoryCatalog!=='zp-general-2026'))fail(403,'Neue Prüfungen benötigen den freigegebenen Kategorienstand.');
  const expected=domainCheck(()=>P.snapshotPattern(p,P.pattern(p,value.examType,s.specialty))),baselines=[expected,...(old||priorExam?.pattern?.categoryDefinitions?[priorExam?.pattern]:[])];
@@ -88,6 +89,8 @@ function checkGroupExam(p,s,value,old){
  for(const item of C.examEntries(value)){
   const expectedKind=item.component==='oral'?'oral':'practical',t=p.tasks.find(t=>t.id===item.originTaskId),prior=priorExam&&C.examEntries(priorExam).find(i=>i.component===item.component&&i.id===item.id&&i.originTaskId===item.originTaskId);
   if(!t||!item.task||t.specialty!==s.specialty||t.examType!==value.examType||t.kind!==expectedKind||item.task.kind!==expectedKind||item.task.familyId!==t.familyId||item.task.examType!==t.examType||item.task.specialty!==t.specialty||expectedKind==='oral'&&!['AP','FW_AP'].includes(value.examType))fail(403,'Aufgabe gehört nicht zum freigegebenen Prüfungsbereich.');
+  for(const key of ['sourceReview','pointsReview','reviewKey','reviewedAt','reviewedBy'])if(item.task[key]!==undefined&&item.task[key]!==''&&![prior?.task,t].some(previous=>previous&&C.equal(item.task[key],previous[key])))fail(403,'Fachliche Freigabe und Bestätigung der Quellenprüfung sind der zuständigen Stelle vorbehalten.');
+  if(!Array.isArray(item.task.flags)||(prior?.task.flags||t.flags||[]).some(flag=>!item.task.flags.includes(flag)))fail(403,'Quellenhinweise bleiben als Herkunftsnachweis erhalten; die zuständige Stelle bestätigt ihre Prüfung.');
   if(!Array.isArray(item.task.assetLinks)||item.task.assetLinks.some(a=>!a||typeof a!=='object'||Array.isArray(a)))fail(400,'Ungültige Anlagenzuordnung.');
   if(!Array.isArray(item.task.sourceIds))fail(400,'Ungültige Quellenzuordnung.');const allowedSources=new Set([...t.sourceIds,...(prior?.task.sourceIds||[])]);if(item.task.sourceIds.some(id=>!allowedSources.has(id)))fail(403,'Nicht freigegebene Quelle.');
   const visiblePrior=prior?C.clone(prior.task):null;if(visiblePrior)visiblePrior.assetLinks=visiblePrior.assetLinks.filter(a=>a.audience!=='source');const changed=!C.equal(item.task,visiblePrior);
@@ -96,6 +99,7 @@ function checkGroupExam(p,s,value,old){
  }
 }
 function enforceExamRequirements(value,old,role){
+ if(old?.status==='used'&&!C.equal(value,old))fail(400,'Bereits dokumentierte Prüfungen bleiben unverändert. Bitte zuerst duplizieren.');
  for(const key of ['oralRequirementVersion','materialRequirementVersion','structureRequirementVersion'])if(value[key]!==undefined&&value[key]!==1)fail(400,'Unbekannter organisatorischer Prüfungsstand.');
  const historicalImport=role==='admin'&&!old&&(Number.isInteger(value.examYear)&&value.examYear<2026||C.validDate(value.date)&&Number(value.date.slice(0,4))<2026||value.status==='used'&&value.oralRequirementVersion===undefined&&value.materialRequirementVersion===undefined&&value.structureRequirementVersion===undefined),fresh=!old&&!historicalImport;
  // Existing archival originals must survive a whole-project autosave unchanged.
