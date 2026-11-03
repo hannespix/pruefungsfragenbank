@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build a public client: never reads a dataset, archive, password or private file."""
-import argparse,pathlib,shutil
+import argparse,pathlib,re,shutil
 ROOT=pathlib.Path(__file__).resolve().parents[2]
 p=argparse.ArgumentParser();p.add_argument('--out',type=pathlib.Path,default=ROOT/'pages-dist');args=p.parse_args()
 html=(ROOT/'offline/src/index.html').read_text().replace("connect-src 'none'",'connect-src https://hortiexam-access.hannes-75b.workers.dev')
@@ -10,7 +10,13 @@ css+='''\n.invitation-url{display:none}@media print{@page{size:A4;margin:18mm}bo
 replacements={'CSS':css,'SEED':'null','VENDOR':(ROOT/'offline/vendor/jszip.min.js').read_text()+'\n'+(ROOT/'offline/vendor/docx.umd.min.js').read_text()+'\n'+(ROOT/'offline/vendor/pdf-lib.min.js').read_text()+'\n'+(ROOT/'online/vendor/qrcode.js').read_text()}
 for name in ['SOURCE-LAYOUT','ICONS','PLANNING','MATERIALS','CORE','TIMING-PLAN','POINTS-PLAN','RELEASE','PRINT','ORGANIZATION','CATALOG','PAPER','DOCX-ASSETS','DOCX','ARCHIVE','HELP','AI','HASH','IMPORT','APP']:replacements[name]=(ROOT/'offline/src'/f'{name.lower()}.js').read_text()
 replacements['APP']=(ROOT/'online/client.js').read_text()+'\n'+replacements['APP']
-for key,value in replacements.items():html=html.replace('/*'+key+'*/',value)
-if args.out.exists():shutil.rmtree(args.out)
+# One pass only: inserted seed text or module code must never be scanned for further placeholders.
+html=re.sub(r'/\*([A-Z][A-Z_-]*)\*/',lambda m:replacements.get(m[1],m[0]),html)
+if args.out.exists():
+    # rmtree only what this script produced earlier, never the repo or an unrelated folder.
+    out=args.out.resolve()
+    if not out.is_dir() or out==ROOT or out in ROOT.parents or (out/'.git').exists() or {f.name for f in out.iterdir()}-{'index.html','.nojekyll'}:
+        raise SystemExit(f'Refusing to delete {out}: not a previous build output.')
+    shutil.rmtree(out)
 args.out.mkdir(parents=True);(args.out/'index.html').write_text(html);(args.out/'.nojekyll').write_text('')
 print(f'Built public online client ({len(html.encode()):,} bytes); no embedded dataset')

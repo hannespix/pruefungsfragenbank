@@ -429,3 +429,34 @@ test('group time proposals persist their origin and invalidate approval without 
  const saved=await save(next,1);assert.equal(saved.status,200,JSON.stringify(saved.body));const reloaded=(await t.req('/api/project',undefined,g.token)).body.project;
  assert.equal(JSON.stringify(reloaded.tasks),before);assert.equal(reloaded.exams.find(x=>x.id===e.id).items[0].task.timingProposal.method,'planning');
 });
+
+// Regression tests from the code audit (2026-11).
+test('group edits keep hidden source links and the coordinator review key',async()=>{
+ const t=await setup(),g=await group(t),task=t.seed.tasks.find(x=>x.specialty==='Baumschule'&&x.kind==='practical'),asset={id:'audit-source-scan',name:'Original.png',mime:'image/png',data:''};
+ assert.equal((await t.req('/api/asset/upload',{asset:{id:asset.id,data:'iVBORw0KGgo='}},t.admin)).status,200);const stored=await t.req('/api/save',{changes:[{kind:'assets',id:asset.id,version:0,value:asset}]},t.admin);assert.equal(stored.status,200,JSON.stringify(stored.body));
+ task.text='Aufgabe: Durchführen von Arbeiten an der Pflanze\nHier: Synthetisches Beispiel.\n'+task.text;assert.equal((await t.req('/api/save',{changes:[{kind:'tasks',id:task.id,version:1,value:task}]},t.admin)).status,200);
+ const e=workflowExam(t.seed,task.examType,task.specialty);e.pattern.slots=[{categoryId:'plantwork',count:1}];C.addItem(e,task);
+ e.items[0].task.assetLinks.push({assetId:asset.id,audience:'source',caption:'Original'});e.items[0].task.reviewStatus='approved';e.items[0].task.reviewedBy='Koordination';e.items[0].task.reviewKey=C.taskReviewKey(e.items[0].task);
+ const saved=await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:0,value:e}]},t.admin);assert.equal(saved.status,200,JSON.stringify(saved.body));
+ const visible=(await t.req('/api/project',undefined,g.token)).body.project.exams.find(x=>x.id===e.id);assert.equal(visible.items[0].task.assetLinks.filter(a=>a.audience==='source').length,0);
+ visible.title+=' · Gruppe';const r=await t.req('/api/save',{changes:[{kind:'exams',id:e.id,version:saved.body.versions['exams:'+e.id],value:visible}]},g.token);assert.equal(r.status,200,JSON.stringify(r.body));
+ const after=(await t.req('/api/project',undefined,t.admin)).body.project.exams.find(x=>x.id===e.id);assert.equal(after.title,visible.title);
+ assert.deepEqual(after.items[0].task.assetLinks,e.items[0].task.assetLinks);assert.equal(after.items[0].task.reviewKey,C.taskReviewKey(after.items[0].task));
+});
+test('large bodies are not buffered before authentication and role checks',async()=>{
+ const t=await setup(),g=await group(t);let pulled=0;
+ const stream=()=>new ReadableStream({pull(c){pulled++;if(pulled>20)c.close();else c.enqueue(new Uint8Array(1024*1024));}},{highWaterMark:0});
+ const upload=token=>handle(new Request('https://api.test/api/asset/upload',{method:'POST',duplex:'half',headers:{Origin:t.env.ALLOWED_ORIGIN,'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:stream()}),t.env);
+ assert.equal((await upload()).status,401);assert.equal((await upload(g.token)).status,403);assert.ok(pulled<=2,'body was read before auth: '+pulled+' chunks');
+});
+test('non-object JSON bodies and missing access ids are rejected with 400',async()=>{
+ const t=await setup();const raw=async(path,text,token)=>(await handle(new Request('https://api.test'+path,{method:'POST',headers:{Origin:t.env.ALLOWED_ORIGIN,'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:text}),t.env)).status;
+ assert.equal(await raw('/api/login','null'),400);assert.equal(await raw('/api/login','[1]'),400);
+ for(const path of ['/api/access/close','/api/access/approve','/api/access/revoke'])assert.equal(await raw(path,'{}',t.admin),400,path);
+});
+test('login limit groups IPv6 clients by /64 and expired limiter rows are removed',async()=>{
+ const t=await setup();const login=ip=>handle(new Request('https://api.test/api/login',{method:'POST',headers:{Origin:t.env.ALLOWED_ORIGIN,'Content-Type':'application/json','CF-Connecting-IP':ip},body:JSON.stringify({password:'wrong'})}),t.env);
+ const statuses=[];for(let i=1;i<=7;i++)statuses.push((await login('2001:db8:1:2::'+i.toString(16))).status);assert.deepEqual(statuses,[401,401,401,401,401,401,429]);
+ assert.equal((await login('2001:db8:1:3::1')).status,401);
+ t.DB.db.prepare('UPDATE attempts SET expires=?').run(Date.now()-1);await login('198.51.100.7');assert.equal(t.DB.db.prepare('SELECT COUNT(*) AS n FROM attempts').get().n,1);
+});
