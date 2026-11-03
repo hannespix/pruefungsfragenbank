@@ -56,7 +56,7 @@
 - [x] Geführten Ablauf auf Desktop/Mobilgerät sowie Speicherfehler und Rückkehr zur Übersicht prüfen.
 - [x] Vollständige lokale Prüfung: 288 Offline- und 187 Online-Tests bestanden.
 - [x] Unabhängige Domänen-, Export- und UI-Prüfung; alle konkreten Befunde behoben und regressionsgeprüft.
-- [ ] PR/Merge und Deployment; Veröffentlichung wird über die GitHub-Checks und den laufenden Worker geprüft.
+- [x] PR #29 zusammengeführt (2235bc4c); Pages-Workflow 41667314836 erfolgreich. Worker und öffentliche Oberfläche bytegenau geprüft. Vorhandene Aufgaben, Quellen und Prüfungen unverändert; parallele neue Benutzerentwürfe blieben erhalten.
 
 ## Fachwerker-Logo und freigegebene Prüfungsarten
 

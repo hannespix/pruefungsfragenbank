@@ -12,7 +12,7 @@ const input={text:'Pflanzen Sie 12 Gehölze in 30 Minuten.',mode:'grammar',field
 const suggested={text:'Pflanzen Sie innerhalb von 30 Minuten 12 Gehölze.',notes:['Die Satzstellung wurde angepasst.']};
 function provider(value=suggested,changes={}){return Response.json({id:'msg_synthetic',type:'message',role:'assistant',model:'claude-sonnet-5-5',content:[{type:'text',text:JSON.stringify(value)}],stop_reason:'end_turn',stop_sequence:null,usage:{input_tokens:100,output_tokens:60},...changes});}
 async function setup(t){
- const DB=new D1(),env={DB,ALLOWED_ORIGIN:'https://example.test',ANTHROPIC_API_KEY:'synthetic-provider-key'};
+ const DB=new D1(),env={DB,INVITATION_VAULT_KEY:'ab'.repeat(32),ALLOWED_ORIGIN:'https://example.test',ANTHROPIC_API_KEY:'synthetic-provider-key'};
  t.after(()=>DB.db.close());
  let number=0;
  async function addSession({role='admin',status='approved',meeting='meeting',specialty='Baumschule',expires=Date.now()+3600000,generation=1}={}){

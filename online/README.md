@@ -21,6 +21,8 @@ Follow [the German setup instructions](../docs/ai-setup.md) to store `ANTHROPIC_
 2. Create a preparation meeting, exam year and specialties.
 3. Under **Gruppen & Einladungen**, activate a session for up to 48 hours.
 4. Show each specialty's QR code or copy its link. Members provide a device label.
+   During an active release, **QR-Code & Zugang** retrieves the same saved code
+   after reload or a fresh coordinator sign-in, without reopening the session.
 5. Compare the device code and approve each pending request.
 6. Groups prepare ZP and AP separately. Changes save centrally. The coordinator
    uses **Aktualisieren** to retrieve colleagues' latest saved drafts.
@@ -60,6 +62,14 @@ payloads. Logout discards caches and rejects late results.
   hashes persist in D1; passwords and exam data are never saved in browser storage.
 - Invitations travel in URL fragments, immediately removed from the address bar.
   Invitations alone never authorize reading data: every device requires approval.
+- Invitation verification still uses hashed tokens. To redisplay active codes,
+  `invitation_codes` additionally stores AES-256-GCM ciphertext protected by the
+  independent Worker secret `INVITATION_VAULT_KEY` (32 random bytes, hex encoded).
+  Only authenticated coordinators can retrieve active-generation codes. These
+  records are excluded from project exports and are removed on close/reopen.
+  Older hash-only releases receive one supplemental code per specialty without
+  revoking existing links/devices. Never silently rotate the vault key: existing
+  ciphertext needs its original key for redisplay.
 - The existing high-entropy coordinator password is checked using a PBKDF2-SHA256
   verifier stored as Worker secret `ADMIN_VERIFIER`, with login rate limiting.
 - Exact CORS origin, `no-store`, bounded requests and server-side role/scope checks.
@@ -90,7 +100,10 @@ The Cloudflare connector deployed the Worker and secret. With an authorized loca
 CLI session, `wrangler deploy --config online/wrangler.jsonc` deploys equivalent
 configuration; set `ADMIN_VERIFIER` securely without exposing it to command logs.
 Pages deploys through `.github/workflows/pages.yml`; it does not deploy the Worker.
-Deploy compatible backend changes before merging frontend changes.
+Deploy compatible backend changes before merging frontend changes. For persistent
+invitation redisplay, provision `INVITATION_VAULT_KEY` and apply the additive
+`invitation_codes` CREATE TABLE statement from `schema.sql` before deploying the
+Worker. Do not recreate existing tables or reopen active sessions during rollout.
 
 Tests exercise real SQLite transactions and API requests, including revocation,
 expiry, scope, source stripping, conflicts, invalid approvals and large assets.
