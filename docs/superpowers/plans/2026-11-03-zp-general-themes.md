@@ -21,7 +21,7 @@
 - [x] Musterverwaltung auf 0/1 Aufgabe je Generalthema begrenzen; gespeicherte Altentwürfe erst nach ausdrücklicher Übernahme umstellen.
 - [x] Aktuellen privaten Bestand nur lesend gegen neue Regeln prüfen; keine Prüfungsinhalte veröffentlichen.
 - [x] Browser-/Domänen-/Worker-Tests, Builds und unabhängige Codeprüfung durchführen.
-- [ ] PR zusammenführen, Worker und GitHub Pages prüfen.
+- [x] PR #28 zusammengeführt; Worker und GitHub Pages bytegenau geprüft (Pages-Workflow 41661179906 erfolgreich).
 
 ## Zusätzlicher Nutzerauftrag: zusammenhängende Textpunkte
 

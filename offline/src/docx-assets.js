@@ -1,5 +1,6 @@
 /* Validated private assets and font metrics shared by Word layout generation. */
 (function(root){'use strict';
+const C=root.HortiCore||(typeof require==='function'?require('./core.js'):null);
 const P=root.HortiPrint||(typeof require==='function'?require('./print.js'):null);
 const NS='http://schemas.openxmlformats.org/';
 const namespaces=`xmlns:w="${NS}wordprocessingml/2006/main" xmlns:r="${NS}officeDocument/2006/relationships" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w10="urn:schemas-microsoft-com:office:word"`;
@@ -9,7 +10,7 @@ const tw=n=>Math.round(n*20),pt=n=>Math.round(n*1000)/1000;
 const bytes=s=>Uint8Array.from(atob(s.replace(/\s/g,'')),c=>c.charCodeAt(0));
 const rels=rs=>xml(`<Relationships xmlns="${NS}package/2006/relationships">${rs.map(r=>`<Relationship Id="${r.id}" Type="${NS}officeDocument/2006/relationships/${r.type}" Target="${esc(r.target)}"/>`).join('')}</Relationships>`);
 function fontAssets(d){return d.assets.filter(a=>a.design==='bw-2024'&&['sansRegular','sansBold','serifBold'].includes(a.docxFontKey)&&a.mime==='font/ttf');}
-function requiredAssetIds(e,d,examiner=true){return [...new Set([...e.items.flatMap(i=>i.task.assetLinks.filter(l=>l.audience==='candidate'||examiner&&l.audience==='examiner').map(l=>l.assetId)),...fontAssets(d).map(a=>a.id)])];}
+function requiredAssetIds(e,d,examiner=true){return [...new Set([...C.examEntries(e).flatMap(i=>i.task.assetLinks.filter(l=>l.audience==='candidate'||examiner&&l.audience==='examiner').map(l=>l.assetId)),...fontAssets(d).map(a=>a.id)])];}
 function requireAsset(d,id){const a=d.assets.find(a=>a.id===id);if(!a?.data)throw Error('Anlage fehlt oder ist nicht geladen: '+(a?.name||id));return a;}
 function fontData(a){const b=bytes(a.data),v=new DataView(b.buffer),tag=n=>String.fromCharCode(...b.slice(n,n+4));if(b.length<12||v.getUint32(0)!==0x10000)throw Error('Ungültige Word-Schrift: '+a.name);let permission=null;for(let n=0;n<v.getUint16(4);n++){const o=12+n*16;if(o+16>b.length)throw Error('Ungültige Word-Schrift.');if(tag(o)==='OS/2'){const p=v.getUint32(o+8);if(p+10>b.length)throw Error('Ungültige Word-Schrift.');permission=v.getUint16(p+8);}}if(permission===null||(permission&2)||(permission&512)||((permission&4)&&!(permission&8)))throw Error('Schrift erlaubt keine bearbeitbare Einbettung: '+a.name);return b;}
 function imageSize(a){const b=bytes(a.data),v=new DataView(b.buffer);if(a.mime==='image/png'&&b.length>=24)return [v.getUint32(16),v.getUint32(20)];if(a.mime==='image/gif'&&b.length>=10)return [v.getUint16(6,true),v.getUint16(8,true)];if(a.mime==='image/jpeg'){let p=2;while(p+9<b.length){if(b[p++]!==255)continue;const m=b[p++];if(m===0xd9||m===0xda)break;const len=v.getUint16(p);if([0xc0,0xc1,0xc2].includes(m))return [v.getUint16(p+5),v.getUint16(p+3)];if(len<2)break;p+=len;}}throw Error('Bildformat für Word nicht lesbar: '+a.name);}

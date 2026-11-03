@@ -20,13 +20,17 @@ python offline/tools/build.py --seed /absoluter/privater/bestand.json --out /abs
 
 ## Arbeitsablauf
 
-1. **Prüfungsbereich**: Zwischen- oder Abschlussprüfung und Fachrichtung wählen. Kategorien, Familien, Quellen und Entwürfe bleiben diesem Bereich zugeordnet.
-2. **Prüfungsmuster**: aus originalen Aufgabenköpfen vorgeschlagene Kategorien prüfen, erforderliche Anzahlen festlegen und mit Namen bestätigen. Der Archivbestand beweist keine vollständige jährliche Zusammensetzung. 0 schließt eine Kategorie aus.
-3. **Kategorien → Aufgabenfamilien → Varianten**: Varianten vergleichen, Quelljahre und bestätigte Einsätze getrennt prüfen. Manuelle Kategorienkorrektur im Aufgabeneditor; Kombinationsaufgaben dürfen mehrere Kategorien abdecken.
-4. Neue Prüfung übernimmt eine feste Musterkopie. Die Kategorienanzeige zeigt fehlende, passende und überbesetzte Slots. Rotationsvorschläge bevorzugen ältere Familienbelege und vermeiden doppelte Familien. Unbekannte Historie zählt nicht als „nie benutzt“.
-5. Aufgaben bearbeiten, Lösungen, Punkte, Grafiken und Zeit ergänzen; Teilnehmer- und Prüferfassung ansehen. Nicht bestätigte Muster, unpassende Kategorien oder fehlende fachliche Freigaben bleiben als Entwurf gekennzeichnet.
-6. Im **Koordinationsprototyp**: Projektdatei vor dem Schließen sichern; Prüfung und Lösung können gemeinsam als ZIP exportiert werden. Diese Exporte sind vertraulicher Klartext. Es gibt keine Offline-Satellitenfunktion mehr.
-7. Tatsächliche Einsätze gesondert bestätigen. Geplante Termine werden nicht als Nutzung gewertet. Eingesetzte Prüfungen sind gesperrt; zum Ändern duplizieren.
+Die zuständige Stelle verwaltet unter **Grundeinstellungen** die angebotenen Themen, ihre Namen, Erläuterungen, Reihenfolge und Sichtbarkeit sowie Standardtitel, Teilnehmerhinweise und eine organisatorische Zielzeit. Die ZP-Einstellungen gelten für alle Gärtner-Fachrichtungen, AP und FW_AP jeweils für die Fachrichtung. Neue Prüfungen speichern einen eigenen Themenstand; spätere Änderungen schreiben bestehende Prüfungen nicht um. Ausgeblendete Themen und ihre früheren Verwendungen bleiben erhalten.
+
+Beim Vorbereitungstermin bestimmt die zuständige Stelle, welche Prüfungsarten je Fachrichtung neu erstellt werden dürfen. Eine später abgewählte Prüfungsart bleibt mit vorhandenen Entwürfen zugänglich. Die Auswahl ersetzt keine Zugangsfreigabe.
+
+1. **Themen auswählen:** Themen für die konkrete Prüfung festlegen. Bei der ZP ist je gewähltem Generalthema genau eine Einzelaufgabe vorgesehen; Kombinationsaufgaben werden nicht angeboten. AP-Themenwahl ersetzt keine praktische Aufgabenanzahl, Bereichsminima oder Höchstzeit.
+2. **Aufgaben & Prüfungsblatt:** Passende Varianten vergleichen und als unabhängige Kopien übernehmen. Aufgabenstellung, Lösung, Punkte, Zeit und Anlagen im Entwurf prüfen und bearbeiten. Neue AP- und FW_AP-Prüfungen enthalten zusätzlich genau eine separate mündliche Aufgabe derselben Prüfungsart und Fachrichtung. Sie erhöht weder praktische Aufgabenzahl noch praktische Punkte/Zeit; ZP hat keinen separaten mündlichen Bestandteil. Fehlende mündliche Vorlagen muss die zuständige Stelle ergänzen.
+3. **Prüfen & abschließen:** Materiallisten je praktischer Aufgabe festlegen, Vorschläge prüfen und ausdrücklich bestätigen; anschließend Blatt, Lösung, Anlagen und interne Bemerkungen kontrollieren. „Bearbeitung abschließen & zur Prüfungsübersicht“ wartet auf die Speicherung und kehrt erst danach zurück. Bei einem Fehler bleibt der Entwurf geöffnet. Eine fehlende mündliche Pflichtaufgabe verhindert Abschluss und Prüfungsexport; weitere offene Hinweise bleiben sichtbar. Die Übergabe ist keine fachliche Freigabe und kein Nachweis eines tatsächlichen Prüfungseinsatzes.
+
+Materiallisten sind organisatorische Metadaten. Klar bezeichnete Rubriken werden als Vorschlag übernommen, sonst entsteht ein allgemeiner Vorschlag ohne erfundene Mengen. Änderungen an Liste oder Arbeitsauftrag setzen die Bestätigung zurück. Die zuständige Stelle kann eine separate **Materialübersicht** drucken; Zusatzlisten werden nicht auf Teilnehmerseiten ergänzt und verändern den Originalwortlaut nicht. Bereits im Original enthaltene Materialrubriken bleiben Teil der Aufgabe.
+
+Im Offline-Build vor dem Schließen eine Projektdatei sichern. Die zuständige Stelle kann Prüfung und Lösung als vertrauliches ZIP mit Word- und Druckfassungen exportieren. Der Online-Dienst speichert Arbeitsstände zentral; siehe [Online-Betrieb](../online/README.md). Tatsächliche Einsätze erst nach der durchgeführten Prüfung dokumentieren. Eingesetzte Prüfungen sind gesperrt; für Änderungen eine Kopie erstellen.
 
 JSON-Import erhält abweichende Aufgaben als separate Kopien. **Abweichende Prüfungsmuster desselben Bereichs werden ausdrücklich abgewiesen**, bis sie fachlich abgeglichen wurden; keine stille Auswahl oder Löschung eines Konflikts.
 
@@ -41,10 +45,12 @@ JSON-Import erhält abweichende Aufgaben als separate Kopien. **Abweichende Prü
 | sources | Originaldokumente, Rohtext, Quelljahr mit Herkunft, Prüfungsart und Fachrichtung |
 | assets | Erhaltene Binärdateien; im Offline-Format Base64 |
 | exams | Prüfungsentwürfe und unveränderlich kopierte Aufgabeninhalte inklusive Lösung/Anlagenverweise |
-| patterns | Bestätigbare, versionierte Pflichtkategorien pro Prüfungsart und Fachrichtung; jede Prüfung erhält eine Kopie |
+| patterns | Prüfungsmuster pro Prüfungsart und Fachrichtung; jede Prüfung erhält eine Kopie ihres Themenstands |
+| settings | Zentrale Themen- und Standardangaben für neue Prüfungen, mit Revision je Geltungsbereich |
+| workshops | Vorbereitungstermine, Fachrichtungsgruppen, vorgesehene Prüfungsarten und Mitwirkende |
 | uses | Manuell bestätigte tatsächliche Einsätze; Rückverweis auf die eingesetzte Prüfung |
 
-Die Oberfläche bleibt auf GitHub Pages. Für temporäre Prüferzugänge und gemeinsames Speichern ist **GitHub Pages + privates Datenrepository + serverlose API** vorgesehen. Siehe `docs/architecture/github-session-access.md` für Sitzungsfreigabe, QR-Einladungen, serverseitige Rollen, Exportrechte und Konfliktbehandlung. Diese Zugangskontrolle ist noch nicht implementiert oder ausgerollt. Das aktuelle gemeinsame Passwort ist nur für den Koordinationstest geeignet.
+Der eigenständige Offline-Build verwendet lokale Projektdaten. Der separate Online-Dienst in `online/` stellt temporäre Gruppenzugänge, zentrale Speicherung und serverseitige Rollen bereit; dessen Build enthält keinen eingebetteten Aufgabenbestand. Einrichtung und Betrieb sind in [online/README.md](../online/README.md) beschrieben. Das frühere verschlüsselte Passwortpaket ist ein eigener Testzugang und ersetzt diese Rollenprüfung nicht.
 
 `server/schema.mysql.sql` bleibt ein älterer, nicht ausgerollter Alternativentwurf. Er ist keine Voraussetzung für die nun gewünschte GitHub-Architektur.
 
@@ -70,8 +76,10 @@ JSZip 3.10.1 ist lokal gebündelt; Lizenz unter `vendor/JSZip-LICENSE.md`.
 
 Nach dem Öffnen erscheint die Leitungsübersicht. „Termin vorbereiten“ legt einen
 Vorbereitungstermin mit Prüfungsjahr und Fachrichtungsgruppen an. Jede Gruppe hat
-zwei getrennte Bereiche für Zwischen- und Abschlussprüfungen; mehrere Entwürfe je
-Prüfungsart sind möglich. „Prüfungen & Ergebnisse“ zeigt auch ältere, noch keinem
+die beim Termin vorgesehenen Prüfungsarten; für Gemüsebau und Zierpflanzenbau
+ist zusätzlich die Fachwerker-Abschlussprüfung verfügbar. Mehrere Entwürfe je
+Prüfungsart sind möglich. Bereits angelegte Entwürfe bleiben erreichbar, wenn
+eine Prüfungsart später für die Neuerstellung abgewählt wird. „Prüfungen & Ergebnisse“ zeigt auch ältere, noch keinem
 Vorbereitungstermin zugeordnete Prüfungen. Diese können über „Prüfungsdaten
 bearbeiten“ zugeordnet werden, sofern Fachrichtung und Prüfungsjahr passen.
 
@@ -80,8 +88,9 @@ Meeting-Metadaten (`workshops`) und Prüfungsverweise (`workshopId`, `examYear`)
 sind additive Felder des Projektformats. Alte Projekte bleiben lesbar. Konflikte
 beim Import erhalten beide Fassungen einschließlich ihrer Verweise.
 
-„Gruppen & Einladungen“ zeigt den geplanten Zugangsort, erzeugt aber keine
-funktionsfähigen Einladungen: Der serverseitige Anmeldedienst ist noch nicht
-angeschlossen. Der aktuelle Gruppenbereich ist die Bearbeitungsansicht der
-zuständigen Stelle, keine Prüferrolle. Gemeinsames Speichern, temporäre
-QR-/URL-Zugänge und serverseitige Exportrechte sind noch nicht verfügbar.
+Im eigenständigen Offline-Build ist der Gruppenbereich die Bearbeitungsansicht
+der zuständigen Stelle. Funktionierende Einladungen, Gerätefreigaben,
+gemeinsames Speichern und serverseitige Exportrechte gehören zum separaten
+Online-Dienst. Die dortige Arbeitsgruppe darf Themen auswählen, Prüfungsentwürfe
+bearbeiten und Materiallisten bestätigen; zentrale Grundeinstellungen,
+fachliche Aufgabenfreigaben und Exporte bleiben der zuständigen Stelle vorbehalten.
