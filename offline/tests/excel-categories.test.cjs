@@ -51,16 +51,16 @@ test('ZP and AP offer identical workbook categories even when legacy source head
  assert.equal(P.inferPattern(db([seed]),'ZP','Baumschule').categoryCatalog,'excel-ap-2026');
  assert.deepEqual(P.rank(db([seed,{...seed,id:'ap',examType:'AP'}]),'ZP','Baumschule','propagation').map(x=>x.task.id),['t']);
 });
-test('previously confirmed exam snapshots retain category coverage until their pattern is explicitly updated',()=>{
+test('stored AP patterns retain category navigation but cannot bypass current structural requirements',()=>{
  for(const [specialty,text,id] of [['Obstbau','Sortieren von Obst','harvest'],['Zierpflanzenbau','Bepflanzen von Rabatten','planting'],['Gemüsebau','Ernten von Gemüse\nKennzeichnen und Verpacken von Gemüse','harvest']]){
   const t=task(specialty,text),d=db([t]),pattern={id:'old',version:1,examType:'AP',specialty,status:'confirmed',slots:[{categoryId:id,count:1}]};
   const e={examType:'AP',specialty,pattern,items:[{task:t}]},before=JSON.stringify(e);
-  assert.equal(P.coverage(e).complete,true);assert.equal(JSON.stringify(e),before);
+  assert.equal(P.coverage(e).complete,false);assert.match(P.coverage(e).issues.join(' '),/fünf/);assert.equal(JSON.stringify(e),before);
   assert.deepEqual(P.propose(d,{...e,items:[]}).map(t=>t.id),['t']);
   assert.equal(B.search(d,{examType:'AP',specialty,category:id,pattern}).length,1);
   assert.ok(require('../src/paper.js').navigationItem(e,{categoryId:id}));
   const fresh=P.inferPattern(d,'AP',specialty);assert.equal(fresh.categoryCatalog,'excel-ap-2026');
-  fresh.status='confirmed';assert.equal(P.coverage({...e,pattern:fresh}).complete,true);
+  fresh.status='confirmed';assert.equal(P.coverage({...e,pattern:fresh}).complete,false);
  }
 });
 test('source-reviewed workbook assignments preserve legacy classification and expose missing matches',()=>{
