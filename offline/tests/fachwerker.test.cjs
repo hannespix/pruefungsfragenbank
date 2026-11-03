@@ -2,7 +2,8 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const C=require('../src/core.js'),L=require('../src/planning.js'),B=require('../src/catalog.js'),P=require('../src/print.js'),Paper=require('../src/paper.js'),D=require('../src/docx.js'),A=require('../src/archive.js'),Zip=require('../vendor/jszip.min.js');
 function task(extra={}){return {id:'fw',familyId:'fw-family',title:'Synthetische Übung',text:'Aufgabe:\nVermehren von Pflanzen\nHier: Beispiel ohne echte Prüfungsfrage',examType:'FW_AP',specialty:'Gemüsebau',category:'Praktische Arbeitsaufgabe',kind:'practical',tags:[],sourceIds:['fw-source'],assetLinks:[],criteria:[],flags:[],points:null,minutes:40,solution:'',solutionStatus:'missing',reviewStatus:'review',qualification:'Gartenbaufachwerker',...extra};}
 function fixture(){const t=task(),d=C.empty();d.families=[{id:t.familyId,title:t.title}];d.tasks=[t];d.sources=[{id:'fw-source',name:'Synthetische Quelle 2025.docx',year:2025,examType:'FW_AP',specialty:'Gemüsebau',role:'Praktisches Aufgabenblatt',text:t.text,attachmentIds:[]}];return d;}
-function exam(t=task()){return {...C.newExam({examType:t.examType,specialty:t.specialty,title:'Synthetische Fachwerkerprüfung'}),items:[{id:'item-fw',originTaskId:t.id,task:C.clone(t)}]};}
+// These historical fixtures exercise FW rendering independently of current oral selection.
+function exam(t=task()){const e={...C.newExam({examType:t.examType,specialty:t.specialty,title:'Synthetische Fachwerkerprüfung'}),items:[{id:'item-fw',originTaskId:t.id,task:C.clone(t)}]};delete e.oralRequirementVersion;return e;}
 test('FW scope is offered and validated only for the two supported specialties',()=>{
  assert.deepEqual(C.examTypesFor('Gemüsebau'),['ZP','AP','FW_AP']);assert.deepEqual(C.examTypesFor('Zierpflanzenbau'),['ZP','AP','FW_AP']);assert.deepEqual(C.examTypesFor('Baumschule'),['ZP','AP']);
  assert.doesNotThrow(()=>C.validate(fixture()));

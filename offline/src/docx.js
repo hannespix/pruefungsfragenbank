@@ -24,6 +24,30 @@ async function pngPixels(asset){
  for(let y=0;y<height;y++){const filter=raw[pos++];if(filter>4)throw Error('Ungültiger PNG-Filter.');const row=new Uint8Array(stride);for(let x=0;x<stride;x++){const a=x>=channels?row[x-channels]:0,b=previous[x],c=x>=channels?previous[x-channels]:0;row[x]=(raw[pos++]+(filter===0?0:filter===1?a:filter===2?b:filter===3?Math.floor((a+b)/2):paeth(a,b,c)))&255;}for(let x=0;x<width;x++){const at=x*channels,out=(y*width+x)*3,alpha=type===4?row[at+1]/255:type===6?row[at+3]/255:1;for(let c=0;c<3;c++)pixels[out+c]=Math.round(255*(1-alpha)+(type===0||type===4?row[at]:row[at+c])*alpha);}previous.set(row);}
  return {width,height,pixels};
 }
+// Only cache the small result, never every decoded full-page raster.
+const logoMarginCache=new WeakMap();
+async function prepareLogoMargins(e,d){
+ let changed=false;
+ for(const item of C.examEntries(e))for(const [index,page]of (item.task.sourceLayout?.pages||[]).entries()){
+  const task=item.task,box=S.logoMarginCandidate(task,page,index);if(!box)continue;
+  const asset=d.assets.find(a=>a.id===page.backgroundAssetId);let safe=false;
+  if(asset?.mime==='image/png'&&asset.data){
+   let cache=logoMarginCache.get(asset);if(!cache||cache.data!==asset.data){cache={data:asset.data,results:new Map()};logoMarginCache.set(asset,cache);}
+   const key=JSON.stringify([page.width,page.height,box]);
+   if(!cache.results.has(key)){
+    let empty=false;try{const raster=await pngPixels(asset),{width,height,pixels}=raster;
+     const x0=Math.floor((box.x-4)*width/page.width),x1=Math.ceil((box.x+box.width+4)*width/page.width),y0=Math.floor((box.y-4)*height/page.height),y1=Math.ceil((box.y+box.height+4)*height/page.height);
+     empty=x0>=0&&y0>=0&&x1<=width&&y1<=height;
+     for(let y=y0;empty&&y<y1;y++)for(let x=x0;x<x1;x++){const at=(y*width+x)*3;if(pixels[at]!==255||pixels[at+1]!==255||pixels[at+2]!==255){empty=false;break;}}
+    }catch{/* Missing or unsupported evidence never authorizes an overlay. */}
+    cache.results.set(key,empty);
+   }
+   safe=cache.data===asset.data&&d.assets.find(a=>a.id===page.backgroundAssetId)===asset&&cache.results.get(key);
+  }
+  changed=S.setLogoMarginProof(page,asset,box,safe)||changed;
+ }
+ return changed;
+}
 async function croppedPng(raster,box){
  const {width,pixels}=raster,w=box.x1-box.x0+1,h=box.y1-box.y0+1,raw=new Uint8Array((w*3+1)*h);
  for(let y=0;y<h;y++)raw.set(pixels.subarray(((y+box.y0)*width+box.x0)*3,((y+box.y0)*width+box.x0+w)*3),y*(w*3+1)+1);
@@ -70,10 +94,11 @@ async function sourceElements(page,d){
  return {graphics,rules};
 }
 async function documentFile(e,input,examiner=false){
- if(!e?.items?.length)throw Error('Die Prüfung enthält keine Aufgaben.');C.assertExamPolicy(e);S.assertExport(e);
+ const entries=C.examEntries(e);if(!entries.length)throw Error('Die Prüfung enthält keine Aufgaben.');C.assertExamPolicy(e);S.assertExport(e);
  const d=await A.wordImages(e,input,examiner),fonts=A.fontAssets(d),regular=fonts.find(a=>a.docxFontKey==='sansRegular'),bold=fonts.find(a=>a.docxFontKey==='sansBold'),serif=fonts.find(a=>a.docxFontKey==='serifBold');
- if(e.items.some(i=>i.task.assetLinks.some(l=>l.design==='bw-2024'))&&(!regular||!bold||!serif))throw Error('Die geschützten Word-Schriften fehlen. Bitte den Datenbestand aktualisieren.');
- if(e.items.some(i=>i.task.sourceLayout)&&!regular)throw Error('Word-Schriften fehlen für die bearbeitbaren Originalseiten. Bitte den Datenbestand aktualisieren.');
+ if(entries.some(i=>i.task.assetLinks.some(l=>l.design==='bw-2024'))&&(!regular||!bold||!serif))throw Error('Die geschützten Word-Schriften fehlen. Bitte den Datenbestand aktualisieren.');
+ if(entries.some(i=>i.task.sourceLayout)&&!regular)throw Error('Word-Schriften fehlen für die bearbeitbaren Originalseiten. Bitte den Datenbestand aktualisieren.');
+ await prepareLogoMargins(e,d);
  const sans=regular?.fontFamily||'Arial',heading=serif?.fontFamily||sans;
  let drawingId=0;
  const draft=!C.readiness(e).ready,label=examiner?'Vertrauliche Prüferfassung':'Teilnehmerfassung',sections=[];
@@ -93,11 +118,11 @@ async function documentFile(e,input,examiner=false){
   return new X.ImageRun({type:{'image/png':'png','image/jpeg':'jpg','image/gif':'gif'}[a.mime],data:A.bytes(a.data),transformation:{width:px(iw*scale),height:px(ih*scale)},altText:{id:String(++drawingId),title:clean(a.name),description:clean(a.name),name:'Prüfungsanlage'}});
  }
  function letterhead(t){
-  const links=t?t.assetLinks:e.items.flatMap(i=>i.task.assetLinks),candidates=links.filter(l=>l.role==='letterhead'&&l.audience==='candidate'),link=candidates.find(l=>l.design==='bw-2024')||candidates[0];
+  const links=t?t.assetLinks:entries.flatMap(i=>i.task.assetLinks),candidates=links.filter(l=>l.role==='letterhead'&&l.audience==='candidate'),link=candidates.find(l=>l.design==='bw-2024')||candidates[0];
   const text=[p('Praktischer Prüfungstag','ExamHeader'),p('„'+e.specialty+'“','ExamHeader'),p((C.examTypeLabel(e.examType))+' '+(e.examYear||'')+' · '+label,'ExamSmall',{spacing:{before:100,after:0}})];
   return new X.Header({children:link?[table([{cells:[[new X.Paragraph({children:[image(A.requireAsset(d,link.assetId),156,66)],spacing:{after:0}})],[p('','ExamSmall')],text]}],[mm(55),mm(10),mm(109)],{bordered:false,padding:0}),gap(0)]:text});
  }
- function originalFooter(){return [...(S.scopeLabel(e)?[p(S.scopeLabel(e),'ExamSmall',{alignment:X.AlignmentType.CENTER,spacing:{line:220,after:0},run:{size:16,color:ink}})]:[]),p(draft?'ENTWURF · NICHT FREIGEGEBEN':(examiner?label:''),'ExamSmall',{alignment:X.AlignmentType.CENTER})];}
+ function originalFooter(item){return [...(item?.component==='oral'?[p('Mündliche Prüfungsaufgabe','ExamSmall',{alignment:X.AlignmentType.CENTER,spacing:{line:220,after:0},run:{size:16,color:ink}})]:[]),...(S.scopeLabel(e)?[p(S.scopeLabel(e),'ExamSmall',{alignment:X.AlignmentType.CENTER,spacing:{line:220,after:0},run:{size:16,color:ink}})]:[]),p(draft?'ENTWURF · NICHT FREIGEGEBEN':(examiner?label:''),'ExamSmall',{alignment:X.AlignmentType.CENTER})];}
  function footer(original=false){
   if(original)return new X.Footer({children:originalFooter()});
   return new X.Footer({children:[new X.Paragraph({style:'ExamSmall',border:{top:{...border,space:6}},tabStops:[{type:X.TabStopType.RIGHT,position:paperWidth}],children:[run(label+' · '),run(draft?'ENTWURF · NICHT FREIGEGEBEN':e.specialty),new X.TextRun({children:[new X.Tab(),'Seite ',X.PageNumber.CURRENT,' / ',X.PageNumber.TOTAL_PAGES]})]})]});
@@ -110,9 +135,9 @@ async function documentFile(e,input,examiner=false){
  function planningBox(){return table([{height:mm(44),cells:[p('','ExamBody')]}],[paperWidth],{padding:140});}
  const graphics=(t,audience)=>t.assetLinks.filter(l=>l.audience===audience&&!['letterhead','brand-font','source-page'].includes(l.role)&&!(t.sourceLayout&&l.role==='source-embedded'));
  function graphic(l){const a=A.requireAsset(d,l.assetId);if(/^image\//.test(a.mime))return [new X.Paragraph({children:[image(a,paperWidth/20,mm(175)/20)],keepNext:true,spacing:{before:180,after:80}}),p(l.caption||a.name,'ExamSmall')];const file=P.attachments({items:[{task:{assetLinks:[l]}}]},d,true)[0];return [callout('Separate Anlage: '+(file?.path||a.name)+' – vor Ausgabe beifügen.')];}
- if(!e.items.some(i=>i.task.sourceLayout)){
+ if(!entries.some(i=>i.task.sourceLayout)){
   const total=C.totals(e);
-  section([p((C.examTypeLabel(e.examType))+' '+(e.examYear||''),'ExamEyebrow'),p(e.title,'ExamTitle'),p(e.specialty,'ExamSubtitle'),gap(10),table([{cells:[p('Prüfungstermin','ExamMeta',{run:{bold:true}}),p(e.date||'Noch festzulegen','ExamMeta')]},{cells:[p('Umfang','ExamMeta',{run:{bold:true}}),p(`${e.items.length} Aufgaben · ${total.points}${total.unknownPoints?' + offene':''} Punkte`,'ExamMeta')]},{cells:[p('Bearbeitungszeit','ExamMeta',{run:{bold:true}}),p(C.durationSummary(total),'ExamMeta')]}],[mm(38),paperWidth-mm(38)],{bordered:false,padding:100}),gap(14),identity(),gap(14),p('Hinweise zur Durchführung','ExamHeading'),p(e.notes||'','ExamBody'),gap(12),callout(draft?'ENTWURF · Vor Verwendung Aufgaben, Punkte, Zeiten und Lösungen fachlich prüfen.':'Freigaben vollständig')]);
+  section([p((C.examTypeLabel(e.examType))+' '+(e.examYear||''),'ExamEyebrow'),p(e.title,'ExamTitle'),p(e.specialty,'ExamSubtitle'),gap(10),table([{cells:[p('Prüfungstermin','ExamMeta',{run:{bold:true}}),p(e.date||'Noch festzulegen','ExamMeta')]},{cells:[p('Umfang','ExamMeta',{run:{bold:true}}),p(`Praktischer Teil: ${e.items.length} Aufgaben · ${total.points}${total.unknownPoints?' + offene':''} Punkte`,'ExamMeta')]},{cells:[p('Bearbeitungszeit','ExamMeta',{run:{bold:true}}),p(C.durationSummary(total),'ExamMeta')]},...(e.oralItem?[{cells:[p('Mündliche Aufgabe','ExamMeta',{run:{bold:true}}),p(`${e.oralItem.task.points??'offene'} Punkte · ${e.oralItem.task.minutes??'offene'} Minuten`,'ExamMeta')]}]:[])],[mm(38),paperWidth-mm(38)],{bordered:false,padding:100}),gap(14),identity(),gap(14),p('Hinweise zur Durchführung','ExamHeading'),p(e.notes||'','ExamBody'),gap(12),callout(draft?'ENTWURF · Vor Verwendung Aufgaben, Punkte, Zeiten und Lösungen fachlich prüfen.':'Freigaben vollständig')]);
  }
  // Source coordinates guide reading order, indents and response space only.
  // All wording remains ordinary Word runs. Paragraphs may wrap and span pages.
@@ -126,17 +151,17 @@ async function documentFile(e,input,examiner=false){
   const children=[];blocks.forEach((b,n)=>{if(n)children.push(new X.TextRun({children:[new X.Tab()]}));children.push(...sourceRuns(b));});
   return new X.Paragraph({children,...(continuation?{alignment:X.AlignmentType.RIGHT}:{}),indent:{left:continuation?0:tw(Math.max(0,main.x-left)),...(label?{hanging:tw(main.x-first.x)}:{})},tabStops:blocks.slice(1).map(b=>({type:X.TabStopType.LEFT,position:tw(Math.max(0,b.x-left))})),spacing:{before:tw(before),after:tw(after),line:tw(Math.max(...blocks.map(b=>b.lineHeight))),lineRule:X.LineRuleType.AT_LEAST},keepNext,keepLines:false,widowControl:false});
  }
- function sourcePage(page,t){
+ function sourcePage(page,t,item,index,logos){
   const left=Math.min(54,...page.blocks.map(b=>b.x)),right=36,width=page.width-left-right;
   const headerBlocks=page.blocks.filter(b=>b.y<100&&(/Prüf/i.test(b.text)||/^\s*-\s*\d+\s*-\s*$/.test(b.text)));
   const footerBlocks=[];
   const bodyBlocks=page.blocks.filter(b=>!headerBlocks.includes(b)&&!footerBlocks.includes(b));
   const logo=t.assetLinks.find(l=>l.role==='letterhead'&&l.design==='bw-2024'&&l.audience==='candidate');
-  if(page.logos.length&&!logo)throw Error('Landeslogo fehlt für die Originalvorlage.');
+  if(logos.length&&!logo)throw Error('Landeslogo fehlt für die Originalvorlage.');
   const headerChildren=headerBlocks.map(b=>sourceParagraph([b],left));
-  for(const box of page.logos)headerChildren.push(new X.Paragraph({children:[image(A.requireAsset(d,logo.assetId),box.width,box.height)],alignment:X.AlignmentType.RIGHT,spacing:{after:0,before:0,line:tw(box.height),lineRule:X.LineRuleType.AT_LEAST}}));
+  for(const box of logos)headerChildren.push(new X.Paragraph({children:[image(A.requireAsset(d,logo.assetId),box.width,box.height)],alignment:X.AlignmentType.RIGHT,spacing:{after:0,before:0,line:tw(box.height),lineRule:X.LineRuleType.AT_LEAST}}));
   const header=new X.Header({children:headerChildren.length?headerChildren:[p('','ExamSmall')]});
-  const sourceFooter=new X.Footer({children:[...footerBlocks.map(b=>sourceParagraph([b],left)),...originalFooter()]});
+  const sourceFooter=new X.Footer({children:[...footerBlocks.map(b=>sourceParagraph([b],left)),...originalFooter(item)]});
   const rules=page.rules||[],horizontal=rules.filter(r=>r.width>24&&(r.height||0)<2.5),vertical=rules.filter(r=>r.height>12&&r.width<2.5),frames=[],usedRules=new Set(),framedBlocks=new Set();
   for(const top of horizontal){const bottoms=horizontal.filter(r=>r!==top&&r.y>top.y+12&&Math.abs(r.x-top.x)<3&&Math.abs(r.width-top.width)<3).sort((a,b)=>a.y-b.y);
    for(const bottom of bottoms){const edges=vertical.filter(r=>r.y<=top.y+3&&r.y+r.height>=bottom.y-3&&r.x>=top.x-3&&r.x<=top.x+top.width+3);if(!edges.some(r=>Math.abs(r.x-top.x)<3)||!edges.some(r=>Math.abs(r.x-top.x-top.width)<3))continue;
@@ -151,7 +176,7 @@ async function documentFile(e,input,examiner=false){
   for(const g of page.graphics||[]){if(bodyBlocks.some(b=>b.text.trim()&&b.x<g.x+g.width+6&&b.x+b.width>g.x-6&&b.y<g.y+g.height+3&&b.y+b.height>g.y-3))throw Error('Beschriftete Originalzeichnung kann nicht ohne veränderte Zuordnung in Word übertragen werden. Bitte die Zeichnung als eigenständige beschriftete Anlage hinterlegen.');rows.push({kind:'graphic',y:g.y,bottom:g.y+g.height,graphic:g});}
   for(const r of rules.filter(r=>!usedRules.has(r)))rows.push({kind:'rule',y:r.y,bottom:r.y+(r.height||0),rule:r});
   rows.sort((a,b)=>a.y-b.y||(a.kind==='text'?-1:1));
-  const sourceTop=Math.max(36,Math.min(160,rows[0]?.y||72)),headerBottom=headerBlocks.length||page.logos.length?Math.max(...headerBlocks.map(b=>b.y+b.height),...page.logos.map(b=>b.y+b.height))+12:0,top=Math.max(sourceTop,headerBottom),children=[];let previous=sourceTop;
+  const sourceTop=Math.max(36,Math.min(160,rows[0]?.y||72)),headerBottom=headerBlocks.length||logos.length?Math.max(...headerBlocks.map(b=>b.y+b.height),...logos.map(b=>b.y+b.height))+(logos.some(b=>b.fallback)?6:12):0,top=Math.max(sourceTop,headerBottom),children=[];let previous=sourceTop;
   for(const row of rows){
    const originalGap=Math.max(0,row.y-previous),before=row.kind==='frame'?Math.min(8,originalGap):originalGap<60?Math.min(18,originalGap):originalGap;
    if(row.kind==='text')children.push(sourceParagraph(row.blocks,left,{before}));
@@ -168,20 +193,20 @@ async function documentFile(e,input,examiner=false){
    previous=Math.max(previous,row.bottom);
   }
   if(rows.at(-1)?.kind==='frame')children.push(gap(0));
-  return {children,header,sourceFooter,margins:{top:tw(top),bottom:tw(footerBlocks.length?66:S.scopeLabel(e)?56:42),left:tw(left),right:tw(right),header:tw(headerBlocks[0]?.y||36),footer:tw(24)}};
+  return {children,header,sourceFooter,margins:{top:tw(top),bottom:tw(footerBlocks.length?66:S.scopeLabel(e)||item?.component==='oral'?56:42),left:tw(left),right:tw(right),header:tw(logos.some(b=>b.fallback)?logos[0].y:headerBlocks[0]?.y||36),footer:tw(24)}};
  }
- for(const [n,{task:t}] of e.items.entries()){
+ for(const [n,item] of entries.entries()){const t=item.task;
   if(t.sourceLayout){
    for(const [index,page] of t.sourceLayout.pages.entries()){
-    const flow=sourcePage({...page,...await sourceElements(page,d),blocks:S.displayBlocks(page)},t);
+    const flow=sourcePage({...page,...await sourceElements(page,d),blocks:S.displayBlocks(page)},t,item,index,S.logoBoxes(t,page,index,d));
     section(flow.children,{original:true,page,...flow,type:index?X.SectionType.NEXT_PAGE:X.SectionType.ODD_PAGE});
    }
    if(t.sourceLayout.pages.length%2)section([gap(0)],{original:true,page:t.sourceLayout.pages.at(-1)});
   }else{
-   section([identity(),gap(12),p('Aufgabe '+(n+1),'ExamEyebrow'),p(t.title,'TaskTitle'),table([{cells:[p(`${t.points??'Offene'} Punkte`,'ExamMeta',{run:{bold:true}}),p('Bearbeitungszeit: '+(t.minutes==null?'noch festzulegen':t.minutes+' Minuten'),'ExamMeta')]}],[mm(50),paperWidth-mm(50)],{bordered:false,padding:80}),gap(8),...(t.pointsProposal&&t.reviewStatus!=='approved'?[callout('Punktevorschlag · Gesamt- und Teilpunkte vor dem Einsatz fachlich prüfen.'),gap(6)]:[]),...(P.timingNotes(t)?[p(P.timingNotes(t),'ExamMeta',{shading:{fill:soft}})]:[]),p(t.text),...graphics(t,'candidate').flatMap(graphic),gap(10),p('Durchführungsplanung / Bearbeitung','ExamHeading'),planningBox()],{task:t,type:X.SectionType.ODD_PAGE});
+   section([identity(),gap(12),p(item.label,'ExamEyebrow'),p(t.title,'TaskTitle'),table([{cells:[p(`${t.points??'Offene'} Punkte`,'ExamMeta',{run:{bold:true}}),p('Bearbeitungszeit: '+(t.minutes==null?'noch festzulegen':t.minutes+' Minuten'),'ExamMeta')]}],[mm(50),paperWidth-mm(50)],{bordered:false,padding:80}),gap(8),...(t.pointsProposal&&t.reviewStatus!=='approved'?[callout('Punktevorschlag · Gesamt- und Teilpunkte vor dem Einsatz fachlich prüfen.'),gap(6)]:[]),...(P.timingNotes(t)?[p(P.timingNotes(t),'ExamMeta',{shading:{fill:soft}})]:[]),p(t.text),...graphics(t,'candidate').flatMap(graphic),gap(10),p(item.component==='oral'?'Vorbereitung / Notizen':'Durchführungsplanung / Bearbeitung','ExamHeading'),planningBox()],{task:t,type:X.SectionType.ODD_PAGE});
   }
  }
- for(const [n,{task:t}] of e.items.entries())if(t.sourceLayout)for(const l of graphics(t,'candidate'))section([p('Zusätzliche Anlage · Aufgabe '+(n+1),'TaskTitle'),...graphic(l)],{task:t});
+ for(const item of entries)if(item.task.sourceLayout)for(const l of graphics(item.task,'candidate'))section([p('Zusätzliche Anlage · '+item.label,'TaskTitle'),...graphic(l)],{task:item.task});
  if(examiner){const g=P.regulationGuidance(e);if(g){
   const compact=text=>p(text,'ExamMeta',{spacing:{line:260,after:100}}),children=[p(g.title,'TaskTitle'),compact(g.status),compact(g.areas),...g.rules.map(compact)];
   if(g.units.length)children.push(p('Ausdrücklich erklärte komplexe Prüfungsaufgaben','ExamHeading'),table([{header:true,cells:['Aufgabenblatt','Komplexe Prüfungsaufgabe','Bereich / Begründung'].map(v=>p(v,'ExamTable',{run:{bold:true}}))},...g.units.map(u=>({keepTogether:false,cells:[compact(u.document),compact(u.title),compact(u.area+(u.reason?'\n'+u.reason:'') )]}))],[mm(28),mm(62),paperWidth-mm(90)],{padding:100}));
@@ -189,10 +214,10 @@ async function documentFile(e,input,examiner=false){
   children.push(compact(g.caution),p(g.source,'ExamSmall'),new X.Paragraph({style:'ExamSmall',children:[new X.ExternalHyperlink({link:g.url,children:[run('Amtlicher Verordnungstext',{style:'Hyperlink'})]})]}));
   section(children);
  }}
- if(examiner)for(const [n,{task:t}] of e.items.entries()){
+ if(examiner)for(const [n,item] of entries.entries()){const t=item.task;
   const criteria=t.criteria.length?t.criteria:[{text:'Gesamtbewertung',answer:'Bewertungskriterien ergänzen',points:t.points}];
   const rows=[{header:true,cells:['Kriterium / Teilaufgabe','Erwartete Leistung','Max.','Erreicht'].map(v=>p(v,'ExamTable',{run:{bold:true}}))},...criteria.map(c=>({keepTogether:false,cells:[p(c.text,'ExamTable'),p(c.answer||'Erwartung ergänzen','ExamTable'),p(c.points??'offen','ExamTable'),p('','ExamTable')]}))];
-  section([p('Aufgabe '+(n+1)+' · Lösung und Bewertung','TaskTitle'),p(t.title,'ExamSubtitle'),p('Lösung / Erwartungshorizont','ExamHeading'),...(t.solutionStatus!=='approved'?[callout('ENTWURF · Lösung noch fachlich prüfen und freigeben.'),gap(8)]:[]),p(t.solution||'Keine Musterlösung hinterlegt. Fachlich ergänzen und freigeben.'),gap(8),p('Bewertung','ExamHeading'),p(C.pointsLabel(t),'ExamMeta'),table(rows,[2762,4340,1381,paperWidth-8483],{padding:120}),...graphics(t,'examiner').flatMap(graphic),gap(8),p('Beobachtungen / Begründung:','ExamMeta')],{task:t});
+  section([p(item.label+' · Lösung und Bewertung','TaskTitle'),p(t.title,'ExamSubtitle'),p('Lösung / Erwartungshorizont','ExamHeading'),...(t.solutionStatus!=='approved'?[callout('ENTWURF · Lösung noch fachlich prüfen und freigeben.'),gap(8)]:[]),p(t.solution||'Keine Musterlösung hinterlegt. Fachlich ergänzen und freigeben.'),gap(8),p('Bewertung','ExamHeading'),p(C.pointsLabel(t),'ExamMeta'),table(rows,[2762,4340,1381,paperWidth-8483],{padding:120}),...graphics(t,'examiner').flatMap(graphic),gap(8),p('Beobachtungen / Begründung:','ExamMeta')],{task:t});
  }
  const style=(id,name,font,size,paragraph={},runProps={})=>({id,name,basedOn:'Normal',next:'ExamBody',quickFormat:true,run:{font,size,color:ink,...runProps},paragraph});
  const doc=new X.Document({title:clean(e.title),creator:'Prüfungswerkstatt Gartenbau',description:label,features:{updateFields:true},compatabilityModeVersion:15,styles:{default:{document:{run:{font:sans,size:22,color:ink,language:{value:'de-DE'}},paragraph:{spacing:{line:336,after:120},widowControl:true}}},paragraphStyles:[
@@ -213,5 +238,5 @@ async function documentFile(e,input,examiner=false){
  const body=await z.file('word/document.xml').async('string');z.file('word/document.xml',body.replace(/<w:p><w:pPr><w:sectPr>/g,'<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/><w:rPr><w:sz w:val="2"/></w:rPr><w:sectPr>'));await A.embedFonts(z,fonts);
  return z.generateAsync({type:'uint8array',compression:'DEFLATE'});
 }
-const api={document:documentFile,requiredAssetIds:A.requiredAssetIds,fontAssets:A.fontAssets};root.HortiDocx=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
+const api={document:documentFile,prepareLogoMargins,requiredAssetIds:A.requiredAssetIds,fontAssets:A.fontAssets};root.HortiDocx=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(globalThis);
