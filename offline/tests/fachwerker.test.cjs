@@ -19,15 +19,73 @@ test('FW snapshots, patterns, sources and families cannot cross the AP/ZP bounda
  const families=fixture();families.tasks.push(task({id:'ap',examType:'AP',sourceIds:[]}));assert.throws(()=>C.validate(families),/familie/i);
  assert.throws(()=>C.revise(fixture(),'fw',{examType:'AP'}),/Prüfungsbereich|Familie/);
 });
-test('FW categories preserve harvest as a separate choice and never reuse AP workbook assignments',()=>{
- const d=fixture();assert.deepEqual(L.categories(d,'FW_AP','Gemüsebau').map(c=>c.id).sort(),['soil','plantwork','harvest','propagation'].sort());
- assert.deepEqual(L.categories(d,'FW_AP','Zierpflanzenbau').map(c=>c.id).sort(),['soil','plantwork','machinery','propagation'].sort());
- assert.equal(L.workbookScope(d.tasks[0]),null);
- for(const [text,ids] of [['Beet bepflanzen',['plantwork']],['Durchführen von Arbeiten an und mit der Pflanze - Ernten und Aufbereitung',['harvest']],['Bodenbearbeitungsmaßnahmen – Maschinelles Bearbeiten',['soil']],['Geräte und Einsatz von Maschinen',['machinery']]])assert.deepEqual(L.classify(task({specialty:text.startsWith('Geräte')?'Zierpflanzenbau':'Gemüsebau',text:'Aufgabe:\n'+text+'\nHier: Test'})).ids,ids);
+test('FW choices expose the seven supplied main headings in both supported specialties',()=>{
+ const expected=[['soil','Durchführen von Bodenbearbeitungsmaßnahmen'],['plantwork','Durchführen von Arbeiten an und mit der Pflanze'],['materials','Be- und Verarbeitung von Materialien und Werkstoffen'],['substrates','Verwendung von Böden, Erden und Substraten'],['machinery','Einsatz von Werkzeug und Geräten'],['propagation','Vermehren von Pflanzen'],['maintenance','Durchführen von Wartungs-/Instandsetzungsarbeiten']],d=fixture();
+ for(const specialty of ['Gemüsebau','Zierpflanzenbau']){
+  assert.deepEqual(L.categories(d,'FW_AP',specialty).map(c=>[c.id,c.label]),expected);
+  for(const [id,text] of expected)assert.deepEqual(L.classify(task({specialty,text:'Aufgabe:\n'+text+'\nHier: Test'})).ids,[id]);
+ }
+ assert.deepEqual(L.categories(d,'FW_AP','Baumschule'),[]);assert.equal(L.workbookScope(d.tasks[0]),null);
  const p=L.inferPattern(d,'FW_AP','Gemüsebau');assert.doesNotThrow(()=>L.checkPattern(p));assert.equal(p.categoryCatalog,'fw-sources-2026');
  assert.throws(()=>L.checkPattern({...p,specialty:'Baumschule'}),/Fachwerker/);
  assert.throws(()=>L.checkPattern({...p,categoryCatalog:'excel-ap-2026'}),/Kategorien/);
  const wrong=fixture();Object.assign(wrong.tasks[0],{planningCategories:['propagation'],planningCategoryCatalog:'excel-ap-2026'});assert.throws(()=>C.validate(wrong),/Kategorie/);
+});
+test('FW subtopics retain their source grouping and classify only the task heading',()=>{
+ assert.equal(typeof L.fachwerkerTopics,'function');
+ const groups={
+  soil:['Boden umgraben','Bodenplanie erstellen','Fläche für Aussaat vorbereiten','Fläche für Pflanzung vorbereiten','Maschinelles Bearbeiten','Provisorium erstellen'],
+  plantwork:['Anbinden','Aufbereitung für Lagerung oder Verkauf','Aufbinden und Formieren','Aufschulen','Ausgeizen','Ausputzen und Rücken','Ballieren','Beet bepflanzen','Bepflanzen von Gefäßen','Ernten','Grab bepflanzen','Handausdünnung','Heckenschnitt','Jahreszeitliche Pflegemaßnahmen an Grabstätten','Kennzeichnen und Verpacken','Mulchen','Pflanzung durchführen','Pflegemaßnahmen im Gelände','Pikieren','Rasen mähen','Roden','Roden und Ballieren','Schnittmaßnahmen','Sortieren','Sortieren und Kennzeichnen','Sortieren, Kennzeichnen und Verpacken','Stäben und Heften','Topfen','Umtopfen'],
+  materials:['Befestigte Flächen herstellen','Bewässerungssysteme installieren','Mauerbau','Naturstein bearbeiten','Naturstein verarbeiten','Stützgerüst erstellen'],
+  substrates:[],
+  machinery:['Düngungs- und Bewässerungstechnik','Flächen ausmessen','Freischneider','Heckenschere','Ladungssicherung','Motorfräse','Motorhacke','Rasenmäher'],
+  propagation:['Aussaat','Rasenansaat','Steckholz','Stecklinge','Teilung','Veredlung'],
+  maintenance:['Gartenschlauch reparieren','Rebschere warten','Schlauchschnellkupplung einsetzen']
+ };
+ for(const specialty of ['Gemüsebau','Zierpflanzenbau'])for(const [id,topics] of Object.entries(groups)){
+  assert.deepEqual(L.fachwerkerTopics({examType:'FW_AP',specialty},id),topics);
+  for(const text of topics)assert.deepEqual(L.classify(task({specialty,text:'Aufgabe:\n'+text+'\nHier: Vermehren von Pflanzen ist nur eine Frage im Aufgabentext.'})).ids,[id],text);
+ }
+ assert.deepEqual(L.fachwerkerTopics({examType:'AP',specialty:'Gemüsebau'},'soil'),[]);
+ assert.deepEqual(L.fachwerkerTopics({examType:'FW_AP',specialty:'Baumschule'},'soil'),[]);
+ assert.deepEqual(L.fachwerkerTopics(task(),'unknown'),[]);
+});
+test('FW inference uses available tasks and combines legacy harvest with plant work without changing sources',()=>{
+ const d=fixture();d.tasks[0]=task({text:'Aufgabe:\nBoden umgraben\nHier: Test'});
+ assert.deepEqual(L.inferPattern(d,'FW_AP','Gemüsebau').slots,[{categoryId:'soil',count:1}]);
+ assert.deepEqual(L.inferPattern({...d,tasks:[]},'FW_AP','Gemüsebau').slots,[]);
+ const legacy=task({text:'Aufgabe:\nDurchführen von Arbeiten an und mit der Pflanze - Ernten und Aufbereitung\nHier: Originalwortlaut',planningCategories:['harvest','plantwork'],planningCategoryCatalog:'fw-sources-2026'});d.tasks=[legacy];const before=C.clone(d);
+ assert.deepEqual(L.classify(legacy).ids,['plantwork']);
+ assert.deepEqual(L.inferPattern(d,'FW_AP','Gemüsebau').slots,[{categoryId:'plantwork',count:1}]);
+ const e=exam(legacy);e.pattern=L.inferPattern(d,'FW_AP','Gemüsebau');e.pattern.status='confirmed';
+ assert.equal(L.coverage(e).complete,true);e.items=[];assert.deepEqual(L.propose(d,e).map(t=>t.id),['fw']);
+ assert.deepEqual(d,before);
+});
+test('FW validation accepts legacy harvest tags with or without a catalog marker and preserves stored data',()=>{
+ for(const specialty of ['Gemüsebau','Zierpflanzenbau'])for(const marked of [false,true]){
+  const d=fixture();d.sources[0].specialty=specialty;Object.assign(d.tasks[0],{specialty,planningCategories:['harvest'],...(marked?{planningCategoryCatalog:'fw-sources-2026'}:{})});
+  const before=C.clone(d);assert.doesNotThrow(()=>C.validate(d));assert.deepEqual(d,before);
+ }
+});
+test('FW legacy harvest ranking stays available while current plant-work ranking also includes harvest',()=>{
+ const harvest=task({text:'Aufgabe:\nErnten und Aufbereitung\nHier: Test'}),plant=task({id:'plant',familyId:'plant-family',text:'Aufgabe:\nBeet bepflanzen\nHier: Test'}),d=fixture();d.tasks=[harvest,plant];
+ assert.deepEqual(L.rank(d,'FW_AP','Gemüsebau','harvest').map(row=>row.task.id),['fw']);
+ assert.deepEqual(L.rank(d,'FW_AP','Gemüsebau','plantwork').map(row=>row.task.id),['fw','plant']);
+});
+test('FW multi-category tasks do not create a legal seven-task or duration requirement',()=>{
+ const d=fixture();Object.assign(d.tasks[0],{planningCategories:['soil','plantwork','materials','substrates','machinery','propagation','maintenance'],planningCategoryCatalog:'fw-sources-2026',minutes:900});
+ const e=exam(d.tasks[0]);e.pattern=L.inferPattern(d,'FW_AP','Gemüsebau');e.pattern.status='confirmed';
+ assert.equal(L.coverage(e).complete,true);assert.equal(e.items.length,1);assert.equal(L.regulationProfile(e),null);
+ e.items=[];assert.deepEqual(L.propose(d,e).map(t=>t.id),['fw']);
+});
+test('FW legacy harvest assignments and stored patterns remain valid and keep separate legacy coverage',()=>{
+ assert.equal(typeof L.fachwerkerMainCategory,'function');assert.equal(L.fachwerkerMainCategory('harvest'),'plantwork');assert.equal(L.fachwerkerMainCategory('soil'),'soil');
+ const harvest=task({text:'Aufgabe:\nDurchführen von Arbeiten an und mit der Pflanze - Ernten und Aufbereitung\nHier: Test'}),plant=task({id:'plant',familyId:'plant-family',text:'Aufgabe:\nBeet bepflanzen\nHier: Test'}),d=fixture();d.tasks=[harvest,plant];
+ const p={id:'old-fw',examType:'FW_AP',specialty:'Gemüsebau',version:1,status:'confirmed',categoryCatalog:'fw-sources-2026',slots:[{categoryId:'harvest',count:1},{categoryId:'plantwork',count:1}]},e={...exam(harvest),pattern:p};
+ assert.doesNotThrow(()=>L.checkPattern(p));assert.deepEqual(L.patternClassify(harvest,p).ids,['harvest']);assert.deepEqual(L.patternClassify(plant,p).ids,['plantwork']);
+ assert.deepEqual(L.propose(d,e).map(t=>t.id),['plant']);e.items.push({id:'plant-item',task:C.clone(plant)});assert.equal(L.coverage(e).complete,true);
+ assert.equal(L.label('harvest',e),'Ernten und Aufbereitung');assert.deepEqual(L.fachwerkerTopics(harvest,'harvest'),L.fachwerkerTopics(harvest,'plantwork'));
+ const before=C.clone(e);L.labels(harvest,p);L.coverage(e);assert.deepEqual(e,before);
 });
 test('FW family history and suggestions remain isolated from AP and ZP records',()=>{
  const d=fixture(),fw=d.tasks[0];d.tasks.push(task({id:'ap',examType:'AP',sourceIds:['ap-source']}),task({id:'zp',examType:'ZP',sourceIds:['zp-source']}));d.sources.push({id:'ap-source',year:2026},{id:'zp-source',year:2026});
@@ -65,4 +123,20 @@ test('FW original-page exports print the qualification independently of titles a
   for(const f of footers.slice(0,2))assert.ok((await f.async('string')).includes(label));
  }
  assert.deepEqual(t,before);
+});
+test('qualification display resolves supplied codes without changing unrelated numbers or original metadata',()=>{
+ assert.equal(typeof L.qualificationInfo,'function');assert.equal(typeof L.qualificationLabel,'function');
+ const specialties=['Zierpflanzenbau','Gemüsebau','Baumschule','Obstbau','Staudengärtnerei','Garten- und Landschaftsbau','Friedhofsgärtnerei'];
+ for(let n=0;n<specialties.length;n++)for(const [code,qualification] of [[String(31+n).padStart(3,'0'),'Gärtner'],[String(171+n),'Gartenbaufachwerker']]){
+  assert.deepEqual(L.qualificationInfo(code),{code,specialty:specialties[n],qualification});
+  assert.equal(L.qualificationLabel(code),`${qualification} · ${specialties[n]} (${code})`);
+  assert.equal(L.qualificationLabel(`${qualification} ${code}`),`${qualification} · ${specialties[n]} (${code})`);
+ }
+ assert.equal(L.qualificationLabel('31'),'Gärtner · Zierpflanzenbau (031)');
+ assert.equal(L.qualificationLabel('030'),'Gärtner (allgemein) (030)');assert.equal(L.qualificationLabel('30'),'Gärtner (allgemein) (030)');
+ assert.equal(L.qualificationLabel('170'),'Gartenbaufachwerker (allgemein) (170)');
+ for(const value of ['2031','317','181','Prüfung 31 Minuten','Arbeit 171','Gärtner 2031','Gartenbaufachwerker 031','Gärtner 171','Gärtner · Gemüsebau']){
+  assert.equal(L.qualificationInfo(value),null);assert.equal(L.qualificationLabel(value),value);
+ }
+ const t=task({qualification:'172'}),before=C.clone(t);assert.equal(L.qualificationLabel(t.qualification),'Gartenbaufachwerker · Gemüsebau (172)');assert.deepEqual(t,before);
 });

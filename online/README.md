@@ -11,7 +11,7 @@ backup integration; it is not the active store.
 
 1. Open the existing Pages URL and sign in with the coordinator password.
 2. Create a preparation meeting, exam year and specialties.
-3. Under **Gruppen & Einladungen**, activate a session for up to 24 hours.
+3. Under **Gruppen & Einladungen**, activate a session for up to 48 hours.
 4. Show each specialty's QR code or copy its link. Members provide a device label.
 5. Compare the device code and approve each pending request.
 6. Groups prepare ZP and AP separately. Changes save centrally. The coordinator

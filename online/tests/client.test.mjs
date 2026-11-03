@@ -154,3 +154,78 @@ test('manual total time entered in the task dialog resolves a source conflict an
 test('editor distinguishes five declared complex tasks from their single source template',async()=>{
  const u=await ui('admin'),d=u.sandbox.testUI.getDb(),t={...structuredClone(d.tasks[0]),id:'grouped-ui',familyId:'grouped-family',examType:'AP',sourceIds:[],minutes:300,practicalUnits:Array.from({length:5},(_,n)=>({title:'Eigenständige Aufgabe '+(n+1),areaId:n<3?'area1':'area2',reason:'Separat bewerteter Teil der Vorlage'}))};d.families.push({id:t.familyId,title:t.title});d.tasks.push(t);await u.click('action','open-group','Baumschule');await u.click('action','track-new','AP');await u.click('action','add',t.id);assert.match(u.elements.get('#app').innerHTML,/5 Prüfungsaufgaben in 1 Vorlage/);assert.match(u.elements.get('#app').innerHTML,/5 getrennte Prüfungsaufgaben in dieser Vorlage/);
 });
+
+test('committee names are recorded per group and remain after editing the preparation date',async()=>{
+ const u=await ui('admin'),d=u.sandbox.testUI.getDb();await u.click('action','open-group','Baumschule');
+ assert.match(u.elements.get('#app').innerHTML,/Mitwirkende erfassen/);await u.click('action','edit-committee','Baumschule');
+ assert.match(u.elements.get('#dialog').innerHTML,/Eine Person je Zeile/);
+ u.elements.set('#committee-name',{value:'Ausschuss Nord'});u.elements.set('#committee-members',{value:'Anna Beispiel\nBen Muster'});
+ await u.click('action','save-committee','Baumschule');assert.deepEqual(C.committee(d.workshops[0],'Baumschule').participants,['Anna Beispiel','Ben Muster']);
+ assert.match(u.elements.get('#app').innerHTML,/Anna Beispiel/);
+ for(const [id,value] of Object.entries({'workshop-title':'Treffen November','workshop-year':'2027','workshop-date':'2026-11-18'}))u.elements.set('#'+id,{value});
+ u.sandbox.document.querySelectorAll=q=>q==='[data-workshop-specialty]:checked'?[{value:'Baumschule'}]:[];
+ await u.click('action','save-workshop','meeting');assert.equal(C.committee(d.workshops[0],'Baumschule').name,'Ausschuss Nord');
+});
+test('committee history searches previous contributors and does not merge different examination years',async()=>{
+ const u=await ui('admin'),d=u.sandbox.testUI.getDb();C.saveCommittee(d,'meeting','Baumschule',{name:'Nord',participants:['Anna Beispiel']});C.saveCommittee(d,'meeting','Baumschule',{name:'Nord',participants:['Ben Muster']});
+ d.workshops.push({id:'next-year',title:'Nächstes Treffen',examYear:2028,meetingDate:'',specialties:['Baumschule']});C.saveCommittee(d,'next-year','Baumschule',{name:'Süd',participants:['Carla Test']});
+ await u.click('route','committees');let h=u.elements.get('#app').innerHTML;assert.match(h,/2027/);assert.match(h,/2028/);assert.match(h,/Frühere Einträge/);
+ for(const [id,value] of Object.entries({'committee-query':'Anna','committee-year':'','committee-specialty':''}))u.elements.set('#'+id,{value});
+ await u.click('action','filter-committees');h=u.elements.get('#app').innerHTML;assert.match(h,/Anna Beispiel/);assert.doesNotMatch(h,/Carla Test/);assert.match(h,/export-committees/);
+});
+test('group reads its recorded committee but cannot edit or export rosters or open history',async()=>{
+ const u=await ui(),d=u.sandbox.testUI.getDb();C.saveCommittee(d,'meeting','Baumschule',{name:'Ausschuss A',participants:['Anna Beispiel']});
+ await u.click('route','group');const h=u.elements.get('#app').innerHTML;assert.match(h,/Anna Beispiel/);assert.doesNotMatch(h,/data-action="edit-committee"/);
+ await u.click('route','committees');assert.equal(u.elements.get('#app').innerHTML,h);
+ for(const a of ['edit-committee','save-committee','export-committees','filter-committees'])await u.click('action',a,'Baumschule');assert.equal(u.elements.get('#dialog').innerHTML,'');
+});
+test('access duration offers 48 hours and sends the selected end time without changing the default',async()=>{
+ const u=await ui('admin');u.elements.set('#confirm-open',{disabled:false});u.elements.set('#session-hours',{value:'48'});let expiry;
+ u.online.open=async(id,expires)=>{assert.equal(id,'meeting');expiry=expires;};
+ await u.click('action','open-session');const h=u.elements.get('#dialog').innerHTML;assert.match(h,/<option value="48">/);assert.match(h,/<option value="4" selected>/);
+ const start=Date.now();await u.elements.get('#confirm-open').onclick();assert.ok(expiry>=start+48*3600000&&expiry<=Date.now()+48*3600000);assert.match(H.view(),/bis zu 48 Stunden/);
+});
+test('FW authoring displays the provided optional main topics and subtopic examples',async()=>{
+ const u=await ui('admin'),d=u.sandbox.testUI.getDb();d.workshops[0].specialties.push('Gemüsebau');await u.click('action','open-group','Gemüsebau');await u.click('action','track-new','FW_AP');await u.click('action','new-task');
+ const h=u.elements.get('#dialog').innerHTML;assert.match(h,/Verwendung von Böden, Erden und Substraten/);assert.match(h,/Hauptaufgabengebiete/);assert.match(h,/Ernten/);assert.match(h,/Gartenschlauch reparieren/);assert.match(h,/keine Pflichtanzahl/);
+ assert.match(h,/data-action="fw-topic"/);
+});
+
+test('qualification codes are shown with full names in task details and task editing',async()=>{
+ const u=await ui('admin'),d=u.sandbox.testUI.getDb(),t=d.tasks[0];t.qualification='031';await u.click('action','detail',t.id);assert.match(u.elements.get('#dialog').innerHTML,/Gärtner · Zierpflanzenbau \(031\)/);
+ await u.click('action','edit-task',t.id);assert.match(u.elements.get('#dialog').innerHTML,/value="Gärtner · Zierpflanzenbau \(031\)"/);
+ assert.equal(t.qualification,'031');
+});
+test('Fachwerker topic selection sets the main category and tag without overwriting the task body',async()=>{
+ const u=await ui('admin'),d=u.sandbox.testUI.getDb();d.workshops[0].specialties.push('Gemüsebau');await u.click('action','open-group','Gemüsebau');await u.click('action','track-new','FW_AP');await u.click('action','new-task');
+ const check={value:'plantwork',checked:false};u.sandbox.document.querySelectorAll=q=>q==='[data-planning-category]'?[check]:[];
+ u.elements.set('#task-tags',{value:'vorhandenes Stichwort'});u.elements.set('#task-title',{value:''});u.elements.set('#task-text',{value:'Unveränderter Auftrag'});
+ const index=L.fachwerkerTopics({examType:'FW_AP',specialty:'Gemüsebau'},'plantwork').indexOf('Ernten');
+ await u.click('action','fw-topic',JSON.stringify(['plantwork',index]));assert.equal(check.checked,true);assert.equal(u.elements.get('#task-tags').value,'vorhandenes Stichwort, Ernten');assert.equal(u.elements.get('#task-title').value,'Ernten');assert.equal(u.elements.get('#task-text').value,'Unveränderter Auftrag');
+ await u.click('action','fw-topic',JSON.stringify(['plantwork',index]));assert.equal(u.elements.get('#task-tags').value,'vorhandenes Stichwort, Ernten');
+});
+
+test('points-only edits preserve the harvest assignment of an existing Fachwerker exam pattern',async()=>{
+ const u=await ui('admin'),d=u.sandbox.testUI.getDb();d.workshops[0].specialties.push('Gemüsebau');const t={...structuredClone(d.tasks[0]),id:'legacy-harvest',familyId:'legacy-harvest-family',specialty:'Gemüsebau',examType:'FW_AP',sourceIds:[],assetLinks:[],criteria:[],planningCategories:['harvest'],planningCategoryCatalog:'fw-sources-2026',points:100,minutes:45};d.families.push({id:t.familyId,title:t.title});d.tasks.push(t);
+ const e=C.newExam({specialty:t.specialty,examType:t.examType,workshopId:'meeting',examYear:2027,pattern:{id:'legacy-pattern',examType:'FW_AP',specialty:t.specialty,status:'confirmed',version:1,categoryCatalog:'fw-sources-2026',slots:[{categoryId:'harvest',count:1}]}});C.addItem(e,t);d.exams.push(e);assert.equal(L.coverage(e).complete,true);
+ await u.click('action','select-exam',e.id);await u.click('action','item-edit',e.items[0].id);const html=u.elements.get('#dialog').innerHTML;
+ const selected=[...html.matchAll(/data-planning-category value="([^"]+)" checked/g)].map(m=>m[1]);assert.deepEqual(selected,['harvest']);
+ taskFormValues(u,t);u.sandbox.document.querySelectorAll=q=>q==='[data-planning-category]:checked'?selected.map(value=>({value})):[];u.elements.get('#task-points').value='120';await u.click('action','save-task');const saved=d.exams.find(x=>x.id===e.id);assert.equal(saved.items[0].task.points,120);assert.equal(L.coverage(saved).complete,true);assert.deepEqual(saved.items[0].task.planningCategories,['harvest']);
+});
+test('comma-containing Fachwerker examples remain one exact tag through repeated selection and saving',async()=>{
+ const u=await ui('admin'),d=u.sandbox.testUI.getDb();d.workshops[0].specialties.push('Gemüsebau');await u.click('action','open-group','Gemüsebau');await u.click('action','track-new','FW_AP');await u.click('action','new-task');
+ const t={...structuredClone(d.tasks[0]),familyId:'',examType:'FW_AP',specialty:'Gemüsebau',sourceIds:[],assetLinks:[],criteria:[],tags:[],planningCategories:['plantwork'],planningCategoryCatalog:'fw-sources-2026'};taskFormValues(u,t);const check={value:'plantwork',checked:false};u.sandbox.document.querySelectorAll=q=>q==='[data-planning-category]'?[check]:q==='[data-planning-category]:checked'&&check.checked?[check]:[];
+ const topic='Sortieren, Kennzeichnen und Verpacken',index=L.fachwerkerTopics(t,'plantwork').indexOf(topic);assert.ok(index>=0);
+ for(let i=0;i<2;i++)await u.click('action','fw-topic',JSON.stringify(['plantwork',index]));await u.click('action','save-task');assert.deepEqual(d.tasks.at(-1).tags,[topic]);
+});
+
+test('existing current drafts offer reportbook cleanup without changing source-bank tasks',async()=>{
+ const u=await ui('admin'),d=u.sandbox.testUI.getDb(),t=d.tasks[0];t.text='Arbeitsauftrag.\n--- das Berichtsheft ist zulässig---\nWeiterer Auftrag.';const original=JSON.stringify(t),e=C.newExam({examType:t.examType,specialty:t.specialty,examYear:2027,workshopId:'meeting'});e.items=[{id:'old-item',originTaskId:t.id,task:structuredClone(t)}];d.exams.push(e);
+ await u.click('action','select-exam',e.id);assert.match(u.elements.get('#app').innerHTML,/clean-reportbook/);await u.click('action','clean-reportbook');const saved=d.exams.find(x=>x.id===e.id);assert.doesNotMatch(saved.items[0].task.text,/Berichtsheft ist zulässig/);assert.match(saved.items[0].task.text,/Weiterer Auftrag/);assert.equal(JSON.stringify(d.tasks[0]),original);assert.doesNotMatch(u.elements.get('#app').innerHTML,/data-action="clean-reportbook"/);
+});
+test('new task authoring removes the obsolete reportbook allowance before saving',async()=>{
+ const u=await ui('admin'),d=u.sandbox.testUI.getDb();await u.click('action','new-task');const t={...structuredClone(d.tasks[0]),title:'Neue Aufgabe',text:'Auftrag. Das Berichtsheft ist zulässig. Weiterarbeiten.',familyId:'',sourceIds:[],assetLinks:[],criteria:[]};taskFormValues(u,t);await u.click('action','save-task');assert.equal(d.tasks.at(-1).title,'Neue Aufgabe');assert.doesNotMatch(d.tasks.at(-1).text,/Berichtsheft ist zulässig/);assert.match(d.tasks.at(-1).text,/Weiterarbeiten/);
+});
+test('duplicating a used old exam removes obsolete permissions only from the new copy',async()=>{
+ const u=await ui('admin'),d=u.sandbox.testUI.getDb(),t=d.tasks[0],e=C.newExam({examType:t.examType,specialty:t.specialty,examYear:2025});e.status='used';e.items=[{id:'historic-item',originTaskId:t.id,task:{...structuredClone(t),text:'--- das Berichtsheft ist zulässig---'}}];d.exams.push(e);const before=JSON.stringify(e);await u.click('action','duplicate-exam',e.id);assert.equal(d.exams.length,2);assert.equal(JSON.stringify(d.exams[0]),before);assert.doesNotMatch(d.exams.at(-1).items[0].task.text,/Berichtsheft ist zulässig/);
+});
