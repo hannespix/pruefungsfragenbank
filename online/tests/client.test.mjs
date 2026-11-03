@@ -15,6 +15,8 @@ import D from '../../offline/src/docx.js';
 import M from '../../offline/src/materials.js';
 import O from '../../offline/src/organization.js';
 import T from '../../offline/src/timing-plan.js';
+import Q from '../../offline/src/points-plan.js';
+import R from '../../offline/src/release.js';
 import Zip from '../../offline/vendor/jszip.min.js';
 const client=fs.readFileSync(new URL('../client.js',import.meta.url),'utf8');
 const app=fs.readFileSync(new URL('../../offline/src/app.js',import.meta.url),'utf8');
@@ -23,12 +25,12 @@ test('a rejected central save preserves revisions for retry and includes only ch
 async function ui(role='group',memoryOnly=false,{specialty='Baumschule',configure=()=>{}}={}){
  const data=demo();for(const t of data.tasks)if(L.zwischenpruefungScope(t))t.text='Aufgabe: Durchführen von Arbeiten an der Pflanze\nHier: Synthetisches Beispiel\n'+t.text;
  data.workshops=[{id:'meeting',title:'Termin',examYear:2027,meetingDate:'',specialties:[specialty]}];configure(data);
- const elements=new Map(),listeners={};for(const id of ['#app','#toast','#dialog','#project-input','#docx-input','#asset-input'])elements.set(id,{innerHTML:'',textContent:'',inert:false,addEventListener(){},classList:{add(){},remove(){}},close(){this.open=false;},showModal(){this.open=true;}});
+ const elements=new Map(),listeners={};for(const id of ['#app','#toast','#dialog','#project-input','#docx-input','#asset-input'])elements.set(id,{innerHTML:'',textContent:'',inert:false,addEventListener(){},classList:{values:new Set(),add(...xs){xs.forEach(x=>this.values.add(x));},remove(...xs){xs.forEach(x=>this.values.delete(x));},contains(x){return this.values.has(x);}},close(){this.open=false;},showModal(){this.open=true;}});
  if(memoryOnly){elements.set('#seed',{textContent:JSON.stringify(data)});elements.set('meta[name=hortiexam-storage]',{content:'memory'});}
  const online={role,session:{specialty,meetingId:'meeting'},start:async()=>data,save:async()=>{},load:async()=>structuredClone(data),board:{meetings:[],requests:[]}};
  let timer=0,themeHtml='',themeInputs=[];const timers=new Map();
  const themes=()=>{const html=elements.get('#app').innerHTML;if(html!==themeHtml){themeHtml=html;themeInputs=[...html.matchAll(/<input[^>]*data-workflow-theme value="([^"]+)"([^>]*)>/g)].map(([,value,attrs])=>({value,checked:/\bchecked\b/.test(attrs),disabled:/\bdisabled\b/.test(attrs),handlers:{},addEventListener(name,fn){this.handlers[name]=fn;}}));}return themeInputs;};
- const sandbox={HortiTimingPlan:T,HortiOrganization:O,HortiMaterials:M,HortiSourceLayout:S,HortiIcons:I,HortiCatalog:B,HortiHelp:H,HortiDocx:D,HortiArchive:A,HortiPaper:W,HortiOnline:memoryOnly?null:online,HortiPlanning:L,HortiCore:C,HortiPrint:P,console,setTimeout:(fn,delay)=>{const id=++timer;timers.set(id,{fn,delay});return id;},clearTimeout:id=>timers.delete(id),confirm:()=>true,window:{addEventListener:(name,fn)=>listeners[name]=fn},document:{querySelector:q=>elements.get(q)||null,querySelectorAll:q=>q==='[data-workflow-theme]'?themes():[],addEventListener:(name,fn)=>listeners[name]=fn}};
+ const sandbox={HortiPointsPlan:Q,HortiRelease:R,HortiTimingPlan:T,HortiOrganization:O,HortiMaterials:M,HortiSourceLayout:S,HortiIcons:I,HortiCatalog:B,HortiHelp:H,HortiDocx:D,HortiArchive:A,HortiPaper:W,HortiOnline:memoryOnly?null:online,HortiPlanning:L,HortiCore:C,HortiPrint:P,console,setTimeout:(fn,delay)=>{const id=++timer;timers.set(id,{fn,delay});return id;},clearTimeout:id=>timers.delete(id),confirm:()=>true,window:{addEventListener:(name,fn)=>listeners[name]=fn},document:{querySelector:q=>elements.get(q)||null,querySelectorAll:q=>q==='[data-workflow-theme]'?themes():[],addEventListener:(name,fn)=>listeners[name]=fn}};
  await vm.runInNewContext(app.replace('await initStorage();','globalThis.testUI={reloadCentral,changed,bankResults,setBankFilters:v=>bankFilters=v,getDb:()=>db};await initStorage();'),sandbox);
  return {online,sandbox,elements,themes,timers,dispatch:(name,event)=>listeners[name](event),click:async(kind,value,id)=>listeners.click({target:{closest:selector=>selector===`[data-${kind}]`?{dataset:{[kind]:value,id}}:null}})};
 }
@@ -60,7 +62,7 @@ test('new draft starts with themes and advances through tasks to review',async()
 });
 test('category filters stay in the paper editor and alternatives replace only the chosen task',async()=>{const u=await ui('admin');await u.click('action','open-group','Baumschule');await createDraft(u,'ZP');const d=u.sandbox.testUI.getDb(),e=d.exams.at(-1);assert.ok(e,u.elements.get('#toast').textContent);const t=d.tasks.find(t=>t.specialty==='Baumschule'&&t.examType==='ZP'),alt=structuredClone(t);alt.id='alternative';alt.title='Alternative prüfen';d.tasks.push(alt);await u.click('action','add',t.id);const id=e.items[0].id;await u.click('action','paper-category',L.classify(t).ids[0]);assert.ok(u.elements.get('#app').innerHTML.includes('paper-stage'));await u.click('action','paper-replace',alt.id);assert.equal(e.items.length,1);assert.equal(e.items[0].originTaskId,alt.id);assert.notEqual(e.items[0].id,id);assert.equal(d.tasks.find(x=>x.id===t.id).title,t.title);const foreign=d.tasks.find(x=>x.specialty!=='Baumschule');await u.click('action','paper-replace',foreign.id);assert.equal(e.items[0].originTaskId,alt.id);e.status='used';await u.click('action','paper-replace',t.id);assert.equal(e.items[0].originTaskId,alt.id);});
 test('imported identifiers are escaped in expandable editor controls',async()=>{const u=await ui('admin'),d=u.sandbox.testUI.getDb();const t=d.tasks.find(t=>t.specialty==='Baumschule'&&t.examType==='ZP');t.id='quoted" ontoggle="alert(1)';await u.click('action','open-group','Baumschule');await createDraft(u,'ZP');const html=u.elements.get('#app').innerHTML;assert.ok(html.includes('data-paper-panel="task-quoted&quot; ontoggle=&quot;alert(1)"'));assert.ok(!html.includes('data-paper-panel="task-quoted" ontoggle="'));});
-test('category selection and inserted task buttons navigate within the paper stage',async()=>{const u=await ui('admin');await u.click('action','open-group','Baumschule');await createDraft(u,'ZP');const d=u.sandbox.testUI.getDb(),e=d.exams.at(-1),t=d.tasks.find(t=>t.specialty==='Baumschule'&&t.examType==='ZP');await u.click('action','add',t.id);const item=e.items[0],calls=[],stage={scrollTop:0,clientWidth:900,style:{setProperty(){}},getBoundingClientRect:()=>({top:100}),scrollTo:o=>calls.push(o)};u.elements.set('.paper-stage',stage);const page={dataset:{paperTask:item.id},classList:{add(){},remove(){}},getBoundingClientRect:()=>({top:700})};u.sandbox.document.querySelectorAll=q=>q==='[data-paper-task]'?[page]:[];u.elements.set('#paper-page',{value:'',addEventListener(){}});await u.click('action','paper-category',L.classify(t).ids[0]);assert.equal(calls.length,1);assert.equal(calls[0].behavior,'smooth');assert.equal(u.elements.get('#paper-page').value,item.id);assert.ok(u.elements.get('#app').innerHTML.includes('data-action="paper-focus"'));await u.click('action','paper-focus',item.id);assert.equal(calls.length,2);await u.click('action','paper-category','gravecare');assert.equal(calls.length,2);});
+test('category selection and inserted task buttons navigate within the paper stage',async()=>{const u=await ui('admin');await u.click('action','open-group','Baumschule');await createDraft(u,'ZP');const d=u.sandbox.testUI.getDb(),e=d.exams.at(-1),t=d.tasks.find(t=>t.specialty==='Baumschule'&&t.examType==='ZP');await u.click('action','add',t.id);const item=e.items[0],calls=[],stage={scrollTop:0,clientWidth:900,style:{setProperty(){}},getBoundingClientRect:()=>({top:100}),scrollTo:o=>calls.push(o)};u.elements.set('.paper-stage',stage);const page={dataset:{paperTask:item.id},classList:{values:new Set(),add(...xs){xs.forEach(x=>this.values.add(x));},remove(...xs){xs.forEach(x=>this.values.delete(x));},contains(x){return this.values.has(x);}},getBoundingClientRect:()=>({top:700})};u.sandbox.document.querySelectorAll=q=>q==='[data-paper-task]'?[page]:[];u.elements.set('#paper-page',{value:'',addEventListener(){}});await u.click('action','paper-category',L.classify(t).ids[0]);assert.equal(calls.length,1);assert.equal(calls[0].behavior,'smooth');assert.equal(u.elements.get('#paper-page').value,item.id);assert.ok(u.elements.get('#app').innerHTML.includes('data-action="paper-focus"'));await u.click('action','paper-focus',item.id);assert.equal(calls.length,2);await u.click('action','paper-category','gravecare');assert.equal(calls.length,2);});
 test('mobile navigation opens explicitly and closes after choosing a destination',async()=>{const u=await ui('admin');let h=u.elements.get('#app').innerHTML;assert.match(h,/aria-controls="primary-navigation" aria-expanded="false"/);await u.click('action','toggle-navigation');h=u.elements.get('#app').innerHTML;assert.match(h,/aria-controls="primary-navigation" aria-expanded="true"/);await u.click('route','catalog');h=u.elements.get('#app').innerHTML;assert.match(h,/aria-controls="primary-navigation" aria-expanded="false"/);assert.match(h,/Aufgabenbank/);});
 test('mobile editor switches views without changing the exam or weakening group permissions',async()=>{const u=await ui();await createDraft(u,'ZP');const e=u.sandbox.testUI.getDb().exams.at(-1),before=JSON.stringify(e);await u.click('action','paper-pane','preview');let h=u.elements.get('#app').innerHTML;assert.match(h,/data-mobile-pane="preview"/);assert.ok(!h.includes('data-action="export-exam"'));await u.click('action','paper-pane','library');h=u.elements.get('#app').innerHTML;assert.match(h,/data-mobile-pane="library"/);assert.equal(JSON.stringify(e),before);});
 test('mobile filters keep the task library open while adding and explicit navigation open the sheet',async()=>{const u=await ui();u.sandbox.matchMedia=q=>({matches:q==='(max-width: 1000px)'});await createDraft(u,'ZP');const d=u.sandbox.testUI.getDb(),e=d.exams.at(-1),t=d.tasks.find(t=>t.specialty==='Baumschule'&&t.examType==='ZP');await u.click('action','add',t.id);assert.match(u.elements.get('#app').innerHTML,/data-mobile-pane="preview"/);await u.click('action','paper-pane','library');await u.click('action','paper-category',L.classify(t).ids[0]);assert.match(u.elements.get('#app').innerHTML,/data-mobile-pane="library"/);await u.click('action','paper-category','');assert.match(u.elements.get('#app').innerHTML,/data-mobile-pane="library"/);await u.click('action','paper-focus',e.items[0].id);assert.match(u.elements.get('#app').innerHTML,/data-mobile-pane="preview"/);});
@@ -124,9 +126,9 @@ test('AP editor shows legal area minima and five-task limit instead of mandatory
  d.workshops[0].specialties.push('Friedhofsgärtnerei');await u.click('action','open-group','Friedhofsgärtnerei');await createDraft(u,'AP');const fh=u.elements.get('#app').innerHTML;assert.match(fh,/Grabanlage/);assert.match(fh,/Pflanzenproduktion, Trauerbinderei und Dekoration/);assert.equal((fh.match(/mindestens 2/g)||[]).length>=2,true);
 });
 
-test('legal review controls save a content-bound confirmation and group has no new bank template action',async()=>{
+test('group cannot confirm legal review or create bank templates',async()=>{
  const u=await ui('group'),d=u.sandbox.testUI.getDb();await createDraft(u,'AP');const e=d.exams.at(-1);await u.click('action','paper-check');await u.click('action','regulation-review','conversation');
- assert.equal(e.regulationReview?.conversation,true);assert.equal(e.regulationReviewKey,L.regulationReviewKey(e));const before=JSON.stringify(d.tasks);await u.click('action','task-template',d.tasks[0].id);assert.equal(JSON.stringify(d.tasks),before);assert.doesNotMatch(u.elements.get('#app').innerHTML,/data-action="task-template"/);
+ assert.equal(e.regulationReview?.conversation,undefined);assert.equal(e.regulationReviewKey,undefined);const before=JSON.stringify(d.tasks);await u.click('action','task-template',d.tasks[0].id);assert.equal(JSON.stringify(d.tasks),before);assert.doesNotMatch(u.elements.get('#app').innerHTML,/data-action="task-template"/);
 });
 
 test('new manual AP task exposes legal assignment and structured drafting hints near the start',async()=>{
@@ -557,4 +559,80 @@ test('used exams expose a read-only time overview and cannot apply or directly e
 test('missing points have an explicit proposal control and never automatically approve a solution',async()=>{
  const u=await ui('admin'),{e}=await requiredFieldsDraft(u),item=e.items[0];await u.click('action','required-field',JSON.stringify([item.id,'points']));assert.match(u.elements.get('#dialog').innerHTML,/Punkte automatisch vorschlagen/);
  taskFormValues(u,item.task);await u.click('action','task-propose-points');assert.match(u.elements.get('#dialog').innerHTML,/value="100"/);assert.match(u.elements.get('#dialog').innerHTML,/Aus einem Punktevorschlag/);assert.equal(item.task.points,null);assert.equal(item.task.solution,'');assert.equal(item.task.reviewStatus,'review');
+});
+
+test('compact editor keeps required values discoverable without opening every control by default',async()=>{
+ const u=await ui();await createDraft(u,'AP');let html=u.elements.get('#app').innerHTML;
+ assert.match(html,/<details class="editor-checks" data-paper-panel="checks"\s*>/);
+ assert.match(html,/Pflichtangaben/);assert.match(html,/data-action="timing-plan"/);
+ assert.match(html,/<details class="editor-oral" data-paper-panel="oral"\s*>/);
+ assert.match(html,/Mündliche Aufgabe.*noch offen/);
+ assert.doesNotMatch(html,/data-action="export-exam"|data-route="archive"|data-route="catalog"/);
+ u.dispatch('toggle',{target:{dataset:{paperPanel:'checks'},open:true,isConnected:true}});
+ await u.click('action','paper-pane','preview');html=u.elements.get('#app').innerHTML;
+ assert.match(html,/<details class="editor-checks" data-paper-panel="checks" open>/);
+ assert.match(html,/data-mobile-pane="preview"/);
+});
+
+test('collection subviews preserve the selected task filters while browsing old exams',async()=>{
+ const u=await ui('admin');await u.click('route','catalog');
+ u.sandbox.testUI.setBankFilters({kind:'practical',specialty:'Baumschule',examType:'ZP',query:'Testfilter'});
+ await u.click('route','archive');assert.match(u.elements.get('#app').innerHTML,/Aufgaben & Archiv/);
+ await u.click('route','catalog');const html=u.elements.get('#app').innerHTML;
+ assert.match(html,/value="Testfilter"/);assert.match(html,/value="Baumschule" selected/);
+});
+
+test('messages use the browser top layer while an editor dialog is open',async()=>{
+ const u=await ui('admin');let raised=0,hidden=0;const toast=u.elements.get('#toast');toast.showPopover=()=>raised++;toast.hidePopover=()=>hidden++;
+ await u.click('action','new-workshop');assert.equal(u.elements.get('#dialog').open,true);
+ await u.click('action','track-new','ZP');
+ assert.match(toast.textContent,/Arbeitsgruppe/);assert.equal(raised,1);assert.equal(hidden,1);assert.equal(u.elements.get('#dialog').open,true);
+});
+
+test('floating help fits the viewport and leaves the top layer when closed',async()=>{
+ const u=await ui('admin');u.sandbox.innerWidth=375;u.sandbox.innerHeight=600;let raised=0,hidden=0;
+ const panel={style:{},setAttribute(){},classList:{add(){}},showPopover(){raised++;},hidePopover(){hidden++;},getBoundingClientRect:()=>({width:280,height:200})};
+ const menu={open:true,isConnected:true,dataset:{},matches:()=>true,querySelector:s=>s==='summary'?{getBoundingClientRect:()=>({right:370,top:550,bottom:590})}:panel};
+ u.dispatch('toggle',{target:menu});assert.equal(raised,1);assert.equal(panel.style.left,'83px');assert.equal(panel.style.top,'342px');
+ menu.open=false;u.dispatch('toggle',{target:menu});assert.equal(hidden,1);
+});
+
+test('point plan is optional and applies missing partial scores without approving task content',async()=>{
+ const u=await ui('admin');await u.click('action','open-group','Baumschule');await createDraft(u,'ZP');const d=u.sandbox.testUI.getDb(),e=d.exams.at(-1),t=d.tasks.find(t=>t.examType==='ZP'&&t.specialty==='Baumschule');await u.click('action','add',t.id);
+ const saved=e.items[0].task;saved.points=60;saved.criteria=[{id:'known',text:'Vorbereitung',answer:'',points:20},{id:'missing',text:'Durchführung',answer:'',points:null}];const original=JSON.stringify(t);
+ await u.click('action','points-plan');assert.match(u.elements.get('#dialog').innerHTML,/Punktverteilung/);assert.match(u.elements.get('#dialog').innerHTML,/40/);assert.equal(saved.criteria[1].points,null);
+ await u.click('action','points-apply');assert.equal(e.items[0].task.points,60);assert.equal(e.items[0].task.criteria[1].points,40);assert.equal(e.items[0].task.reviewStatus,'review');assert.equal(JSON.stringify(t),original);
+ assert.match(u.elements.get('#dialog').innerHTML,/Punktverteilung freigeben/);
+});
+
+test('group has proposals and optional solutions but no coordinator release actions',async()=>{
+ const u=await ui();await createDraft(u,'ZP');const d=u.sandbox.testUI.getDb(),e=d.exams.at(-1),t=d.tasks.find(t=>t.examType==='ZP'&&t.specialty==='Baumschule');await u.click('action','add',t.id);e.items[0].task.solution='';e.items[0].task.solutionStatus='missing';
+ await u.click('action','workflow-step','3');const html=u.elements.get('#app').innerHTML;assert.match(html,/Lösung: optional/);assert.doesNotMatch(html,/data-action="release-exam"|data-action="points-approve"/);
+ const before=JSON.stringify(e);await u.click('action','release-exam');assert.equal(JSON.stringify(e),before);
+ await u.click('action','points-plan');assert.doesNotMatch(u.elements.get('#dialog').innerHTML,/data-action="points-approve"/);
+});
+
+test('coordinator release saves a complete exam with optional empty solutions and reopens after edits',async()=>{
+ const u=await ui('admin');await u.click('action','open-group','Baumschule');await createDraft(u,'ZP');const d=u.sandbox.testUI.getDb(),e=d.exams.at(-1);
+ e.items=e.pattern.slots.filter(s=>s.count>0).map(s=>s.categoryId).map((category,n)=>{const task={...structuredClone(d.tasks[0]),id:'release-task-'+n,familyId:'release-family-'+n,examType:'ZP',specialty:'Baumschule',kind:'practical',text:'Führen Sie die beschriebenen Arbeiten aus.',planningCategoryCatalog:'zp-general-2026',planningCategories:[category],planningCategoryEvidence:'Geprüfter Aufgabenkopf',category:'',tags:[],sourceIds:[],assetLinks:[],criteria:[{id:'c',text:'Fachgerechte Arbeit',answer:'',points:20}],flags:['Aufteilung und Layout am Original prüfen.'],points:20,minutes:60,solution:'',solutionStatus:'missing',reviewStatus:'review',materials:{text:'Werkzeuge laut Auftrag',status:'proposal',method:'manual',evidence:[]}};d.families.push({id:task.familyId,title:task.title});d.tasks.push(structuredClone(task));return {id:'release-item-'+n,originTaskId:task.id,task};});
+ let saves=0;u.online.save=async()=>saves++;await u.click('action','workflow-step','3');assert.match(u.elements.get('#app').innerHTML,/Prüfung mit einem Klick freigeben/);assert.equal(R.inspect(e).ready,true,JSON.stringify(R.inspect(e)));
+ await u.click('action','release-exam');assert.equal(C.readiness(e).ready,true,u.elements.get('#toast').textContent);assert.ok(saves>0);assert.ok(e.releaseReview);assert.equal(e.items[0].task.solution,'');assert.equal(e.items[0].task.flags.length,1);assert.equal(C.openTaskFlags(e.items[0].task).length,0);
+ e.items[0].task.text+=' Geänderter Arbeitsauftrag.';await u.click('action','workflow-step','3');assert.equal(C.readiness(e).ready,false);assert.match(u.elements.get('#app').innerHTML,/Übernahme prüfen/);
+});
+
+test('group regulation confirmations remain read-only and cannot dirty the exam',async()=>{
+ const u=await ui();await createDraft(u,'AP');const e=u.sandbox.testUI.getDb().exams.at(-1),before=JSON.stringify(e);await u.click('action','paper-check');assert.match(u.elements.get('#dialog').innerHTML,/data-action="regulation-review"[^>]*disabled/);
+ await u.click('action','regulation-review',L.regulationChecklist(e)[0].id);assert.equal(JSON.stringify(e),before);
+});
+
+test('an existing message is raised again when another native dialog opens',async()=>{
+ const u=await ui('admin');let raised=0;const toast=u.elements.get('#toast');toast.showPopover=()=>raised++;toast.hidePopover=()=>{};
+ await u.click('action','track-new','ZP');assert.equal(raised,1);await u.click('action','new-workshop');assert.equal(raised,2);
+ u.dispatch('toggle',{target:{tagName:'DIALOG',open:true}});assert.equal(raised,3);
+});
+
+test('explicit coordinator task reapproval updates an existing content fingerprint',async()=>{
+ const u=await ui('admin');await u.click('action','open-group','Baumschule');await createDraft(u,'ZP');const d=u.sandbox.testUI.getDb(),e=d.exams.at(-1),base=d.tasks.find(t=>t.examType==='ZP'&&t.specialty==='Baumschule');await u.click('action','add',base.id);const item=e.items[0];item.task.reviewStatus='approved';item.task.reviewKey=C.taskReviewKey(item.task);const oldKey=item.task.reviewKey;
+ const reviewField={value:'approved',handlers:{},addEventListener(name,fn){this.handlers[name]=fn;}};u.elements.set('#task-review',reviewField);await u.click('action','item-edit',item.id);const confirmReview=reviewField.handlers.change;taskFormValues(u,item.task);u.elements.get('#task-text').value+=' Neuer Auftrag.';u.elements.get('#task-review').value='approved';u.elements.get('#task-reviewer').value='Testprüfung';confirmReview();await u.click('action','save-task');
+ const saved=d.exams.find(x=>x.id===e.id).items[0].task;assert.equal(C.taskReviewCurrent(saved),true,u.elements.get('#toast').textContent);assert.notEqual(saved.reviewKey,oldKey);assert.match(saved.text,/Neuer Auftrag/);
 });

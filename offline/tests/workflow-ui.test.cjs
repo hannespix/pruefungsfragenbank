@@ -5,9 +5,9 @@ async function ui(prepare=()=>{}){
  data.workshops=[{id:'meeting',title:'Testtermin',examYear:2027,meetingDate:'',specialties:['Baumschule']}];
  prepare(data);
  const elements=new Map(),listeners={},menus=[];
- for(const id of ['#app','#toast','#dialog','#project-input','#docx-input','#asset-input','#ready-download'])elements.set(id,{innerHTML:'',textContent:'',showModal(){this.open=true;},close(){this.open=false;},addEventListener(){},classList:{add(){},remove(){}}});
+ for(const id of ['#app','#toast','#dialog','#project-input','#docx-input','#asset-input','#ready-download'])elements.set(id,{innerHTML:'',textContent:'',showModal(){this.open=true;},close(){this.open=false;},addEventListener(){},classList:{values:new Set(),add(...xs){xs.forEach(x=>this.values.add(x));},remove(...xs){xs.forEach(x=>this.values.delete(x));},contains(x){return this.values.has(x);}}});
  elements.set('#seed',{textContent:JSON.stringify(data)});elements.set('meta[name=hortiexam-storage]',{content:'memory'});
- const sandbox={HortiOrganization:require('../src/organization.js'),HortiTimingPlan:require('../src/timing-plan.js'),HortiMaterials:require('../src/materials.js'),HortiArchive:require('../src/archive.js'),HortiDocx:require('../src/docx.js'),JSZip:require('../vendor/jszip.min.js'),Blob,URL:{createObjectURL:b=>{download=b;return 'blob:test';},revokeObjectURL(){}},HortiSourceLayout:require('../src/source-layout.js'),HortiIcons:require('../src/icons.js'),HortiCatalog:require('../src/catalog.js'),HortiHelp:require('../src/help.js'),HortiPaper:require('../src/paper.js'),HortiPlanning:require('../src/planning.js'),HortiCore:require('../src/core.js'),HortiPrint:require('../src/print.js'),console,setTimeout,clearTimeout,
+ const sandbox={HortiPointsPlan:require('../src/points-plan.js'),HortiRelease:require('../src/release.js'),HortiOrganization:require('../src/organization.js'),HortiTimingPlan:require('../src/timing-plan.js'),HortiMaterials:require('../src/materials.js'),HortiArchive:require('../src/archive.js'),HortiDocx:require('../src/docx.js'),JSZip:require('../vendor/jszip.min.js'),Blob,URL:{createObjectURL:b=>{download=b;return 'blob:test';},revokeObjectURL(){}},HortiSourceLayout:require('../src/source-layout.js'),HortiIcons:require('../src/icons.js'),HortiCatalog:require('../src/catalog.js'),HortiHelp:require('../src/help.js'),HortiPaper:require('../src/paper.js'),HortiPlanning:require('../src/planning.js'),HortiCore:require('../src/core.js'),HortiPrint:require('../src/print.js'),console,setTimeout,clearTimeout,
  window:{addEventListener(){}},document:{querySelector:q=>elements.get(q)||null,querySelectorAll:selector=>selector.includes("[open]")?menus.filter(m=>m.open):[],addEventListener:(name,fn)=>listeners[name]=fn}};
  await vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/app.js'),'utf8'),sandbox);
  return {html:()=>elements.get('#app').innerHTML,dialog:()=>elements.get('#dialog'),data,menus,dispatchClick:ev=>listeners.click(ev),keydown:ev=>listeners.keydown(ev),outside:()=>listeners.click({target:{closest:()=>null}}),download:()=>download,click:async(kind,value,id)=>listeners.click({target:{closest:selector=>selector===`[data-${kind}]`?{dataset:{[kind]:value,id}}:null}})};
@@ -34,3 +34,14 @@ test('archive shortcut keeps selected year boundaries visible even without a sou
 test('floating menus close on outside click and Escape restores focus',async()=>{const app=await ui();let focused=false;const menu={open:true,dataset:{},querySelector:()=>({focus(){focused=true;}})};app.menus.push(menu);await app.outside();assert.equal(menu.open,false);menu.open=true;app.keydown({key:'Escape'});assert.equal(menu.open,false);assert.equal(focused,true);});
 
 test('interacting with one floating menu closes the other and keeps the current menu usable',async()=>{const app=await ui(),first={open:true,dataset:{paperPanel:'options'}},second={open:true,dataset:{}};app.menus.push(first,second);await app.dispatchClick({target:{closest:selector=>selector.startsWith('.editor-account-menu')?second:null}});assert.equal(first.open,false);assert.equal(second.open,true);});
+
+test('compact navigation groups historical examinations and tasks under one destination',async()=>{
+ const app=await ui();let html=app.html();
+ const primary=html.match(/<div class="nav-primary">([\s\S]*?)<\/div>/)?.[1];
+ assert.ok(primary,'primary navigation exists');
+ assert.deepEqual([...primary.matchAll(/data-route="([^"]+)"/g)].map(m=>m[1]),['dashboard','results','catalog']);
+ assert.match(html,/<details class="nav-more" data-ui-panel="administration"\s*>/);
+ await app.click('route','catalog');html=app.html();assert.match(html,/<h1>Aufgaben & Archiv<\/h1>/);assert.match(html,/aria-label="Bestand durchsuchen"/);assert.match(html,/data-route="archive"/);
+ await app.click('route','archive');html=app.html();assert.match(html,/<h1>Aufgaben & Archiv<\/h1>/);assert.match(html,/archive-from/);assert.match(html,/class="collection-tab active"[^>]*data-route="archive"/);
+ await app.click('route','settings');assert.match(app.html(),/<details class="nav-more" data-ui-panel="administration" open>/);
+});

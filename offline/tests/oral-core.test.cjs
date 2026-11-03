@@ -9,7 +9,7 @@ test('oral references validate, general traversal includes oral, and practical t
 test('oral review issues participate in readiness; recording requires selection and records both components',()=>{
  const t=task(),practical=['propagation','plantwork','nutrition','advice','propagation'].map((categoryId,n)=>{const pr=task('pr-'+n,'practical');P.assignCategories(pr,[categoryId],'Synthetisch bestätigte komplexe Aufgabe');return pr;}),d=db([t,...practical]),e=exam();
  e.pattern=P.pattern(d,e.examType,e.specialty);for(const pr of practical)C.addItem(e,pr);d.exams.push(e);assert.equal(P.structureCoverage(e).complete,true);
- assert.throws(()=>C.recordUse(d,e.id,'2026-01-01'),/Mündliche/);C.setOralItem(e,t);e.oralItem.task.solutionStatus='missing';assert.ok(C.readiness(e).issues.some(x=>/Mündliche.*Lösung/.test(x)));C.recordUse(d,e.id,'2026-01-01');
+ assert.throws(()=>C.recordUse(d,e.id,'2026-01-01'),/Mündliche/);C.setOralItem(e,t);e.oralItem.task.solution='';e.oralItem.task.solutionStatus='missing';assert.ok(!C.readiness(e).issues.some(x=>/Mündliche.*Lösung/.test(x)));C.recordUse(d,e.id,'2026-01-01');
  assert.deepEqual(d.uses[0].taskIds,[...practical.map(t=>t.id),'oral']);assert.deepEqual(d.uses[0].familyIds,[...practical.map(t=>t.familyId),'f-oral']);
 });
 test('oral reportbook cleanup is confined to new snapshots and policy scans the oral component',()=>{const t=task();t.text+=' Das Berichtsheft ist zulässig.';const e=exam();C.setOralItem(e,t);assert.doesNotMatch(e.oralItem.task.text,/Berichtsheft/);assert.match(t.text,/Berichtsheft/);e.oralItem.task.text+=' Das Berichtsheft ist zulässig.';assert.ok(C.reportbookIssues(e).some(x=>/Mündliche/.test(x)));C.cleanReportbook(e);assert.equal(C.reportbookIssues(e).length,0);});
