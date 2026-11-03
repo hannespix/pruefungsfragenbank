@@ -44,7 +44,7 @@ test('prohibitions and unrelated reportbook references remain unchanged',()=>{
  }
 });
 test('adding tasks sanitizes current snapshots but retains pre-2026 exam copies and the bank task',()=>{
- const t=sourceTask(),before=C.clone(t),current=C.newExam({examType:t.examType,specialty:t.specialty,examYear:2026}),old=C.newExam({examType:t.examType,specialty:t.specialty,examYear:2025});
+ const t=sourceTask();Object.assign(t,{planningCategories:['plantwork'],planningCategoryCatalog:'zp-general-2026',planningCategoryEvidence:'Geprüfte synthetische Einzelaufgabe'});const before=C.clone(t),current=C.newExam({examType:t.examType,specialty:t.specialty,examYear:2026,pattern:require('../src/planning.js').pattern({...C.empty(),tasks:[t]},t.examType,t.specialty)}),old=C.newExam({examType:t.examType,specialty:t.specialty,examYear:2025});
  C.addItem(current,t);C.addItem(old,t);assert.equal(current.items[0].task.sourceLayout.pages[0].blocks[1].text,'');assert.deepEqual(old.items[0].task,t);assert.deepEqual(t,before);
 });
 test('policy issues cover every rendered statement field and readiness exposes the policy issue',()=>{

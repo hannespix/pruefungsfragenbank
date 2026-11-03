@@ -598,7 +598,7 @@ function regulationCoverage(e){
   if(t.kind!=='practical'){issues.push(prefix+'ist keine praktische Prüfungsaufgabe.');continue;}
   if(t.familyId&&families.has(t.familyId))issues.push(prefix+'Aufgabenfamilie mehrfach ausgewählt.');if(t.familyId)families.add(t.familyId);
   const result=regulationTask(t,examContext(e));units.push(...result.units.map(u=>({...u,itemId:item.id,taskId:t.id})));issues.push(...result.issues.map(s=>prefix+s));
-  if(!Number.isFinite(t.minutes)||t.minutes<0||t.timing?.method==='conflict'&&!(Number.isFinite(t.timing.manualTotalMinutes)&&t.timing.manualTotalMinutes===t.minutes))unknownMinutes++;else minutes+=t.minutes;
+  if(!Number.isFinite(t.minutes)||t.minutes<=0||t.timing?.method==='conflict'&&!(Number.isFinite(t.timing.manualTotalMinutes)&&t.timing.manualTotalMinutes===t.minutes))unknownMinutes++;else minutes+=t.minutes;
  }
  const total=units.length,areas=profile.areas.map(a=>({...a,actual:units.filter(u=>u.areaId===a.id).length,missing:Math.max(0,a.min-units.filter(u=>u.areaId===a.id).length)}));
  if(total!==profile.totalTasks)issues.push(`${total} von ${profile.totalTasks} komplexen Prüfungsaufgaben; genau fünf sind erforderlich.`);
@@ -630,23 +630,75 @@ function checkRegulationReview(e){
  if(e.regulationReviewKey!==undefined&&(typeof e.regulationReviewKey!=='string'||!/^[0-9a-f]{16}$/.test(e.regulationReviewKey)))throw Error('Ungültiger Stand der Bestätigung zur Prüfungsverordnung.');
 }
 function regulationPattern(type,specialty){const profile=regulationProfile({examType:type,specialty});return profile?{id:`pattern:${type}:${specialty}`,examType:type,specialty,status:'confirmed',version:1,categoryCatalog:'excel-ap-2026',ruleSet:regulationRuleSet,slots:[],note:`${profile.section} Abs. 2: fünf komplexe Aufgaben, Bereichsmindestzahlen und höchstens 300 Minuten einschließlich Prüfungsgespräch. Kategorien sind Beispiele; die fünfte Aufgabe ist flexibel.`}:null;}
+// Fixed examination requirements are independent of editable category labels,
+// source-file counts, saved selection filters and the number of printed pages.
+function examRequirements(context){
+ const ap=regulationProfile(context);if(ap)return {...ap,examType:'AP',themeCount:null,exactMinutes:null,sourceLabel:'GärtnAusbV',quote:ap.quotes.count,themeExplanation:'Zwei Prüfungsbereiche mit Mindestzahlen; keine Pflicht zu fünf verschiedenen Kategorien.'};
+ if(zwischenpruefungScope(context))return {id:'gaertner-zp-1996-v1',examType:'ZP',totalTasks:3,themeCount:3,maxMinutes:180,exactMinutes:null,areas:[],section:'§ 8 Abs. 4',url:'https://www.gesetze-im-internet.de/g_rtnausbv/__8.html',sourceLabel:'GärtnAusbV',quote:'Der Prüfling soll in der praktischen Prüfung in insgesamt höchstens drei Stunden drei Aufgaben durchführen und jeweils in einem Prüfungsgespräch erläutern.',themeExplanation:'Drei Aufgaben sind vorgeschrieben. Drei verschiedene Generalthemen und der Ausschluss von Kombinationsaufgaben sind zusätzlich die festgelegte Planungsregel dieser Anwendung.'};
+ if(fachwerkerScope(context))return {id:'fachwerker-ap-bw-2022-v1',examType:'FW_AP',totalTasks:4,themeCount:null,maxMinutes:180,exactMinutes:180,areas:[],section:'§ 11',url:'https://www.landesrecht-bw.de/bsbw/?query=DOKNR%3Ajlr-NNLBW00007D10&source=PermaLink',sourceLabel:'GBFWVO Baden-Württemberg',quote:'Die praktische Abschlussprüfung dauert 180 Minuten. Es sind vier Aufgaben zu bearbeiten.',themeExplanation:'Vier praktische Aufgaben. Mehrere Aufgaben dürfen aus demselben Generalthema stammen; eine Pflicht zu vier verschiedenen Generalthemen besteht nicht.'};
+ return null;
+}
+function themeSelectionIssue(e){const p=examRequirements(e);if(!p?.themeCount)return null;const slots=e.pattern?.slots||[];return slots.length!==p.themeCount||new Set(slots.map(s=>s.categoryId)).size!==p.themeCount||slots.some(s=>s.count!==1)?'Zwischenprüfung: genau drei verschiedene Generalthemen mit jeweils einer Aufgabe auswählen.':null;}
+function structureCoverage(e){
+ const profile=examRequirements(e);if(!profile)return null;
+ const ap=regulationCoverage(e),items=e.items||[],issues=ap?[...ap.issues]:[],units=ap?.units||items.filter(i=>i.task?.kind==='practical').map(i=>({itemId:i.id,taskId:i.task.id}));
+ const total=units.length,areas=ap?.areas||[];let minutes=ap?.minutes||0,unknownMinutes=ap?.unknownMinutes||0;
+ const families=new Set(),themes=new Set();
+ if(ap)for(const [n,item] of items.entries())if(item.task&&!activeTask(item.task,examContext(e)))issues.push(`Aufgabe ${n+1}: Thema ist für diese Prüfung nicht freigegeben.`);
+ if(!ap)for(const [n,item] of items.entries()){
+  const t=item.task;if(!t||t.kind!=='practical'||t.examType!==e.examType||t.specialty!==e.specialty){issues.push(`Aufgabe ${n+1}: gehört nicht zum praktischen Prüfungsbereich.`);continue;}
+  if(families.has(t.familyId))issues.push('Eine Aufgabenfamilie ist mehrfach ausgewählt.');families.add(t.familyId);
+  if(!activeTask(t,examContext(e)))issues.push(`Aufgabe ${n+1}: Thema ist für diese Prüfung nicht ausgewählt oder nicht freigegeben.`);
+  if(profile.themeCount){const ids=classifyZwischenpruefung(t,examContext(e)).ids;if(!eligibleZwischenpruefungTask(t,examContext(e)))issues.push('Zwischenprüfung: nur Einzelaufgaben mit genau einem Generalthema; keine Kombinationsaufgaben.');for(const id of ids){if(themes.has(id))issues.push('Zwischenprüfung: jede Aufgabe muss aus einem anderen Generalthema stammen.');themes.add(id);if(!e.pattern?.slots?.some(s=>s.categoryId===id))issues.push('Aufgabe liegt außerhalb der gewählten Generalthemen.');}}
+  if(!Number.isFinite(t.minutes)||t.minutes<=0||t.timing?.method==='conflict'&&t.timing.manualTotalMinutes!==t.minutes)unknownMinutes++;else minutes+=t.minutes;
+ }
+ if(!ap&&total!==profile.totalTasks)issues.push(`${total} von ${profile.totalTasks} praktischen Prüfungsaufgaben; genau ${profile.totalTasks} sind erforderlich.`);
+ const selection=themeSelectionIssue(e);if(selection)issues.push(selection);
+ if(profile.themeCount&&(e.pattern?.slots||[]).some(s=>!categories(null,e.examType,e.specialty,examContext(e)).some(c=>c.id===s.categoryId)))issues.push('Für diese Fachrichtung ausgeblendete Generalthemen sind noch ausgewählt. Aktuelle Vorgaben übernehmen.');
+ if(!ap&&unknownMinutes)issues.push(`${unknownMinutes} Zeitangabe(n) offen oder widersprüchlich; die Gesamtzeit muss vor Abschluss feststehen.`);
+ if(!ap&&minutes>profile.maxMinutes)issues.push(`${minutes} Minuten überschreiten die ${profile.maxMinutes} Minuten für die praktische Prüfung.`);
+ if(profile.exactMinutes&&!unknownMinutes&&minutes!==profile.exactMinutes)issues.push(`${minutes} von ${profile.exactMinutes} Minuten eingeplant; die Fachwerker-Praxis dauert 180 Minuten. Zeiten ausdrücklich prüfen und ergänzen, Originalwerte bleiben erhalten.`);
+ return {profile,total,areas,minutes,unknownMinutes,units,themeCount:themes.size,issues:[...new Set(issues)],complete:issues.length===0};
+}
+function structureViolations(e){
+ const c=structureCoverage(e);if(!c)return [];
+ const p=c.profile,items=e.items||[],themes=[],families=[],context=examContext(e);let invalid=0;
+ for(const i of items){const t=i.task;if(!t||t.kind!=='practical'||t.examType!==e.examType||t.specialty!==e.specialty){invalid++;continue;}families.push(t.familyId);if(!activeTask(t,context))invalid++;if(p.themeCount){const ids=classifyZwischenpruefung(t,context).ids;themes.push(...ids);if(!eligibleZwischenpruefungTask(t,context)||ids.some(id=>!e.pattern?.slots?.some(s=>s.categoryId===id)))invalid++;}}
+ const unknownAreas=c.units.filter(u=>!u.areaId).length,missing=c.areas.reduce((n,a)=>n+a.missing,0);
+ return [
+  [Math.max(0,c.total-p.totalTasks),`Höchstens ${p.totalTasks} praktische Prüfungsaufgaben. Bitte eine vorhandene Aufgabe entfernen oder ersetzen.`],
+  [p.themeCount?Math.max(0,(e.pattern?.slots?.length||0)-p.themeCount):0,'Zwischenprüfung: höchstens drei Generalthemen auswählen.'],
+  [Math.max(0,c.minutes-p.maxMinutes),`Die praktische Gesamtzeit darf ${p.maxMinutes} Minuten nicht überschreiten.`],
+  [p.examType==='AP'?Math.max(0,missing-unknownAreas-Math.max(0,p.totalTasks-c.total)):0,'Die Mindestanzahl in den Prüfungsbereichen wäre mit fünf Aufgaben nicht mehr erreichbar. Bitte eine Aufgabe aus dem noch fehlenden Bereich wählen.'],
+  [invalid,'Aufgabe ist für die Prüfungsart, Fachrichtung oder Themenauswahl nicht zulässig. Zwischenprüfungen enthalten nur Einzelaufgaben.'],
+  [families.length-new Set(families).size,'Eine Aufgabenfamilie darf nicht mehrfach in derselben Prüfung vorkommen.'],
+  [p.themeCount?themes.length-new Set(themes).size:0,'Zwischenprüfung: höchstens eine Aufgabe je Generalthema.']
+ ];
+}
+function structureTransitionIssue(value,old){const next=structureViolations(value),before=old&&old.examType===value.examType&&old.specialty===value.specialty?structureViolations(old):[];return next.find(([n],i)=>n>(before[i]?.[0]||0)+1e-8)?.[1]||null;}
+function structureSelectionIssue(e,t,replacingItemId){const items=(e.items||[]).filter(i=>i.id!==replacingItemId);return structureTransitionIssue({...e,items:[...items,{id:replacingItemId||'pending',task:t}]},e);}
+function fixedFachwerkerPattern(specialty){return {id:`pattern:FW_AP:${specialty}`,examType:'FW_AP',specialty,status:'confirmed',version:1,categoryCatalog:'fw-sources-2026',ruleSet:'fachwerker-ap-bw-2022-v1',slots:[],note:'§ 11 GBFWVO: vier praktische Aufgaben, 180 Minuten. Themen sind Auswahlmöglichkeiten; mehrere Aufgaben dürfen aus demselben Generalthema stammen.'};}
+const otherProposalHistory=new WeakMap();
+function proposalMemory(d,e){let all=otherProposalHistory.get(d);if(!all){all=new Map();otherProposalHistory.set(d,all);}const key=e.examType+':'+e.specialty;let m=all.get(key);if(!m){m={sequence:0,used:new Map()};all.set(key,m);}return m;}
+function rememberProposal(m,tasks){if(tasks.length){m.sequence++;for(const t of tasks)m.used.set(t.id,m.sequence);}}
 function proposeRegulation(d,e){
+ const memory=proposalMemory(d,e);
  const current=regulationCoverage(e),used=new Set(e.items.map(i=>i.task.familyId)),counts=current.areas.map(a=>a.actual),initialTotal=current.total;
  if(initialTotal>=current.profile.totalTasks)return [];
- const candidates=scoped(d,e.examType,e.specialty).filter(task=>selectedTask(task,e)).map(task=>({task,result:regulationTask(task,examContext(e)),h:history(d,task)})).filter(c=>c.result.units.length&&!c.result.issues.length&&c.result.units.every(u=>u.areaId)&&!used.has(c.task.familyId)).map(c=>({...c,size:c.result.units.length,counts:current.areas.map(a=>c.result.units.filter(u=>u.areaId===a.id).length)})).sort((a,b)=>(a.h.sortDate||'9999').localeCompare(b.h.sortDate||'9999')||a.task.familyId.localeCompare(b.task.familyId)||a.task.id.localeCompare(b.task.id));
+ const candidates=scoped(d,e.examType,e.specialty).filter(task=>selectedTask(task,e)).map(task=>({task,result:regulationTask(task,examContext(e)),h:history(d,task)})).filter(c=>c.result.units.length&&!c.result.issues.length&&c.result.units.every(u=>u.areaId)&&!used.has(c.task.familyId)).map(c=>({...c,size:c.result.units.length,counts:current.areas.map(a=>c.result.units.filter(u=>u.areaId===a.id).length)})).sort((a,b)=>(memory.used.get(a.task.id)||0)-(memory.used.get(b.task.id)||0)||(a.h.sortDate||'9999').localeCompare(b.h.sortDate||'9999')||a.task.familyId.localeCompare(b.task.familyId)||a.task.id.localeCompare(b.task.id));
  let best=[],bestScore=-1,visits=0;
- function search(chosen,total){
+ function search(chosen,total,minutes){
   if(++visits>5000)return false;
   const score=counts.reduce((sum,n,i)=>sum+Math.min(n,current.areas[i].min)*100,0)+total;
   if(score>bestScore){bestScore=score;best=chosen.slice();}
   if(total===5&&counts.every((n,i)=>n>=current.areas[i].min))return true;
   const missing=counts.map((n,i)=>Math.max(0,current.areas[i].min-n));
-  const fits=c=>!used.has(c.task.familyId)&&total+c.size<=5;
+  const fits=c=>!used.has(c.task.familyId)&&total+c.size<=5&&minutes+(Number.isFinite(c.task.minutes)?Math.max(0,c.task.minutes):0)<=300&&current.areas.reduce((sum,a,i)=>sum+Math.max(0,a.min-counts[i]-c.counts[i]),0)<=5-total-c.size+current.units.filter(u=>!u.areaId).length;
   const options=missing.map((n,i)=>({n,i,list:candidates.filter(c=>fits(c)&&c.counts[i]>0)})).filter(x=>x.n>0).sort((a,b)=>a.list.length-b.list.length);
   const next=options.find(x=>x.list.length);const choices=next?next.list:options.length?[]:candidates.filter(fits);
-  for(const c of choices){used.add(c.task.familyId);c.counts.forEach((n,i)=>counts[i]+=n);chosen.push(c.task);if(search(chosen,total+c.size))return true;chosen.pop();c.counts.forEach((n,i)=>counts[i]-=n);used.delete(c.task.familyId);if(visits>5000)break;}return false;
+  for(const c of choices){used.add(c.task.familyId);c.counts.forEach((n,i)=>counts[i]+=n);chosen.push(c.task);if(search(chosen,total+c.size,minutes+(Number.isFinite(c.task.minutes)?Math.max(0,c.task.minutes):0)))return true;chosen.pop();c.counts.forEach((n,i)=>counts[i]-=n);used.delete(c.task.familyId);if(visits>5000)break;}return false;
  }
- search([],initialTotal);return best;
+ search([],initialTotal,current.minutes);rememberProposal(memory,best);return best;
 }
 
 const workbookSource={sheet:'Aufgaben',version:'03.02.2020',workbook:'Notenberechnung Gärtner AP S 2026'};
@@ -818,6 +870,7 @@ function categories(d,type,specialty,context={}){const scope={examType:type,spec
 function scoped(d,type,specialty,all=false){return d.tasks.filter(t=>t.examType===type&&t.specialty===specialty&&t.kind==='practical'&&(all||!t.supersededBy));}
 function inferPattern(d,type,specialty){const context=projectContext(d,{examType:type,specialty}),zp=zwischenpruefungScope({examType:type,specialty}),tasks=scoped(d,type,specialty).filter(t=>(!zp||eligibleZwischenpruefungTask(t,context))&&activeTask(t,context)),ids=new Set(tasks.flatMap(t=>classify(t,{context}).ids));return {id:`pattern:${type}:${specialty}`,examType:type,specialty,status:'proposed',version:1,...(zp?{categoryCatalog:zwischenpruefungCatalog}:['AP','ZP'].includes(type)?{categoryCatalog:'excel-ap-2026'}:type==='FW_AP'?{categoryCatalog:'fw-sources-2026'}:{}),slots:(settingsFor(d,context)?context.categoryDefinitions:zp||(type==='FW_AP'?fachwerkerScope({examType:type,specialty})||[]:catalog)).filter(c=>!c.hidden&&ids.has(c.id)).map(c=>({categoryId:c.id,count:1})),note:zp?'Aus vorhandenen Einzelaufgaben abgeleitet. Generalthemen auswählen und bestätigen; höchstens eine Aufgabe je Generalthema, keine Kombinationsaufgaben. Angeboten werden die für diese Fachrichtung hinterlegten Generalthemen.':'Aus vorhandenen Aufgabenköpfen abgeleitet. Anzahl und Pflichtkategorien fachlich bestätigen; kein Nachweis eines vollständigen Prüfungsjahres.'};}
 function checkPattern(p){if(p?.specialtyThemesVersion!==undefined&&(p.specialtyThemesVersion!==1||!zwischenpruefungScope(p)||!p.categoryDefinitions))throw Error('Ungültiger Kategorienstand für die Fachrichtung.');if(p?.categoryDefinitions!==undefined){if(p.categoryDefinitionsVersion!==1||!Number.isInteger(p.settingsRevision)||p.settingsRevision<0)throw Error('Ungültiger Kategorienstand.');checkDefinitions(p.categoryDefinitions,p);}
+ if(p?.ruleSet==='fachwerker-ap-bw-2022-v1'){if(!fachwerkerScope(p)||p.categoryCatalog!=='fw-sources-2026'||!Number.isInteger(p.version)||p.version<1||!['proposed','confirmed'].includes(p.status)||!Array.isArray(p.slots)||p.slots.length)throw Error('Ungültige feste Fachwerker-Prüfungsvorgaben.');return p;}
  if(p?.ruleSet!==undefined){if(p.ruleSet!==regulationRuleSet||!regulationProfile(p)||p.categoryCatalog!=='excel-ap-2026'||!Number.isInteger(p.version)||p.version<1||!['proposed','confirmed'].includes(p.status)||!Array.isArray(p.slots)||p.slots.length)throw Error('Ungültiges Prüfungsmuster zur Gärtner-Prüfungsverordnung.');return p;}
  const zp=p?.categoryCatalog===zwischenpruefungCatalog;
  if(p?.categoryCatalog!==undefined&&(zp?!zwischenpruefungScope(p):p.categoryCatalog!==(p.examType==='FW_AP'?'fw-sources-2026':'excel-ap-2026')))throw Error('Unbekannter oder nicht zum Prüfungsbereich passender Kategorienstand.');
@@ -835,12 +888,31 @@ function basePattern(d,type,specialty){
  const slots=(stored.slots||[]).filter(s=>s.categoryId!=='harvest'&&zp.some(c=>c.id===s.categoryId)).map(s=>({categoryId:s.categoryId,count:1}));
  return {...current,id:stored.id,version:stored.version+1,slots:slots.length?slots:current.slots,note:current.note+' Bisheriges Muster für neue Prüfungen auf Generalthemen umgestellt; Auswahl erneut bestätigen.'};
 }
-function pattern(d,type,specialty){const p=basePattern(d,type,specialty);if(!settingsFor(d,p)&&!zwischenpruefungScope(p))return p;const result=snapshotPattern(d,p),active=new Set(result.categoryDefinitions.filter(c=>!c.hidden).map(c=>c.id));result.slots=result.slots.filter(s=>active.has(s.categoryId));if(result.categoryCatalog===zwischenpruefungCatalog&&!result.slots.length)result.status='proposed';return result;}
+function pattern(d,type,specialty){
+ const fixed=regulationPattern(type,specialty)||(fachwerkerScope({examType:type,specialty})?fixedFachwerkerPattern(specialty):null),p=fixed||basePattern(d,type,specialty);
+ if(!fixed&&!settingsFor(d,p)&&!zwischenpruefungScope(p))return p;
+ const result=snapshotPattern(d,p),active=result.categoryDefinitions.filter(c=>!c.hidden);
+ if(zwischenpruefungScope(p)){
+  const context={...result,categoryDefinitions:result.categoryDefinitions,specialtyThemesVersion:1},available=scoped(d,type,specialty).filter(t=>eligibleZwischenpruefungTask(t,context));
+  const ids=new Set(available.flatMap(t=>classifyZwischenpruefung(t,context).ids)),kept=result.slots.filter(s=>active.some(c=>c.id===s.categoryId)).map(s=>s.categoryId);
+  const order=[...new Set([...kept.filter(id=>ids.has(id)),...active.filter(c=>ids.has(c.id)).map(c=>c.id),...kept,...active.map(c=>c.id)])];
+  result.slots=order.slice(0,3).map(categoryId=>({categoryId,count:1}));result.status='confirmed';
+  result.note='Drei praktische Aufgaben aus drei verschiedenen Generalthemen; höchstens 180 Minuten. Themenvorschlag prüfen und bei Bedarf ändern.';
+ }
+ return result;
+}
 function history(d,t){const variants=d.tasks.filter(v=>v.examType===t.examType&&v.specialty===t.specialty&&v.kind===t.kind&&v.familyId===t.familyId),sourceIds=new Set(variants.flatMap(v=>v.sourceIds)),years=d.sources.filter(s=>sourceIds.has(s.id)&&Number.isInteger(s.year)&&s.year<=new Date().getFullYear()).map(s=>s.year),uses=d.uses.filter(u=>{const e=d.exams.find(e=>e.id===u.examId);return e?.examType===t.examType&&e?.specialty===t.specialty&&(variants.some(v=>u.taskIds.includes(v.id))||u.familyIds.includes(t.familyId)&&!d.tasks.some(v=>v.familyId===t.familyId&&v.examType===t.examType&&v.specialty===t.specialty&&v.kind!==t.kind))&&u.date<=new Date().toISOString().slice(0,10);}).map(u=>u.date).sort();const confirmed=uses.at(-1)||null,sourceYear=years.length?Math.max(...years):null,year=Math.max(sourceYear||0,confirmed?Number(confirmed.slice(0,4)):0)||null;const sortDate=sourceYear&&(!confirmed||sourceYear>Number(confirmed.slice(0,4)))?sourceYear+'-12-31':confirmed;return {confirmed,sourceYear,year,sortDate,unknown:year===null};}
 function rank(d,type,specialty,categoryId,excluded=[],context=projectContext(d,{examType:type,specialty})){const skip=new Set(excluded),zp=zwischenpruefungScope({examType:type,specialty});return scoped(d,type,specialty).filter(t=>!skip.has(t.familyId)&&(!zp||eligibleZwischenpruefungTask(t,context))&&activeTask(t,context)&&classify(t,{context,legacyFachwerker:type==='FW_AP'&&categoryId==='harvest'}).ids.includes(categoryId)).map(task=>({task,history:history(d,task)})).sort((a,b)=>(a.history.sortDate||'9999').localeCompare(b.history.sortDate||'9999')||a.task.familyId.localeCompare(b.task.familyId)||a.task.id.localeCompare(b.task.id));}
 function patternClassify(t,p,context){return classify(t,{context:context||(p?.categoryDefinitions?{...p,categoryDefinitions:p.categoryDefinitions}:undefined),legacy:['AP','ZP'].includes(p?.examType)&&!p.categoryCatalog,legacyZwischenpruefung:p?.examType==='ZP'&&p.categoryCatalog!==zwischenpruefungCatalog,legacyFachwerker:p?.examType==='FW_AP'&&p.slots?.some(s=>s.categoryId==='harvest')});}
-function coverage(e){const regulation=regulationCoverage(e);if(regulation){if(e.pattern){try{checkPattern(e.pattern);}catch{regulation.issues.push('Prüfungsmuster ist ungültig.');}if(e.pattern.examType!==e.examType||e.pattern.specialty!==e.specialty)regulation.issues.push('Prüfungsmuster passt nicht zum Prüfungsbereich.');}return {...regulation,slots:[],complete:regulation.issues.length===0};}const issues=[],p=e.pattern;try{checkPattern(p);}catch{ return {complete:false,slots:[],issues:['Prüfungsmuster fehlt oder hat noch keine Kategorien.']};}if(p.examType!==e.examType||p.specialty!==e.specialty)issues.push('Prüfungsmuster passt nicht zum Prüfungsbereich.');if(p.status!=='confirmed')issues.push('Prüfungsmuster noch nicht bestätigt.');if(currentZwischenpruefung(e)&&!p.slots.length)issues.push('Noch keine Generalthemen für die Zwischenprüfung ausgewählt.');if(p.examType==='FW_AP'&&!p.slots.length)issues.push('Noch keine Kategorien für die Fachwerker-Prüfung ausgewählt.');if(p.slots.some(s=>resolveCatalog(null,examContext(e)).some(c=>c.id===s.categoryId&&c.hidden)))issues.push('Prüfungsmuster enthält für diese Fachrichtung ausgeblendete Kategorien.');const families=new Set(),themes=new Set();for(const i of e.items){if(i.task.examType!==e.examType||i.task.specialty!==e.specialty)issues.push('Aufgabe gehört zu einem anderen Prüfungsbereich.');if(families.has(i.task.familyId))issues.push('Aufgabenfamilie mehrfach ausgewählt.');families.add(i.task.familyId);const ids=patternClassify(i.task,p).ids;if(currentZwischenpruefung(e)){if(!eligibleZwischenpruefungTask(i.task,examContext(e)))issues.push('Zwischenprüfung: nur Einzelaufgaben mit genau einem Generalthema; keine Kombinationsaufgaben.');for(const id of ids){if(themes.has(id))issues.push(`${label(id,e)}: höchstens eine Aufgabe je Generalthema.`);themes.add(id);}}if(ids.some(id=>!p.slots.some(s=>s.categoryId===id)))issues.push('Aufgabe deckt eine Kategorie außerhalb des Musters ab.');if(ids.includes('unassigned'))issues.push('Aufgabe ohne bestätigbare Kategorie.');}
+function legacyCoverage(e){const regulation=regulationCoverage(e);if(regulation){if(e.pattern){try{checkPattern(e.pattern);}catch{regulation.issues.push('Prüfungsmuster ist ungültig.');}if(e.pattern.examType!==e.examType||e.pattern.specialty!==e.specialty)regulation.issues.push('Prüfungsmuster passt nicht zum Prüfungsbereich.');}return {...regulation,slots:[],complete:regulation.issues.length===0};}const issues=[],p=e.pattern;try{checkPattern(p);}catch{ return {complete:false,slots:[],issues:['Prüfungsmuster fehlt oder hat noch keine Kategorien.']};}if(p.examType!==e.examType||p.specialty!==e.specialty)issues.push('Prüfungsmuster passt nicht zum Prüfungsbereich.');if(p.status!=='confirmed')issues.push('Prüfungsmuster noch nicht bestätigt.');if(currentZwischenpruefung(e)&&!p.slots.length)issues.push('Noch keine Generalthemen für die Zwischenprüfung ausgewählt.');if(p.examType==='FW_AP'&&!p.slots.length)issues.push('Noch keine Kategorien für die Fachwerker-Prüfung ausgewählt.');if(p.slots.some(s=>resolveCatalog(null,examContext(e)).some(c=>c.id===s.categoryId&&c.hidden)))issues.push('Prüfungsmuster enthält für diese Fachrichtung ausgeblendete Kategorien.');const families=new Set(),themes=new Set();for(const i of e.items){if(i.task.examType!==e.examType||i.task.specialty!==e.specialty)issues.push('Aufgabe gehört zu einem anderen Prüfungsbereich.');if(families.has(i.task.familyId))issues.push('Aufgabenfamilie mehrfach ausgewählt.');families.add(i.task.familyId);const ids=patternClassify(i.task,p).ids;if(currentZwischenpruefung(e)){if(!eligibleZwischenpruefungTask(i.task,examContext(e)))issues.push('Zwischenprüfung: nur Einzelaufgaben mit genau einem Generalthema; keine Kombinationsaufgaben.');for(const id of ids){if(themes.has(id))issues.push(`${label(id,e)}: höchstens eine Aufgabe je Generalthema.`);themes.add(id);}}if(ids.some(id=>!p.slots.some(s=>s.categoryId===id)))issues.push('Aufgabe deckt eine Kategorie außerhalb des Musters ab.');if(ids.includes('unassigned'))issues.push('Aufgabe ohne bestätigbare Kategorie.');}
  const slots=p.slots.map(s=>({...s,actual:e.items.filter(i=>patternClassify(i.task,p).ids.includes(s.categoryId)).length}));for(const s of slots)if(s.actual!==s.count)issues.push(`${label(s.categoryId,e)}: ${s.actual} von ${s.count} vorgesehenen Aufgaben.`);return {complete:issues.length===0,slots,issues};}
+function coverage(e){
+ const fixed=structureCoverage(e);if(!fixed)return legacyCoverage(e);
+ const issues=[...fixed.issues];try{checkPattern(e.pattern);}catch{issues.push('Prüfungsvorgaben fehlen oder sind ungültig.');}
+ if(e.pattern&&(e.pattern.examType!==e.examType||e.pattern.specialty!==e.specialty))issues.push('Prüfungsmuster passt nicht zum Prüfungsbereich.');
+ const slots=fixed.profile.themeCount?(e.pattern?.slots||[]).map(s=>({...s,actual:(e.items||[]).filter(i=>classifyZwischenpruefung(i.task,examContext(e)).ids.includes(s.categoryId)).length})):[];
+ return {...fixed,slots,issues:[...new Set(issues)],complete:issues.length===0};
+}
 // Track suggestion recency for families and variants in this database session.
 // Source tasks, saved patterns, and confirmed usage history are never modified.
 const previousZwischenpruefungProposals=new WeakMap();
@@ -853,10 +925,12 @@ function proposeZwischenpruefung(d,e){
  // Each task covers one theme. Bipartite matching fills every feasible theme
  // while allowing a family with several variants only once across the exam.
  function match(excludedFamily,excludedTask){
-  const familyOwners=new Map(),chosen=new Map();
-  function assign(theme,seen){for(const c of byTheme.get(theme)){const family=c.task.familyId;if(family===excludedFamily||c.task.id===excludedTask||seen.has(family))continue;seen.add(family);const previous=familyOwners.get(family);if(previous===undefined||assign(previous,seen)){familyOwners.set(family,theme);chosen.set(theme,c);return true;}}return false;}
-  for(const theme of [...missing].sort((a,b)=>byTheme.get(a).length-byTheme.get(b).length))assign(theme,new Set());
-  return missing.flatMap(id=>chosen.has(id)?[chosen.get(id)]:[]);
+  const limit=Math.max(0,3-e.items.length),ordered=[...missing].sort((a,b)=>byTheme.get(a).length-byTheme.get(b).length),families=new Set(usedFamilies),selected=[];let best=[],visits=0;
+  const known=structureCoverage(e)?.minutes||0;
+  function search(n,minutes){if(++visits>5000)return false;if(selected.length>best.length)best=selected.slice();if(selected.length===limit)return true;if(n===ordered.length)return false;
+   for(const c of byTheme.get(ordered[n])){const duration=Number.isFinite(c.task.minutes)?Math.max(0,c.task.minutes):0;if(c.task.familyId===excludedFamily||c.task.id===excludedTask||families.has(c.task.familyId)||minutes+duration>180)continue;families.add(c.task.familyId);selected.push(c);if(search(n+1,minutes+duration))return true;selected.pop();families.delete(c.task.familyId);}return search(n+1,minutes);
+  }
+  search(0,known);return missing.flatMap(id=>best.filter(c=>c.categoryId===id));
  }
  const signature=rows=>rows.map(c=>c.task.familyId).sort().join('\n'),taskSignature=rows=>rows.map(c=>c.task.id).sort().join('\n'),quality=rows=>rows.map(c=>`${c.history.sortDate||'9999'}:${c.task.familyId}:${c.task.id}`).sort().join('\n'),previous=rotation.previous;
  let chosen=match();
@@ -872,9 +946,10 @@ function proposeZwischenpruefung(d,e){
   const alternatives=chosen.map(c=>match(undefined,c.task.id)).filter(rows=>rows.length===chosen.length&&taskSignature(rows)!==rotation.previousTasks);
   alternatives.sort((a,b)=>quality(a).localeCompare(quality(b)));if(alternatives.length)chosen=alternatives[0];
  }
- rotation.previous=signature(chosen);rotation.previousTasks=taskSignature(chosen);rotation.sequence++;for(const c of chosen){rotation.lastSuggested.set(c.task.familyId,rotation.sequence);rotation.lastSuggestedTask.set(c.task.id,rotation.sequence);}memory.set(key,rotation);previousZwischenpruefungProposals.set(d,memory);return chosen.map(c=>c.task);
+ rotation.previous=signature(chosen);rotation.previousTasks=taskSignature(chosen);rotation.sequence++;for(const c of chosen){rotation.lastSuggested.set(c.task.familyId,rotation.sequence);rotation.lastSuggestedTask.set(c.task.id,rotation.sequence);}memory.set(key,rotation);previousZwischenpruefungProposals.set(d,memory);return chosen.slice(0,Math.max(0,3-e.items.length)).map(c=>c.task);
 }
 function propose(d,e){
+ if(fachwerkerScope(e))return proposeFachwerker(d,e);
  if(regulationProfile(e)){if(e.pattern&&(e.pattern.examType!==e.examType||e.pattern.specialty!==e.specialty))throw Error('Prüfungsmuster passt nicht zum Prüfungsbereich.');return proposeRegulation(d,e);}
  checkPattern(e.pattern);if(e.pattern.examType!==e.examType||e.pattern.specialty!==e.specialty)throw Error('Prüfungsmuster passt nicht zum Prüfungsbereich.');
  if(currentZwischenpruefung(e))return proposeZwischenpruefung(d,e);
@@ -891,6 +966,24 @@ function propose(d,e){
  search([]);return best;
 }
 
+function proposeFachwerker(d,e){
+ const memory=proposalMemory(d,e),remaining=Math.max(0,4-e.items.length),used=new Set(e.items.map(i=>i.task.familyId));if(!remaining)return [];
+ const candidates=scoped(d,e.examType,e.specialty).filter(t=>selectedTask(t,e)&&!used.has(t.familyId)).map(task=>({task,h:history(d,task)})).sort((a,b)=>(memory.used.get(a.task.id)||0)-(memory.used.get(b.task.id)||0)||(a.h.sortDate||'9999').localeCompare(b.h.sortDate||'9999')||a.task.id.localeCompare(b.task.id));
+ let best=[],score=-1,visits=0;const chosen=[],initial=structureCoverage(e)?.minutes||0;
+ function search(start,minutes){if(++visits>5000)return false;const value=chosen.length*10000+minutes;if(value>score){score=value;best=chosen.slice();}if(chosen.length===remaining)return minutes===180;
+  for(let n=start;n<candidates.length;n++){const t=candidates[n].task,duration=Number.isFinite(t.minutes)?Math.max(0,t.minutes):0;if(used.has(t.familyId)||minutes+duration>180)continue;used.add(t.familyId);chosen.push(t);if(search(n+1,minutes+duration))return true;chosen.pop();used.delete(t.familyId);}return false;
+ }
+ search(0,initial);rememberProposal(memory,best);return best;
+}
+function proposeThemeSelection(d,e){
+ const profile=examRequirements(e);if(!profile)return [];
+ const temp=copy(e);delete temp.selectedCategoryIds;
+ if(profile.themeCount){temp.pattern={...temp.pattern,slots:categories(d,e.examType,e.specialty,examContext(e)).map(c=>({categoryId:c.id,count:1}))};}
+ const tasks=[...(e.items||[]).map(i=>i.task),...propose(d,temp)],ids=[...new Set(tasks.flatMap(t=>classify(t,{context:examContext(temp)}).ids).filter(id=>id!=='unassigned'))];
+ if(profile.themeCount)return [...new Set([...ids,...categories(d,e.examType,e.specialty,examContext(e)).map(c=>c.id)])].slice(0,profile.themeCount);
+ return ids;
+}
+function proposeOralTask(d,e){const list=oralCandidates(d,e);return list.find(t=>t.id!==e.oralItem?.originTaskId)||list[0]||null;}
 function oralCandidates(d,e){if(!['AP','FW_AP'].includes(e.examType))return [];return d.tasks.filter(t=>t.kind==='oral'&&t.examType===e.examType&&t.specialty===e.specialty&&!t.supersededBy).map(task=>({task,history:history(d,task)})).sort((a,b)=>(a.history.sortDate||'9999').localeCompare(b.history.sortDate||'9999')||a.task.id.localeCompare(b.task.id)).map(x=>x.task);}
-const api={settingsId,settingsFor,resolveCatalog,checkSettings,checkDefinitions,snapshotPattern,examContext,projectContext,examDefaults,oralCandidates,selectedTask,activeTask,zwischenpruefungScope,zwischenpruefungScopeInfo,eligibleZwischenpruefungTask,zwischenpruefungSelectionIssue,regulationProfile,regulationCategory,regulationTask,regulationCoverage,regulationChecklist,regulationReviewKey,regulationPattern,checkPracticalUnits,checkRegulationReview,fachwerkerSpecialties,fachwerkerCategories,fachwerkerScope,fachwerkerMainCategory,fachwerkerTopics,qualificationInfo,qualificationLabel,assignCategories,workbookCategories,workbookSource,workbookScope,patternClassify,labels,catalog,categories,archiveScopes,label,heading,classify,scoped,inferPattern,pattern,checkPattern,history,rank,coverage,propose};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.HortiPlanning=api;
+const api={examRequirements,themeSelectionIssue,structureCoverage,structureSelectionIssue,structureTransitionIssue,proposeThemeSelection,proposeOralTask,settingsId,settingsFor,resolveCatalog,checkSettings,checkDefinitions,snapshotPattern,examContext,projectContext,examDefaults,oralCandidates,selectedTask,activeTask,zwischenpruefungScope,zwischenpruefungScopeInfo,eligibleZwischenpruefungTask,zwischenpruefungSelectionIssue,regulationProfile,regulationCategory,regulationTask,regulationCoverage,regulationChecklist,regulationReviewKey,regulationPattern,checkPracticalUnits,checkRegulationReview,fachwerkerSpecialties,fachwerkerCategories,fachwerkerScope,fachwerkerMainCategory,fachwerkerTopics,qualificationInfo,qualificationLabel,assignCategories,workbookCategories,workbookSource,workbookScope,patternClassify,labels,catalog,categories,archiveScopes,label,heading,classify,scoped,inferPattern,pattern,checkPattern,history,rank,coverage,propose};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.HortiPlanning=api;
 })(globalThis);
