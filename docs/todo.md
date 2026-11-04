@@ -57,6 +57,15 @@ Jedes Paket geht als eigener PR raus und wird nach grüner CI automatisch gemerg
   - „Mehrere Entwürfe löschen …“: einzelne, alle oder nur die leeren Entwürfe auswählen und in einem Schritt verschieben.
   - Der Papierkorb ist nach Löschdatum sortiert und hat „Alle wiederherstellen“ und „Papierkorb leeren“ (eine Bestätigung für alle).
   - Eingesetzte Prüfungen bleiben geschützt, Arbeitsgruppen sehen die Aufräum-Funktionen nicht.
+- [x] **Originalseiten: Inhalt rutscht nach unten statt kleinerer Schrift.**
+  - Bearbeiteter Text behält seine Schriftgröße. Alles darunter rutscht mit: Text, Logos und der Hintergrund mit Rahmen, Linien, Tabellen und Planungsfeldern.
+  - Tabellenzeilen wachsen mit, senkrechte Linien laufen durch, nebeneinanderliegende Zellen zählen nur einmal.
+  - Erst wenn der Platz bis zum Seitenende nicht reicht, wird die Stelle markiert und der Druck gesperrt.
+  - Gleiches Verhalten in Editor, Druckvorschau, Druckdatei und Live-Vorschau des Aufgabenfensters.
+  - Neue Zeilen:
+    - im Blatt mit Enter oder „+ Zeile“ am aktiven Abschnitt;
+    - im Aufgabenfenster mit „+ Neue Zeile“ pro Abschnitt, die Live-Vorschau zeigt Änderungen sofort.
+  - Offen: frei platzierbare zusätzliche Textfelder an beliebiger Stelle einer Originalseite.
 - [ ] Rund 20 Formularfeldern fehlt ein `<label for>` (Barrierefreiheit).
 
 ## Technik & Sicherheit (aus `docs/code-audit-2026-11.md`)
