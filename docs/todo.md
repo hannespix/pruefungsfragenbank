@@ -134,6 +134,16 @@ Aus den Rückmeldungen der Aufgabenersteller, präzisiert. Reihenfolge = Umsetzu
    - **Fertig wenn:** Aus einem eingefügten Vorschlag entsteht nach Rückfragen eine speicherbare Aufgabe, die direkt in die Prüfung übernommen werden kann.
    - **Umgesetzt:** Worker-Endpunkt `/api/ai/draft` (strukturierte Ausgabe, Ratenbegrenzung, nichts gespeichert) und Dialog „Aus Vorschlag (KI)“. **Wird erst sichtbar, nachdem der Worker über „Worker ausrollen“ neu ausgerollt wurde.**
 
+## Neuplanung der Oberfläche (Konzept: `docs/ui-neuplanung.md`)
+
+Ziel: viel einfacher und intuitiver. Prüfungseditor mit einer Aufgabe: sichtbare Knöpfe 74 → ≤ 20, Aufklapper 9 → 0.
+
+- [ ] 1. Neuer Prüfungsbildschirm: Gliederung · Blatt · Checkliste, Platzhalter-Seiten mit „Vorschlag übernehmen“
+- [ ] 2. „Aufgabe wählen“ als Vollbild mit Reitern (Vorschläge, Alle, Nach Jahr, Selbst schreiben, KI)
+- [ ] 3. Fertigstellen-Dialog statt Schritt 3
+- [ ] 4. Startseiten (Karten für Gruppen, Tabelle für die zuständige Stelle), Navigation Start · Aufgaben · Einstellungen
+- [ ] 5. Handy, einheitliche Begriffe, Hilfe statt i-Blasen; Test mit Anwendern
+
 ## Rückmeldungen
 
 - [x] Begriff „Familieneinsatz“ verwirrte: Einsatzhistorie jetzt in Klartext („Zuletzt in einer Prüfung eingesetzt am … (diese oder eine ähnliche Ausführung)“, „Jüngste Vorlage aus …“).
