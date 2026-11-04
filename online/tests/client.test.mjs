@@ -667,6 +667,16 @@ test('working groups create their own task from the sheet; it is saved as a draf
  const before=u.elements.get('#dialog').innerHTML;await u.click('action','edit-task',base.id);assert.equal(u.elements.get('#dialog').innerHTML,before,'the bank editor stays closed for groups');
 });
 
+test('working groups build from the archive: choose a year and add its tasks to their draft; original PDFs stay hidden',async()=>{
+ const u=await ui('group',false,{configure:d=>{d.sources.push({...structuredClone(d.sources.find(s=>s.id==='demo-source-1')),id:'archive-2023',name:'ZP Baumschule 2023.pdf',year:2023});d.tasks.find(t=>t.id==='demo-task-1').sourceIds=['archive-2023'];}}),d=u.sandbox.testUI.getDb();
+ await createDraft(u,'ZP');const e=d.exams.at(-1);await u.click('action','paper-layout','years');let html=u.elements.get('#app').innerHTML;
+ assert.match(html,/data-action="paper-year" data-id="2023"/,'groups see the years of their specialty');assert.match(html,/archive-year-label">2023</);
+ await u.click('action','paper-year','2023');html=u.elements.get('#app').innerHTML;
+ assert.match(html,/<section class="archive-year" aria-label="Quelljahr 2023">[\s\S]*data-drag-task="demo-task-1"/);assert.doesNotMatch(html,/aria-label="Quelljahr 2024"/);
+ assert.match(html,/Aus ZP Baumschule 2023\.pdf/);assert.doesNotMatch(html,/data-action="(download-source|source)"/,'no original PDF for groups');
+ await u.click('action','add','demo-task-1');assert.ok(e.items.some(i=>i.originTaskId==='demo-task-1'),u.elements.get('#toast').textContent);C.validate(d);
+});
+
 test('until the server accepts group tasks, groups keep the previous view without create buttons',async()=>{
  const u=await ui('group',false,{capabilities:[]}),d=u.sandbox.testUI.getDb();await createDraft(u,'ZP');const html=u.elements.get('#app').innerHTML;
  assert.doesNotMatch(html,/data-action="new-task"|class="paper-new-task"/);const count=d.tasks.length;await u.click('action','new-task');assert.equal(d.tasks.length,count);assert.doesNotMatch(u.elements.get('#dialog').innerHTML,/id="task-title"/);

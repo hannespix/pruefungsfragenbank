@@ -105,7 +105,7 @@ Aus den Rückmeldungen der Aufgabenersteller, präzisiert. Reihenfolge = Umsetzu
      - Große Aufgabenauswahl als breite Ansicht neben dem Blatt mit Kartenraster, Miniaturvorschau, Filterleiste oben (Thema, Prüfungsart, Jahr) und Aktionen direkt auf der Karte.
      - Das Blatt wirkt wie in Word: grauer Arbeitsbereich, zentrierte Seiten, schlanke Werkzeugleiste oben.
    - **Fertig wenn:** Aufgaben werden ohne verschachtelte Aufklapper gefunden, verglichen und hinzugefügt, am Laptop wie am Tablet.
-3. [ ] **Historienzentriertes Arbeiten aus dem Archiv, auch für Arbeitsgruppen.**
+3. [x] **Historienzentriertes Arbeiten aus dem Archiv, auch für Arbeitsgruppen.**
    - **Ziel:** Prüfungen aus früheren Jahrgängen heraus erstellen.
    - **Umsetzung:**
      - Die Aufgabenauswahl erhält die Ansicht „Archiv nach Jahr“: Aufgaben, gruppiert nach Quelljahr und letztem Einsatz, mit optionalem Themenfilter darüber.
