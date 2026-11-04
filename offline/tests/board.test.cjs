@@ -14,7 +14,7 @@ async function ui(){
  const stubs=new Map(),listeners={},mk=id=>{const el={id,value:'',innerHTML:'',textContent:'',open:false,dataset:{},addEventListener(){},showModal(){this.open=true;},close(){this.open=false;},classList:{s:new Set(),add(...x){x.forEach(v=>this.s.add(v));},remove(...x){x.forEach(v=>this.s.delete(v));},contains(x){return this.s.has(x);}}};stubs.set(id,el);return el;};
  for(const id of ['#app','#toast','#dialog','#project-input','#docx-input','#asset-input'])mk(id);
  stubs.set('#seed',{textContent:JSON.stringify(data)});stubs.set('meta[name=hortiexam-storage]',{content:'memory'});
- const sandbox={HortiHistory:r('history.js'),HortiPointsPlan:r('points-plan.js'),HortiRelease:r('release.js'),HortiOrganization:r('organization.js'),HortiTimingPlan:r('timing-plan.js'),HortiMaterials:r('materials.js'),HortiArchive:r('archive.js'),HortiDocx:r('docx.js'),JSZip:require(path.join(ROOT,'vendor/jszip.min.js')),Blob,URL:{createObjectURL:()=>'blob:test',revokeObjectURL(){}},HortiSourceLayout:r('source-layout.js'),HortiIcons:r('icons.js'),HortiCatalog:r('catalog.js'),HortiHelp:r('help.js'),HortiPaper:r('paper.js'),HortiPlanning:r('planning.js'),HortiCore:C,HortiPrint:r('print.js'),console,setTimeout,clearTimeout,confirm:()=>true,
+ const sandbox={HortiHistory:r('history.js'),HortiAdvisor:r('advisor.js'),HortiPointsPlan:r('points-plan.js'),HortiRelease:r('release.js'),HortiOrganization:r('organization.js'),HortiTimingPlan:r('timing-plan.js'),HortiMaterials:r('materials.js'),HortiArchive:r('archive.js'),HortiDocx:r('docx.js'),JSZip:require(path.join(ROOT,'vendor/jszip.min.js')),Blob,URL:{createObjectURL:()=>'blob:test',revokeObjectURL(){}},HortiSourceLayout:r('source-layout.js'),HortiIcons:r('icons.js'),HortiCatalog:r('catalog.js'),HortiHelp:r('help.js'),HortiPaper:r('paper.js'),HortiPlanning:r('planning.js'),HortiCore:C,HortiPrint:r('print.js'),console,setTimeout,clearTimeout,confirm:()=>true,
   window:{addEventListener(){}},document:{querySelector:q=>stubs.get(q)||null,querySelectorAll:()=>[],addEventListener:(n,f)=>listeners[n]=f}};
  await vm.runInNewContext(fs.readFileSync(path.join(SRC,'app.js'),'utf8').replace('await initStorage();','globalThis.testUI={getDb:()=>db};await initStorage();'),sandbox);
  const click=(kind,value,id)=>listeners.click({target:{closest:s=>s===`[data-${kind}]`?{dataset:{[kind]:value,id}}:null}});
@@ -43,4 +43,11 @@ test('dropping a task card onto a slot places it as a building block',async()=>{
 test('tapping an open slot filters the task list to that theme',async()=>{
  const u=await ui();await u.click('action','board-slot','propagation');
  assert.match(u.toast(),/Vermehren von Pflanzen/);assert.match(u.html(),/class="paper-category selected"[^>]*data-paper-category="propagation"/);
+});
+
+test('a regulation violation appears as a visible card with its fix',async()=>{
+ const u=await ui(),t=u.db().tasks.find(x=>x.examType==='ZP'&&x.text.includes('an der Pflanze'));await u.click('action','add',t.id);
+ const e=u.db().exams.at(-1);e.items[0].task.minutes=500;await u.click('action','paper-category','');
+ const h=u.html();assert.match(h,/class="rule-board"/);assert.match(h,/Zeitrahmen überschritten/);
+ assert.match(h,/<div class="rule-card rule-violation"[\s\S]*?data-action="timing-plan"/);assert.match(h,/1 Verstoß/);
 });
