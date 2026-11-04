@@ -161,6 +161,11 @@ Ziel: viel einfacher und intuitiver. Prüfungseditor mit einer Aufgabe: sichtbar
 
 ## Rückmeldungen
 
+- [x] **Die Prüfpunkte nerven („Punkte klären“, „Fachliche Freigabe offen“, „Material bestätigen“) – einfacher machen.**
+  - Punktevorschläge, Hinweise aus der Übernahme, Materialvorschläge und die fachliche Prüfung erscheinen nirgends mehr als offene Punkte: nicht unter „Fertigstellen“, nicht in der Checkliste („Angaben vollständig“) und nicht auf der Startseite. „Prüfung freigeben“ bestätigt sie stillschweigend, ein Satz unter dem Knopf sagt das.
+  - Als offen zählt nur noch, was die Freigabe wirklich aufhält (z. B. fehlende Punkte, Zeiten, Texte oder Materialliste).
+  - In den Details steht der Hinweis aus der Übernahme nur noch zur Info. Der Knopf „Materialliste bestätigen“ fällt weg. Statt „Aufgabe fachlich freigeben“ gibt es den kleinen, ausdrücklich optionalen Knopf „Nur diese Aufgabe freigeben“; Arbeitsgruppen sehen keinen Freigabe-Abschnitt.
+  - Neue Punktevorschläge verlangen nicht mehr, den Hinweis „nach Klärung zu entfernen“.
 - [x] **„Fertigstellen“ war verwirrend, das Aufgaben-Popup soll weg.**
   - „Fertigstellen“ trennt jetzt „Noch zu erledigen“ (nur, was wirklich fehlt; die Freigabe wartet darauf) von „Mit der Freigabe bestätigst du“. Letzteres zeigt je Aufgabe kurz Punkte, Hinweise aus der Übernahme, Materialliste und fachliche Prüfung mit „Ansehen“. Arbeitsgruppen sehen diesen Teil als „Prüft die zuständige Stelle“; das sind keine Aufgaben für sie.
   - Statt des Popups öffnet sich rechts neben dem Blatt das Feld „Details“: Punkte und Minuten, Lösung auf dem Blatt, Hinweise aus der Übernahme, Materialliste (bearbeiten, bestätigen) und für die zuständige Stelle „Aufgabe fachlich freigeben“. Das Formular bleibt nur als Link „Alle Angaben im Formular“ für Seltenes.

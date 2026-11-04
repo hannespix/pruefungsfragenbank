@@ -179,7 +179,7 @@ function proposePoints(task,context){
  const weights=unknown.length?targets.map(()=>1):rubric.map(x=>x[1]),sum=weights.reduce((a,b)=>a+b,0);let assigned=0;
  targets.forEach((c,i)=>{c.points=i===targets.length-1?Math.round((remainder-assigned)*100)/100:Math.floor(remainder*weights[i]/sum);assigned+=c.points;});
  t.points=total;t.pointsProposal={method:'working-scale-100-v1',total,preservedPoints:preserved,originalCriterionIds:known.map(c=>c.id).filter(Boolean)};
- t.flags.push('Punktevorschlag: '+total+' Punkte als Arbeitsgrundlage, keine amtliche Vorgabe. Vor Einsatz Gesamtpunkte, Teilpunkte und Gewichtung fachlich prüfen und diesen Hinweis nach Klärung entfernen.');
+ t.flags.push('Punktevorschlag: '+total+' Punkte als Arbeitsgrundlage, keine amtliche Vorgabe. Gesamtpunkte, Teilpunkte und Gewichtung werden mit der Freigabe bestätigt.');
  t.reviewStatus='review';t.solutionStatus=t.solution.trim()?'draft':'missing';t.reviewedBy='';delete t.reviewedAt;return t;
 }
 // Content fingerprints detect stale review decisions; authorization remains server-side.
