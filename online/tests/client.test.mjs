@@ -22,12 +22,12 @@ const client=fs.readFileSync(new URL('../client.js',import.meta.url),'utf8');
 const app=fs.readFileSync(new URL('../../offline/src/app.js',import.meta.url),'utf8');
 const demo=()=>C.validate(JSON.parse(fs.readFileSync(new URL('../../offline/demo.json',import.meta.url))));
 test('a rejected central save preserves revisions for retry and includes only changed records',async()=>{const p=demo(),calls=[],versions={};for(const kind of ['families','tasks','sources','assets','uses','exams','patterns','workshops'])for(const x of p[kind])versions[kind+':'+x.id]=1;let reject=true;const context={HortiCore:C,HortiPrint:P,console,fetch:async(url,init)=>{const payload=init.body?JSON.parse(init.body):null;if(url.endsWith('/api/project'))return Response.json({project:structuredClone(p),versions});if(url.includes('/api/assets?')){const id=new URL(url).searchParams.get('ids');return Response.json({assets:[p.assets.find(a=>a.id===id)]});}if(url.endsWith('/api/save')){calls.push(payload);if(reject)return Response.json({error:'Conflict'},{status:409});return Response.json({versions:Object.fromEntries(payload.changes.map(c=>[c.kind+':'+c.id,c.version+1]))});}throw Error('Unexpected request');},setInterval,clearInterval,setTimeout};vm.runInNewContext(client,context);const o=context.HortiOnline;const loaded=await o.load();loaded.tasks[0].title+=' edited';await assert.rejects(o.save(loaded),/Conflict/);assert.equal(calls[0].changes.length,1);assert.equal(calls[0].changes[0].version,1);reject=false;await o.save(loaded);assert.equal(calls[1].changes[0].version,1);await o.save(loaded);assert.equal(calls.length,2);});
-async function ui(role='group',memoryOnly=false,{specialty='Baumschule',configure=()=>{}}={}){
+async function ui(role='group',memoryOnly=false,{specialty='Baumschule',configure=()=>{},capabilities=['group-tasks']}={}){
  const data=demo();for(const t of data.tasks)if(L.zwischenpruefungScope(t))t.text='Aufgabe: Durchführen von Arbeiten an der Pflanze\nHier: Synthetisches Beispiel\n'+t.text;
  data.workshops=[{id:'meeting',title:'Termin',examYear:2027,meetingDate:'',specialties:[specialty]}];configure(data);
  const elements=new Map(),listeners={};for(const id of ['#app','#toast','#dialog','#project-input','#docx-input','#asset-input'])elements.set(id,{innerHTML:'',textContent:'',inert:false,addEventListener(name,fn){(this.handlers??={})[name]=fn;},click(){},classList:{values:new Set(),add(...xs){xs.forEach(x=>this.values.add(x));},remove(...xs){xs.forEach(x=>this.values.delete(x));},contains(x){return this.values.has(x);}},close(){this.open=false;},showModal(){this.open=true;}});
  if(memoryOnly){elements.set('#seed',{textContent:JSON.stringify(data)});elements.set('meta[name=hortiexam-storage]',{content:'memory'});}
- const online={role,session:{specialty,meetingId:'meeting'},start:async()=>data,save:async()=>{},load:async()=>structuredClone(data),board:{meetings:[],requests:[]}};
+ const online={role,session:{specialty,meetingId:'meeting',capabilities},start:async()=>data,save:async()=>{},load:async()=>structuredClone(data),board:{meetings:[],requests:[]}};
  let timer=0,themeHtml='',themeInputs=[];const timers=new Map();
  const themes=()=>{const html=elements.get('#app').innerHTML;if(html!==themeHtml){themeHtml=html;themeInputs=[...html.matchAll(/<input[^>]*data-workflow-theme value="([^"]+)"([^>]*)>/g)].map(([,value,attrs])=>({value,checked:/\bchecked\b/.test(attrs),disabled:/\bdisabled\b/.test(attrs),handlers:{},addEventListener(name,fn){this.handlers[name]=fn;}}));}return themeInputs;};
  const sandbox={HortiPointsPlan:Q,HortiRelease:R,HortiTimingPlan:T,HortiOrganization:O,HortiMaterials:M,HortiSourceLayout:S,HortiIcons:I,HortiCatalog:B,HortiHelp:H,HortiDocx:D,HortiArchive:A,HortiPaper:W,HortiOnline:memoryOnly?null:online,HortiPlanning:L,HortiCore:C,HortiPrint:P,console,setTimeout:(fn,delay)=>{const id=++timer;timers.set(id,{fn,delay});return id;},clearTimeout:id=>timers.delete(id),confirm:()=>true,window:{addEventListener:(name,fn)=>listeners[name]=fn},document:{querySelector:q=>elements.get(q)||null,querySelectorAll:q=>q==='[data-workflow-theme]'?themes():[],addEventListener:(name,fn)=>listeners[name]=fn}};
@@ -372,7 +372,7 @@ test('material dialog proposals require confirmation, remain organizational and 
  e.status='used';const frozen=JSON.stringify(e);await u.click('action','materials',item.id);assert.match(u.elements.get('#dialog').innerHTML,/<textarea[^>]*readonly/);assert.doesNotMatch(u.elements.get('#dialog').innerHTML,/data-action="materials-confirm"|data-action="materials-save"/);await u.click('action','materials-confirm',item.id);assert.equal(JSON.stringify(e),frozen);
 });
 test('FW oral pool absence stays explicit and used exams navigate without mutating stored content',async()=>{
- const u=await ui('group',false,{specialty:'Gemüsebau'});await createDraft(u,'FW_AP');const d=u.sandbox.testUI.getDb(),e=d.exams.at(-1);assert.match(u.elements.get('#app').innerHTML,/noch keine mündliche Vorlage vorhanden/);assert.doesNotMatch(u.elements.get('#app').innerHTML,/data-action="new-oral-task"/);
+ const u=await ui('group',false,{specialty:'Gemüsebau'});await createDraft(u,'FW_AP');const d=u.sandbox.testUI.getDb(),e=d.exams.at(-1);assert.match(u.elements.get('#app').innerHTML,/noch keine mündliche Vorlage vorhanden/);assert.match(u.elements.get('#app').innerHTML,/data-action="new-oral-task"/,'groups may create the missing oral task themselves');
  e.status='used';const before=JSON.stringify(e);await u.click('action','workflow-step','3');assert.match(u.elements.get('#app').innerHTML,/3\. Prüfung durchsehen/);assert.doesNotMatch(u.elements.get('#app').innerHTML,/data-action="finish-editing"/);await u.click('action','workflow-step','2');await u.click('action','oral-remove');assert.equal(JSON.stringify(e),before);
 });
 
@@ -647,4 +647,26 @@ test('online project merge is applied only after the central save accepted it',a
  assert.equal(saved,1,u.elements.get('#toast').textContent);assert.equal(db().tasks.length,before);assert.match(u.elements.get('#toast').textContent,/Import nicht übernommen/);
  let accepted=null;u.online.save=async p=>{accepted=p;};await change();
  assert.ok(accepted?.tasks.some(x=>x.id==='merge-import-task'));assert.ok(db().tasks.some(x=>x.id==='merge-import-task'));
+});
+
+test('working groups create their own task from the sheet; it is saved as a draft and added to their exam',async()=>{
+ const u=await ui(),d=u.sandbox.testUI.getDb();await createDraft(u,'ZP');const e=d.exams.at(-1);
+ assert.match(u.elements.get('#app').innerHTML,/data-action="new-task"/,'groups see "Eigene Aufgabe schreiben"');
+ await u.click('action','new-task');assert.match(u.elements.get('#dialog').innerHTML,/id="task-title"/,u.elements.get('#toast').textContent);
+ const theme=L.label(e.pattern.slots[0].categoryId,e),base=d.tasks.find(t=>t.specialty===e.specialty&&t.examType==='ZP'&&t.kind==='practical');
+ const t={...structuredClone(base),title:'Synthetische Gruppenaufgabe',text:`Aufgabe: ${theme}\nHier: Synthetische neue Aufgabe der Arbeitsgruppe.`,familyId:'',flags:[],tags:[],criteria:[],assetLinks:[],solution:'Synthetische Lösung.',planningCategories:[e.pattern.slots[0].categoryId]};
+ taskFormValues(u,t);u.elements.get('#task-review').value='approved';u.elements.get('#task-solution-status').value='approved';u.elements.get('#task-reviewer').value='Gruppe';
+ const count=d.tasks.length;await u.click('action','save-task');
+ assert.equal(d.tasks.length,count+1,u.elements.get('#toast').textContent);const created=d.tasks.at(-1);
+ assert.equal(created.reviewStatus,'review','groups cannot approve their own task');assert.notEqual(created.solutionStatus,'approved');assert.equal(created.reviewedBy,'');assert.equal(created.reviewKey,undefined);
+ assert.ok(d.families.some(f=>f.id===created.familyId&&f.reviewStatus==='review'));
+ assert.ok(d.exams.find(x=>x.id===e.id).items.some(i=>i.originTaskId===created.id),'added to the group draft');assert.match(u.elements.get('#toast').textContent,/zuständige Stelle gibt sie anschließend fachlich frei/);
+ C.validate(d);
+ // Existing bank tasks stay with the coordinator.
+ const before=u.elements.get('#dialog').innerHTML;await u.click('action','edit-task',base.id);assert.equal(u.elements.get('#dialog').innerHTML,before,'the bank editor stays closed for groups');
+});
+
+test('until the server accepts group tasks, groups keep the previous view without create buttons',async()=>{
+ const u=await ui('group',false,{capabilities:[]}),d=u.sandbox.testUI.getDb();await createDraft(u,'ZP');const html=u.elements.get('#app').innerHTML;
+ assert.doesNotMatch(html,/data-action="new-task"|class="paper-new-task"/);const count=d.tasks.length;await u.click('action','new-task');assert.equal(d.tasks.length,count);assert.doesNotMatch(u.elements.get('#dialog').innerHTML,/id="task-title"/);
 });

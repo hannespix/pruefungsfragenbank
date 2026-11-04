@@ -66,6 +66,16 @@ Jedes Paket geht als eigener PR raus und wird nach grüner CI automatisch gemerg
     - im Blatt mit Enter oder „+ Zeile“ am aktiven Abschnitt;
     - im Aufgabenfenster mit „+ Neue Zeile“ pro Abschnitt, die Live-Vorschau zeigt Änderungen sofort.
   - Offen: frei platzierbare zusätzliche Textfelder an beliebiger Stelle einer Originalseite.
+- [x] **Arbeitsgruppen legen selbst neue Aufgaben an.**
+  - „Eigene Aufgabe schreiben“ im Prüfungsblatt, „Aufgabe anlegen“ in der Aufgabenbank, „Als Vorlage verwenden“ und „Mündliche Aufgabe anlegen“ stehen jetzt auch Arbeitsgruppen zur Verfügung. Die neue Aufgabe landet direkt im eigenen Prüfungsentwurf.
+  - Neue Aufgaben einer Gruppe bleiben Entwürfe, die fachliche Freigabe erteilt die zuständige Stelle.
+  - Der Server erlaubt Gruppen nur neue Aufgaben und Aufgabenfamilien:
+    - nur für die eigene Fachrichtung und die freigegebenen Prüfungsarten;
+    - nur mit sichtbaren Quellen und Anlagen;
+    - keine Änderung bestehender Bankaufgaben;
+    - keine Freigaben.
+  - Die Knöpfe erscheinen für Gruppen erst, wenn der Server die Funktion meldet (`capabilities: ['group-tasks']`). Der Worker wird getrennt von den Pages ausgeliefert: `wrangler deploy --config online/wrangler.jsonc`.
+  - Offen: Grafiken und Pläne können Gruppen weiterhin nicht hochladen.
 - [ ] Rund 20 Formularfeldern fehlt ein `<label for>` (Barrierefreiheit).
 
 ## Technik & Sicherheit (aus `docs/code-audit-2026-11.md`)
