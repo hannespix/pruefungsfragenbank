@@ -437,3 +437,46 @@ dialog.preview-dialog{max-width:1000px}
 @media print{.focus-toggle,.focus-hints,.library-toggle,.board-toggle{display:none!important}}
 .sheet-focus .paper-preview-heading>.workspace-panel-heading{display:none}.sheet-focus .paper-preview-actions{flex:1;flex-wrap:wrap}.sheet-focus .paper-preview-heading #paper-page{min-width:160px}
 .sheet-focus .paper-preview-actions{flex:0 0 auto;flex-wrap:nowrap}.sheet-focus .paper-preview-heading #paper-page{flex:1 1 160px}.library-toggle{display:inline-flex;align-items:center;gap:6px}.library-toggle svg{width:16px;height:16px}.library-toggle[aria-pressed=true]{background:#eaf2e3;border-color:#9fc29a}@media(max-width:1250px){.sheet-focus .paper-preview-actions{flex-wrap:wrap}}
+/* ---- Drag & drop: precise insertion, replace, dock, grips ---- */
+/* Sheets: line above or below depending on the half under the pointer */
+.paper-stage [data-paper-before].dragover.drop-before{box-shadow:0 -6px 0 0 #4f9a6b,0 0 0 2px #4f9a6b66!important}
+.paper-stage [data-paper-before].dragover.drop-after{box-shadow:0 6px 0 0 #4f9a6b,0 0 0 2px #4f9a6b66!important}
+.paper-stage [data-paper-before].dragover.drop-after::before{top:auto;bottom:-30px;content:"Hier einfügen (danach)"}
+.paper-stage .paper-gap.dragover{background:#e3f1e6;border-color:#4f9a6b;color:var(--dark)}
+/* Blocks: bar on the left or right */
+.board-block.dragover.drop-before{box-shadow:-6px 0 0 -1px var(--green),0 8px 22px -14px #20392d55}
+.board-block.dragover.drop-after{box-shadow:6px 0 0 -1px var(--green),0 8px 22px -14px #20392d55}
+.board-block.replace-target{outline:3px dashed var(--cat);outline-offset:3px;animation:slotBreath 1.4s ease-in-out infinite}
+.board-block.replace-target::after{content:"ersetzen";position:absolute;right:8px;top:-10px;padding:0 8px;border-radius:999px;background:var(--cat);color:white;font-size:10.5px;font-weight:700;line-height:18px}
+.drop-reject{animation:dropReject .45s ease-in-out}
+@keyframes dropReject{0%,100%{transform:none}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+/* Drop dock: always reachable targets during a drag */
+.drop-dock{position:fixed;left:12px;right:12px;bottom:14px;margin:0 auto;width:fit-content;z-index:1200;max-width:min(940px,calc(100vw - 24px));box-sizing:border-box;padding:10px 12px 12px;border-radius:16px;background:#ffffffee;border:1px solid #cfdccb;box-shadow:0 20px 50px -18px #193b2a80;backdrop-filter:blur(6px);animation:dockIn .18s ease-out}
+.drop-dock p{margin:0 2px 6px;font-size:10.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--green)}
+.drop-dock-targets{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.dock-target{--cat:hsl(var(--cat-h,150) 42% 36%);--cat-soft:hsl(var(--cat-h,150) 48% 95%);flex:0 1 auto;max-width:280px;min-width:0;display:flex;align-items:center;gap:8px;min-height:48px;line-height:1.25;padding:8px 14px;border-radius:12px;border:2px dashed #b9c9b4;background:white;font-size:13px;font-weight:650;color:var(--dark);transition:transform .15s,background .15s,border-color .15s}
+.dock-target svg{flex:none;width:18px;height:18px;color:var(--cat)}
+.dock-target.is-match{border-color:var(--cat);background:var(--cat-soft)}
+.dock-target.dragover{transform:scale(1.05);border-style:solid;border-color:var(--green);background:#e3f1e6}
+.dock-remove{border-color:#efb4a7}.dock-remove svg{color:#b3361f}
+.dock-remove.dragover{border-color:#c2381f;background:#fde8e4}
+@keyframes dockIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+/* Grip on every sheet to move a task directly on the paper */
+.sheet-grip{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin-right:6px;border-radius:7px;color:#8fa48a;cursor:grab;vertical-align:middle}
+.sheet-grip:hover{background:#e3ecdf;color:var(--green)}
+.sheet-grip svg,.card-grip svg,.board-grip svg{fill:currentColor}
+.sheet-grip svg{width:16px;height:16px}
+.board-grip,.card-grip,.sheet-grip{touch-action:none}
+@media(pointer:coarse){.sheet-grip{width:36px;height:36px}.card-grip{padding:8px;right:4px;top:4px}.card-grip svg{width:18px;height:18px}.board-grip{left:0;padding:10px 4px}.dock-target{min-height:56px;padding:10px 16px}}
+@media(prefers-reduced-motion:reduce){.drop-reject,.board-block.replace-target,.drop-dock{animation:none}}
+@media print{.sheet-grip,.drop-dock{display:none!important}}
+.drop-dock.is-top{top:10px;bottom:auto;animation-name:dockInTop}@keyframes dockInTop{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+
+/* Drag & drop polish: the finger ghost stays above the dock, the toast does not cover the dock,
+   labels keep to two lines, a compact single row for mouse drags and two columns on phones. */
+.drag-ghost.touch-ghost{z-index:1300}
+body.dnd-active #toast{visibility:hidden}
+.dock-target span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.drop-dock.is-top{padding:8px 10px 10px}.drop-dock.is-top p{margin-bottom:4px}
+.drop-dock.is-top .dock-target{max-width:210px;min-height:40px;padding:6px 12px;font-size:12.5px}
+@media(max-width:600px){.drop-dock{padding:8px 8px 10px}.drop-dock-targets{display:grid;grid-template-columns:1fr 1fr;gap:6px}.dock-target{max-width:none;min-height:48px;padding:8px 10px;font-size:12px;gap:6px}}

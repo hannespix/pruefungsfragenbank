@@ -23,6 +23,21 @@ Jedes Paket geht als eigener PR raus und wird nach grüner CI automatisch gemerg
 - [x] **Drag & Drop per Tastatur und Touch.**
   - Tastatur: Leertaste nimmt einen Baustein auf, die Pfeiltasten verschieben ihn, Leertaste legt ab und Esc bricht ab. Alt+Pfeil verschiebt direkt. Jeder Schritt wird für Screenreader angesagt.
   - Touch: kurz gedrückt halten, ziehen, loslassen. Die Vorschau folgt dem Finger, das Blatt scrollt am Rand mit. Ein schnelles Wischen scrollt weiterhin.
+- [x] **Drag & Drop überall geprüft und verbessert (Maus und Touch).**
+  - Genaue Position: Die obere oder untere Hälfte eines Blatts entscheidet über „davor“ oder „danach“, bei Bausteinen die linke oder rechte Hälfte. Eine Einfügelinie zeigt die Stelle, das Deckblatt bedeutet „an den Anfang“.
+  - Ersetzen per Ziehen: Belegte Themen und andere Ausführungen lassen sich auf die Prüfung ziehen. Nach einer Rückfrage wird ersetzt, die betroffenen Bausteine leuchten vorher auf.
+  - Leiste „Hier ablegen“ bei jedem Ziehen:
+    - mit offenen Themenplätzen und „Ans Ende“;
+    - für Aufgaben aus der Prüfung zusätzlich „Entfernen“ (rückgängig mit Strg+Z);
+    - auf dem Handy der Weg, Aufgaben zu ziehen, weil Liste und Blatt dort getrennte Ansichten sind;
+    - bricht um, statt über den Bildschirmrand zu ragen.
+  - Jedes Blatt hat einen Griff: Aufgaben lassen sich direkt auf dem Blatt verschieben. Der Baukasten folgt der Reihenfolge auf dem Blatt.
+  - Automatisches Scrollen am Rand von Blatt, Aufgabenliste und Seite: Es läuft auch bei ruhendem Finger weiter und wird schneller, je näher man dem Rand kommt.
+  - Touch:
+    - Langes Drücken wirkt auch auf der Vorschau-Miniatur, Griffe starten sofort.
+    - Die Vorschau schwebt über dem Finger.
+    - Die Meldungsleiste verdeckt das Ablageziel nicht mehr.
+  - Ablegen außerhalb eines Ziels fügt keinen Text ein, eine verweigerte Ablage wackelt und zeigt den Grund.
 - [x] **WYSIWYG-Vorschau der Aufgaben in der Liste.** Jede Karte, auch jede „Andere Ausführung“, zeigt ein Miniatur-Blatt aus dem echten Blatt-Renderer. „Vorschau“ öffnet das ganze Blatt mit Grafiken, Umschalter zwischen allen Ausführungen, Themen- und Punktechips sowie „Zur Prüfung hinzufügen“, „Für dieses Thema ersetzen“ oder „Als Vorlage verwenden“.
 - [x] **Neue Aufgaben einfacher erstellen.**
   - Schnellstart mit drei Wegen:
