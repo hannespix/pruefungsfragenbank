@@ -11,7 +11,15 @@ Jedes Paket geht als eigener PR raus und wird nach grüner CI automatisch gemerg
 - [x] **Hinweis „Text passt nicht in die Originalvorlage“ lesbar.** Statt des abgeschnittenen Browser-Tooltips zeigt der Editor eine Warnkarte mit „Zur Stelle springen“ und, bei geänderten Stellen, „Originaltext wiederherstellen“. Betroffene Stellen tragen ein Etikett „zu viel Text“.
 - [x] **Baukasten-Oberfläche.** Aufgaben als grafische Bausteine (Thema mit Farbe und Symbol, Punkte, Minuten, Status auf einen Blick). Die Prüfung als Baukasten-Fläche mit einem Platz pro gefordertem Thema („hier fehlt noch: Vermehren von Pflanzen“). Weniger Formularfelder, Details erst bei Bedarf. *Erster Schritt umgesetzt: Baukasten über dem Blatt, farbige Bausteine mit Symbol in der Aufgabenliste. Weitere Vereinfachung der Formulare folgt.*
 - [x] **Drag & Drop mit Animation.** Bausteine aus der Liste auf die Prüfung ziehen, mit Vorschau beim Ziehen, hervorgehobenen Zielplätzen, Einfüge-Linie, „Einrasten“-Animation und sanftem Nachrücken beim Umsortieren. Auf Touch-Geräten weiterhin per Tippen.
-- [ ] **Warnungen zur Prüfungsordnung mit Lösungsvorschlag.** Jeder Verstoß als Karte mit Ein-Klick-Lösung, wo eine eindeutige Korrektur möglich ist. Beispiele: Zeit überschritten → „Zeiten automatisch vorschlagen“; Thema fehlt → „Passende Aufgabe ergänzen“; Punkte fehlen → „Punkte verteilen“; Kombinationsaufgabe in der ZP → „Durch Einzelaufgabe ersetzen“.
+- [x] **Warnungen zur Prüfungsordnung mit Lösungsvorschlag.** Verstöße stehen als rote Karten immer sichtbar über dem Editor, offene Punkte und Bestätigungen in „Pflichtangaben & Vorgaben“. Jede Karte hat einen Lösungsknopf:
+  - Zeit überschritten → „Zeit von Aufgabe N ändern“ und „Zeitplan ansehen“. Quellzeiten werden nie automatisch gekürzt.
+  - Aufgaben fehlen → „Fehlende Aufgaben vorschlagen“.
+  - Punkte offen → „Punkte verteilen“.
+  - Kombinationsaufgabe oder doppeltes Thema → „Aufgabe ansehen“ und „Einzelaufgaben vorschlagen“.
+  - Mündliche Aufgabe fehlt → Vorschlag.
+  - Bestätigungen zur Prüfungsverordnung erscheinen gesammelt mit „Jetzt bestätigen“.
+  - Material und Freigabe → direkt ins richtige Feld.
+- [ ] Weitere Vereinfachung: Aufgabeneditor in Schritte/Karten gliedern, selten genutzte Felder einklappen.
 - [ ] Rückfrage beim Schließen des Aufgabeneditors mit ungespeicherten Eingaben (Esc / ✕ / Abbrechen).
 - [ ] Rund 20 Formularfeldern fehlt ein `<label for>` (Barrierefreiheit).
 

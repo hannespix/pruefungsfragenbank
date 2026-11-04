@@ -252,3 +252,26 @@ button:focus-visible,summary:focus-visible{outline:3px solid #73985d;outline-off
 @media(max-width:700px){.exam-board-grid{grid-template-columns:1fr}.exam-board-meter{display:none}}
 @media(prefers-reduced-motion:reduce){.board-block,.board-slot,.paper-source-task,.exam-board-meter i{transition:none}.dnd-active .board-slot,.board-block.just-added,.paper-sheet.just-added{animation:none}}
 @media print{.exam-board{display:none!important}}
+/* Regulation advisor: warning cards with a one-click way to the fix. */
+.badge.red{background:#fde8e4;color:#a1301d}
+.rule-board{display:grid;gap:8px;margin:10px 0 4px}
+.rule-list{display:grid;gap:8px;margin-bottom:14px}
+.rule-card{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:white;animation:cardIn .25s ease-out}
+.rule-card.rule-violation{border-color:#f3b4a6;border-left:5px solid #c2381f;background:linear-gradient(90deg,#fff4f1,#fff 60%);box-shadow:0 10px 26px -18px #9a2a1666}
+.rule-card.rule-open{border-left:5px solid #d6942c;background:#fffcf6}
+.rule-card.rule-confirm{border-left:5px solid #4f8f6a;background:#f6fbf6}
+.rule-icon{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;font-weight:800;font-size:14px;color:white;background:#d6942c}
+.rule-violation .rule-icon{background:#c2381f}
+.rule-confirm .rule-icon{background:#4f8f6a}
+.rule-icon svg{width:15px;height:15px}
+.rule-text{display:grid;gap:1px;min-width:0;font-size:13px;color:#4a5a50}
+.rule-text strong{font-size:13.5px;color:var(--dark)}
+.rule-violation .rule-text strong{color:#8f2614}
+.rule-text em{font-style:normal;font-weight:600;font-size:11px;padding:1px 7px;margin-left:4px;border-radius:999px;background:#eef3ea;color:#41584a;vertical-align:1px}
+.rule-fixes{margin-left:auto;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.rule-fixes button{white-space:nowrap}
+.rule-violation .rule-fixes .primary{background:#c2381f;border-color:#c2381f}
+.rule-violation .rule-fixes .primary:hover{background:#962a16}
+@media(max-width:760px){.rule-card{flex-wrap:wrap}.rule-fixes{margin-left:40px;justify-content:flex-start}}
+@media(prefers-reduced-motion:reduce){.rule-card{animation:none}}
+@media print{.rule-board,.rule-list{display:none!important}}
