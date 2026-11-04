@@ -19,8 +19,13 @@ Jedes Paket geht als eigener PR raus und wird nach grüner CI automatisch gemerg
   - Mündliche Aufgabe fehlt → Vorschlag.
   - Bestätigungen zur Prüfungsverordnung erscheinen gesammelt mit „Jetzt bestätigen“.
   - Material und Freigabe → direkt ins richtige Feld.
-- [ ] Weitere Vereinfachung: Aufgabeneditor in Schritte/Karten gliedern, selten genutzte Felder einklappen.
-- [ ] Rückfrage beim Schließen des Aufgabeneditors mit ungespeicherten Eingaben (Esc / ✕ / Abbrechen).
+- [x] **Aufgabeneditor in fünf Schritten.** Die Schritte sind Aufgabe → Punkte & Zeit → Lösung → Material & Anlagen → Freigabe. Jeder Schritt hat einen Haken, sobald er vollständig ist. „Weiter“ und „Zurück“ führen durch die Schritte, „Speichern“ geht jederzeit. Bei einem Speicherfehler springt der Editor zum betroffenen Schritt. Fachrichtung, Prüfungsart, Bestandteil und Übernahme-Hinweise sind eingeklappt.
+- [x] **Drag & Drop per Tastatur und Touch.**
+  - Tastatur: Leertaste nimmt einen Baustein auf, die Pfeiltasten verschieben ihn, Leertaste legt ab und Esc bricht ab. Alt+Pfeil verschiebt direkt. Jeder Schritt wird für Screenreader angesagt.
+  - Touch: kurz gedrückt halten, ziehen, loslassen. Die Vorschau folgt dem Finger, das Blatt scrollt am Rand mit. Ein schnelles Wischen scrollt weiterhin.
+- [ ] **WYSIWYG-Vorschau der Aufgaben in der Liste.** Vor dem Hinzufügen zeigt jede Aufgabe, auch jede „Andere Ausführung“, eine Blattvorschau.
+- [ ] **Neue Aufgaben einfacher erstellen.** Schnellstart und Live-Vorschau.
+- [x] **Rückfrage bei ungespeicherten Eingaben.** Esc, ✕ und „Abbrechen“ zeigen eine Karte mit „Weiter bearbeiten“, „Verwerfen“ und „Speichern“. Auch beim Verlassen der Seite wird gefragt.
 - [ ] Rund 20 Formularfeldern fehlt ein `<label for>` (Barrierefreiheit).
 
 ## Technik & Sicherheit (aus `docs/code-audit-2026-11.md`)

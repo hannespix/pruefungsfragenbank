@@ -275,3 +275,39 @@ button:focus-visible,summary:focus-visible{outline:3px solid #73985d;outline-off
 @media(max-width:760px){.rule-card{flex-wrap:wrap}.rule-fixes{margin-left:40px;justify-content:flex-start}}
 @media(prefers-reduced-motion:reduce){.rule-card{animation:none}}
 @media print{.rule-board,.rule-list{display:none!important}}
+/* Task editor in five steps: one topic at a time, everything else stays in the form. */
+.task-steps{position:sticky;top:-24px;z-index:6;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:-6px -6px 18px;padding:6px;border-radius:14px;background:#f1f5ee;border:1px solid #dfe8da}
+.task-step-tab{display:flex;align-items:center;gap:9px;min-width:0;padding:8px 10px;border:1px solid transparent;border-radius:10px;background:transparent;text-align:left}
+.task-step-tab:hover{background:white}
+.task-step-tab.is-active{background:white;border-color:#bcd2b6;box-shadow:0 4px 14px -10px #20392d88}
+.task-step-tab strong{display:block;font-size:12.5px;color:var(--dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.task-step-tab small{display:block;font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.task-step-num{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:white;border:1.5px solid #b9c9b4;font-size:12px;font-weight:700;color:#5d6d62}
+.task-step-tab.is-active .task-step-num{background:var(--green);border-color:var(--green);color:white}
+.task-step-tab.is-done:not(.is-active) .task-step-num{background:#e3f1e6;border-color:#7fb08f;color:transparent;position:relative}
+.task-step-tab.is-done:not(.is-active) .task-step-num::after{content:"✓";position:absolute;color:#2a6548;font-size:13px}
+.task-step{display:none}
+.task-step.is-active{display:block;animation:stepIn .22s ease-out}
+@keyframes stepIn{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:none}}
+.task-context-options>summary{font-size:12.5px}
+.modal-foot [data-action="task-step-next"]{margin-left:auto}
+.modal-foot [data-action="task-step-prev"]:disabled,.modal-foot [data-action="task-step-next"]:disabled{visibility:hidden}
+@media(max-width:760px){.task-steps{grid-template-columns:repeat(5,minmax(44px,1fr));top:-18px}.task-step-tab{justify-content:center;padding:8px 4px}.task-step-tab>span:last-child{display:none}.task-step-tab.is-active>span:last-child{display:none}}
+/* Unsaved changes: in-dialog confirmation instead of losing input on Esc. */
+.discard-guard{position:fixed;inset:0;z-index:30;display:grid;place-items:center;padding:20px;background:#193b2a59;backdrop-filter:blur(2px);animation:fadeIn .15s ease-out}
+.discard-card{width:min(440px,100%);padding:22px;border-radius:16px;background:white;box-shadow:0 24px 60px #0d281a55;text-align:center;animation:cardIn .2s ease-out}
+.discard-card strong{display:block;font-size:17px;color:var(--dark);margin:8px 0 6px}
+.discard-card p{margin:0 0 16px;color:#4f5f55;font-size:13.5px}
+.discard-icon{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:50%;background:#fdecd3;color:#9a5a12;font-weight:800;font-size:18px}
+.discard-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+dialog:has(.discard-guard){overflow:hidden}
+@media(prefers-reduced-motion:reduce){.task-step.is-active,.discard-guard,.discard-card{animation:none}}
+/* Keyboard and touch drag & drop */
+.board-block:focus-visible{outline:3px solid #4f9a6b;outline-offset:2px}
+.board-block.key-grabbed{transform:translateY(-3px) scale(1.02);border-color:var(--cat);box-shadow:0 0 0 4px hsl(var(--cat-h) 50% 55% / .3),0 16px 30px -16px #20392d88;cursor:grabbing}
+.board-block.key-grabbed .board-grip{color:var(--cat)}
+.drag-ghost.touch-ghost{top:0;left:0;z-index:1000;pointer-events:none;opacity:.96;transition:none;will-change:transform}
+.dnd-touch,.dnd-touch *{-webkit-user-select:none;user-select:none}
+@media(pointer:coarse){.board-block,.paper-source-task.is-draggable{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}.board-grip,.card-grip{display:flex}}
+dialog:has([data-task-form]) .modal-body{min-height:min(64vh,600px)}
