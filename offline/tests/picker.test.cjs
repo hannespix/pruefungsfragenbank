@@ -73,3 +73,17 @@ test('a used exam shows the cards read-only without copy or create actions',asyn
  assert.match(lib,/Im Blatt anzeigen/,'the task in the exam');
  assert.match(lib,/Prüfung ist schreibgeschützt/);assert.doesNotMatch(lib,/id="paper-scope"|data-action="suggest"|data-action="new-task"|data-action="add"/);
 });
+
+test('"Archiv nach Jahr" groups the tasks by the year of their old exam and narrows to one year',async()=>{
+ const u=await ui();await u.click('action','paper-layout','years');let lib=library(u.html());
+ assert.match(lib,/data-action="paper-layout" data-id="years" aria-pressed="true"/);assert.doesNotMatch(lib,/id="paper-year"/,'year chips replace the year select');
+ const section=y=>{const m=lib.match(new RegExp(`<section class="archive-year" aria-label="Quelljahr ${y}">([\\s\\S]*?)</section>`));return m?.[1]||'';};
+ assert.match(section(2025),/data-drag-task="demo-task-1"/,'the 2025 variant under 2025');assert.match(section(2024),/data-drag-task="demo-task-0"/,'the 2024 variant under 2024');
+ assert.ok(lib.indexOf('Quelljahr 2025')<lib.indexOf('Quelljahr 2024'),'newest year first');
+ assert.match(section(2024),/Aus Demobeispiel_2024/);assert.match(lib,/data-action="paper-year" data-id="2025" aria-pressed="false"><span>2025<\/span><span class="category-count complete">1<\/span>/);
+ await u.click('action','paper-year','2024');lib=library(u.html());
+ assert.match(lib,/aria-label="Quelljahr 2024"/);assert.doesNotMatch(lib,/aria-label="Quelljahr 2025"/);assert.match(lib,/data-action="paper-year" data-id="2025"/,'other years stay selectable');
+ await u.click('action','paper-year','2024" onclick="x');assert.match(library(u.html()),/aria-label="Quelljahr 2025"/,'invalid years reset the filter');
+ await u.click('action','add','demo-task-0');assert.ok(u.db().exams.at(-1).items.some(i=>i.originTaskId==='demo-task-0'),'added from the archive view');
+ await u.click('action','paper-layout','grid');lib=library(u.html());assert.doesNotMatch(lib,/class="archive-year"/);assert.match(lib,/id="paper-year"/);
+});

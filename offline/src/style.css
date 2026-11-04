@@ -627,9 +627,22 @@ body.is-resizing .paper-stage,body.is-resizing .paper-library{pointer-events:non
  .word-workspace .library-toggle{display:none}
  .sheet-statusbar-hint{display:none}
 }
-@media(max-width:600px){.word-workspace .library-actions{width:100%}.word-workspace .library-actions button{flex:1 1 0}.word-workspace .library-field{flex:1 1 calc(50% - 4px)}.word-workspace .library-field select{width:100%}}
+@media(max-width:600px){.library-themes>.paper-categories{flex-basis:100%}.word-workspace .library-actions{width:100%}.word-workspace .library-actions button{flex:1 1 0}.word-workspace .library-field{flex:1 1 calc(50% - 4px)}.word-workspace .library-field select{width:100%}}
 .library-results{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 14px 0}
 .library-results .library-count{font-size:12.5px;color:#40513f}
 .word-workspace .library-results .library-field select{background-color:#fff}
 .word-workspace .library-search{flex-basis:100%!important}
+.layout-switch{display:flex}
+.layout-switch button{border-radius:0;padding:5px 11px;font-size:12px;min-height:32px}
+.layout-switch button:first-child{border-radius:999px 0 0 999px}
+.layout-switch button:last-child{border-radius:0 999px 999px 0;margin-left:-1px}
+.library-results .library-count{margin-right:auto}
+.archive-years{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 0}
+.archive-year{padding:4px 0 0}
+.archive-year-head{display:flex;align-items:baseline;gap:10px;margin:12px 14px 0;padding-bottom:6px;border-bottom:2px solid #dfe8da;font-size:13px}
+.archive-year-label{font-size:20px;font-weight:750;color:#215c40;letter-spacing:-.3px}
+.archive-year-meta{font-weight:500;color:var(--muted);font-size:12px}
+.archive-year-sources{margin:5px 14px 0;font-size:11.5px;color:var(--muted)}
+.word-workspace .archive-empty{margin:12px 14px}
+@media(max-width:1000px){.archive-years{padding:10px 12px 0}.archive-year-head{margin:12px 12px 0}.archive-year-sources{margin:5px 12px 0}.layout-switch button{min-height:40px}}
 @media print{.library-resizer,.sheet-statusbar,.sheet-toolbar{display:none!important}}
