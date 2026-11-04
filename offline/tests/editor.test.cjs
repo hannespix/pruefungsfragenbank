@@ -96,7 +96,7 @@ test('"Andere Aufgabe wählen" opens the full-screen picker for that theme; choo
 test('themes change in an overlay; the old step buttons map to overlays',async()=>{
  const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');
  await u.click('action','editor-overlay','themes');let h=u.html();assert.match(h,/data-workflow-theme/);assert.doesNotMatch(h,/1\. Welche Themen/);assert.doesNotMatch(h,/Weiter: passende Aufgaben/);
- await u.click('action','workflow-step','3');h=u.html();assert.match(h,/Prüfung fertigstellen/);assert.match(h,/id="required-fields"/);assert.doesNotMatch(h,/3\. Prüfung durchsehen/);
+ await u.click('action','workflow-step','3');h=u.html();assert.match(h,/Prüfung fertigstellen/);assert.match(h,/class="finish"/);assert.doesNotMatch(h,/3\. Prüfung durchsehen/);
  await u.click('action','workflow-step','2');assert.doesNotMatch(u.html(),/class="editor-overlay"/);
  await u.click('action','workflow-step','1');assert.match(u.html(),/data-overlay="themes"/);await u.click('action','editor-overlay-close');assert.doesNotMatch(u.html(),/class="editor-overlay"/);
 });
@@ -194,4 +194,14 @@ test('ZP: "Alternative hinzufügen" lists the same theme, offers no copies from 
  await u.click('action','alt-add','demo-task-1');assert.equal(owner.alternatives?.length,1,u.toast());assert.equal(L.structureCoverage(e).total,3);
  await u.click('action','alt-open',owner.id);u.listeners.keydown({key:'Escape',preventDefault(){},target:{closest:()=>null}});h=u.html();assert.doesNotMatch(h,/class="editor-overlay"/);
  await u.click('action','picker-open','');assert.doesNotMatch(u.html(),/Als Alternative übernehmen/,'the normal picker is back');
+});
+
+test('"Fertigstellen": open points with one button each, done list, message saved as typed, release for the coordinating body',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');
+ await u.click('action','editor-finish');await u.click('action','editor-overlay','finish');let h=u.html(),f=h.slice(h.indexOf('class="finish"'));
+ assert.match(f,/Baumschule · 0 Prüfungsaufgaben/);assert.match(f,/Noch \d+ Punkte? offen/);assert.match(f,/class="rule-card/);assert.match(f,/class="rule-fixes"/,'each open point brings its fix');
+ assert.match(f,/<h3>Erledigt<\/h3>[\s\S]*3 Themen/);assert.match(f,/id="finish-note"/);assert.match(f,/data-action="release-exam"[^>]*disabled/,'release waits for the open points');
+ for(const a of ['timing-plan','points-plan','preview-candidate','export-exam','editor-overlay-close'])assert.match(f,new RegExp(`data-action="${a}"`),a);
+ assert.doesNotMatch(f,/<details/,'no fold-outs');
+ await u.click('action','proposals-accept');await u.click('action','editor-overlay','finish');f=u.html().slice(u.html().indexOf('class="finish"'));assert.match(f,/Aufgaben · 3 von 3/);
 });

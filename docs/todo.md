@@ -146,7 +146,9 @@ Ziel: viel einfacher und intuitiver. Prüfungseditor mit einer Aufgabe: sichtbar
 - [x] 2. „Aufgabe wählen“ als Vollbild mit Reitern (Vorschläge, Alle, Nach Jahr, Selbst schreiben, KI)
   - Vorschläge zuerst: Suchfeld und höchstens sechs passende Karten, lange nicht eingesetzte zuerst. 17 sichtbare Knöpfe statt 28.
   - „Alle Aufgaben“ enthält andere Prüfungsarten und Fachrichtungen (als Kopie). „Nach Jahr“ ist das Archiv. „Selbst schreiben“ und „Aus Vorschlag (KI)“ haben je einen Knopf.
-- [ ] 3. Fertigstellen-Dialog statt Schritt 3
+- [x] 3. Fertigstellen-Dialog statt Schritt 3
+  - Ein Satz Zusammenfassung, „Noch offen“ mit genau einem Knopf je Punkt, „Erledigt“ als kurze Liste, Nachricht an die zuständige Stelle (speichert beim Tippen), Seitennotizen.
+  - Unten „An die zuständige Stelle übergeben“ (Gruppe) bzw. „Prüfung freigeben“ (zuständige Stelle) und „Weiter bearbeiten“. Zeitplan, Punkteverteilung, Vorschau & Druck als Links. 10 Knöpfe, keine Aufklapper.
 - [ ] 4. Startseiten (Karten für Gruppen, Tabelle für die zuständige Stelle), Navigation Start · Aufgaben · Einstellungen
 - [ ] 5. Handy, einheitliche Begriffe, Hilfe statt i-Blasen; Test mit Anwendern
 

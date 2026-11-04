@@ -869,3 +869,19 @@ button.link{background:none;border:0;padding:2px 0;margin:0;color:var(--green);t
 .picker-panel button{width:auto;margin:0;padding:11px 18px}
 .editor-picker .layout-switch,.editor-picker .library-actions,.editor-picker .library-title{display:none}
 .picker-suggest [data-action="task-template"]{display:none}
+/* ---- Fertigstellen: offen · erledigt · Nachricht · Übergabe ---- */
+.finish{max-width:840px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.finish-summary{margin:0;color:var(--muted);font-size:15px}
+.finish h3{margin:0 0 10px;font-size:16px}
+.finish-open h3{color:#8a4b08}
+.finish-open.is-clear h3{color:var(--green)}
+.finish-open.is-clear p{margin:0;color:var(--muted)}
+.finish-done ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:6px 16px}
+.finish-done li{display:flex;gap:8px;align-items:center;font-size:14px}
+.finish-done svg{width:16px;height:16px;color:var(--green);flex:none}
+.finish-message textarea{display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border-radius:12px;border:1px solid var(--line);font:inherit;font-size:15px;resize:vertical}
+.finish-links{display:flex;flex-wrap:wrap;gap:6px 18px;margin:0}
+.finish-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding-top:16px;border-top:1px solid var(--line)}
+.finish-actions .finish-main{width:auto;margin:0;padding:12px 20px;font-size:15px;font-weight:700}
+.finish-actions button.ghost{width:auto;margin:0}
+.finish-actions p{flex:1 1 100%;margin:0}
