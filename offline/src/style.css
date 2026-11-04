@@ -187,3 +187,68 @@ button:focus-visible,summary:focus-visible{outline:3px solid #73985d;outline-off
 @media(max-width:700px){.layout-fix-card{flex-wrap:wrap}.layout-fix-actions{margin-left:0}}
 @media print{.layout-fix-card,.source-blank-marker{display:none!important}}
 @media(prefers-reduced-motion:reduce){.layout-fix-card,.source-overflow-flash{animation:none}}
+/* ---- Baukasten: graphical building blocks, slots and animated drag & drop ---- */
+.exam-board,.paper-source-task,.drag-ghost{--cat:hsl(var(--cat-h,150) 42% 36%);--cat-soft:hsl(var(--cat-h,150) 48% 95%);--cat-line:hsl(var(--cat-h,150) 36% 78%)}
+.exam-board{margin:0 0 14px;padding:14px;border:1px solid #d6e2d1;border-radius:16px;background:linear-gradient(180deg,#fbfdf9,#f2f7ef)}
+.exam-board-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;font-size:12px;color:var(--muted)}
+.exam-board-head strong{display:flex;align-items:center;gap:7px;font-size:14px;color:var(--dark)}
+.exam-board-head strong svg{width:17px;height:17px;color:var(--green)}
+.exam-board-meter{flex:1;max-width:220px;height:7px;border-radius:999px;background:#e1e9dc;overflow:hidden}
+.exam-board-meter i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#4f9a6b,var(--green));transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.exam-board-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.board-block,.board-slot{--cat:hsl(var(--cat-h,150) 42% 36%);--cat-soft:hsl(var(--cat-h,150) 48% 95%);--cat-line:hsl(var(--cat-h,150) 36% 78%);position:relative;display:flex;align-items:center;gap:10px;min-height:76px;padding:10px 12px;border-radius:14px;text-align:left;font-size:13px}
+.board-block{background:white;border:1px solid var(--cat-line);border-left:5px solid var(--cat);box-shadow:0 2px 0 #20392d0f,0 8px 22px -14px #20392d55;cursor:grab;transition:transform .18s ease,box-shadow .18s ease}
+.board-block:hover{transform:translateY(-2px);box-shadow:0 2px 0 #20392d0f,0 14px 28px -14px #20392d70}
+.board-block:active{cursor:grabbing}
+.board-icon{flex:none;display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:var(--cat-soft);color:var(--cat)}
+.board-icon svg{width:21px;height:21px}
+.board-body{display:grid;gap:2px;min-width:0;flex:1}
+.board-body small{font-size:10.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--cat);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.board-body strong{font-size:13.5px;line-height:1.3;color:var(--dark);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.board-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.board-chips i{font-style:normal;font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;background:#eef3ea;color:#41584a}
+.board-chips i.open{background:#fff2e2;color:#9a5a12}
+.board-chips i.ok{background:#e3f3e7;color:#22663d}
+.board-grip{position:absolute;left:3px;top:50%;transform:translateY(-50%);color:#b8c4b4;display:flex}
+.board-grip svg,.card-grip svg{width:14px;height:14px;fill:currentColor}
+.board-open{flex:none;display:grid;place-items:center;width:32px;height:32px;padding:0;border-radius:10px;border-color:transparent;background:transparent;color:var(--cat)}
+.board-open:hover{background:var(--cat-soft)}
+.board-open svg{width:16px;height:16px}
+.board-slot{width:100%;border:2px dashed var(--cat-line);background:repeating-linear-gradient(135deg,#ffffff,#ffffff 10px,var(--cat-soft) 10px,var(--cat-soft) 20px);color:var(--ink);transition:border-color .2s,background .2s,transform .2s,box-shadow .2s}
+.board-slot:hover{border-color:var(--cat);background:var(--cat-soft)}
+.board-slot .board-icon{background:white;opacity:.85}
+.board-hint{font-size:11px;color:var(--muted)}
+.board-plus{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:white;border:1.5px solid var(--cat-line);color:var(--cat)}
+.board-plus svg{width:16px;height:16px}
+/* library cards as blocks */
+.paper-source-task{position:relative;border-left:5px solid var(--cat-line)!important;transition:transform .18s ease,box-shadow .18s ease,border-color .18s}
+.paper-source-task.is-draggable{cursor:grab}
+.paper-source-task.is-draggable:hover{transform:translateY(-2px);border-left-color:var(--cat)!important;box-shadow:0 14px 30px -18px #20392d80}
+.paper-source-task .paper-task-label{display:flex;align-items:center;gap:7px;color:var(--cat);padding-right:22px}
+.card-cat-icon{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:var(--cat-soft);color:var(--cat)}
+.card-cat-icon svg{width:15px;height:15px}
+.paper-source-task>p:not(.tiny){display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card-grip{position:absolute;right:8px;top:9px;color:#b4c1b0;display:flex;padding:3px;border-radius:6px}
+.paper-source-task.is-draggable:hover .card-grip{color:var(--cat);background:var(--cat-soft)}
+/* drag states */
+.drag-ghost{position:fixed;top:-200px;left:-400px;display:flex;align-items:center;gap:10px;width:260px;padding:10px 12px;border-radius:14px;background:white;border:1px solid var(--cat-line);border-left:5px solid var(--cat);box-shadow:0 18px 40px #193b2a40;font-size:13px;transform:rotate(-2deg)}
+.drag-ghost small{display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--cat)}
+.drag-ghost strong{display:block;color:var(--dark)}
+.drag-source{opacity:.45;transform:scale(.97)!important;filter:saturate(.6)}
+.dnd-active .board-slot{animation:slotBreath 1.6s ease-in-out infinite}
+.dnd-active .board-slot.slot-match{border-color:var(--cat);background:var(--cat-soft);box-shadow:0 0 0 4px hsl(var(--cat-h) 50% 60% / .25)}
+.dnd-active .board-slot.slot-match .board-hint::after{content:" · passt!";font-weight:700;color:var(--cat)}
+.board-slot.dragover,.dnd-active .board-slot.slot-match.dragover{transform:scale(1.03);border-style:solid;box-shadow:0 0 0 6px hsl(var(--cat-h) 50% 55% / .3)}
+.board-block.dragover{box-shadow:-6px 0 0 -1px var(--green),0 8px 22px -14px #20392d55}
+.dnd-active .paper-stage [data-paper-before]{transition:box-shadow .15s}
+.paper-stage [data-paper-before].dragover{box-shadow:0 -6px 0 0 #4f9a6b,0 0 0 2px #4f9a6b66!important}
+.paper-stage [data-paper-before].dragover::before{content:"Hier einfügen";position:absolute;left:50%;top:-30px;transform:translateX(-50%);padding:3px 12px;border-radius:999px;background:#2a6548;color:white;font:700 11px/18px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;white-space:nowrap;z-index:5;pointer-events:none}
+@keyframes slotBreath{0%,100%{transform:none}50%{transform:scale(1.015)}}
+/* landing animation */
+.board-block.just-added{animation:blockLand .55s cubic-bezier(.2,.9,.25,1.25)}
+.paper-sheet.just-added{animation:sheetGlow 1.4s ease-out}
+@keyframes blockLand{0%{opacity:0;transform:translateY(-14px) scale(.9)}60%{opacity:1;transform:translateY(2px) scale(1.02)}100%{transform:none}}
+@keyframes sheetGlow{0%{box-shadow:0 0 0 0 #4f9a6b00}25%{box-shadow:0 0 0 8px #4f9a6b55}100%{box-shadow:0 0 0 0 #4f9a6b00}}
+@media(max-width:700px){.exam-board-grid{grid-template-columns:1fr}.exam-board-meter{display:none}}
+@media(prefers-reduced-motion:reduce){.board-block,.board-slot,.paper-source-task,.exam-board-meter i{transition:none}.dnd-active .board-slot,.board-block.just-added,.paper-sheet.just-added{animation:none}}
+@media print{.exam-board{display:none!important}}
