@@ -99,7 +99,7 @@ Aus den Rückmeldungen der Aufgabenersteller, präzisiert. Reihenfolge = Umsetzu
    - **Fertig wenn:**
      - Suchbegriffe ohne Treffer im Thema zeigen Treffer aus anderen Bereichen mit Herkunftsangabe.
      - Eine AP-Aufgabe lässt sich in einer ZP mit einem Klick als ZP-Variante übernehmen, auch von Arbeitsgruppen.
-2. [ ] **Übersichtlichere Aufgabenauswahl im Papier-Look.**
+2. [x] **Übersichtlichere Aufgabenauswahl im Papier-Look.**
    - **Ziel:** weniger Unterfenster, kein Gedränge in der schmalen Seitenleiste.
    - **Umsetzung:**
      - Große Aufgabenauswahl als breite Ansicht neben dem Blatt mit Kartenraster, Miniaturvorschau, Filterleiste oben (Thema, Prüfungsart, Jahr) und Aktionen direkt auf der Karte.
