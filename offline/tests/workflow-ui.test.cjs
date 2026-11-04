@@ -14,7 +14,7 @@ async function ui(prepare=()=>{}){
 }
 test('existing meeting remains usable after coordinator browses the unscoped task archive',async()=>{
  const app=await ui();await app.click('route','scope');await app.click('action','choose-type','ZP');await app.click('route','dashboard');
- assert.ok(app.html().includes('Arbeitsgruppen für 2027'));assert.ok(!app.html().includes('Hier beginnen'));
+ assert.ok(app.html().includes('Prüfungsjahr 2027'));assert.match(app.html(),/class="status-table"/);assert.ok(!app.html().includes('Hier beginnen'));
  await app.click('route','groups');assert.ok(app.html().includes('Arbeitsbereich öffnen'));
 });
 test('global source archive shows the existing documents on first entry and after task browsing',async()=>{
@@ -35,13 +35,15 @@ test('floating menus close on outside click and Escape restores focus',async()=>
 
 test('interacting with one floating menu closes the other and keeps the current menu usable',async()=>{const app=await ui(),first={open:true,dataset:{paperPanel:'options'}},second={open:true,dataset:{}};app.menus.push(first,second);await app.dispatchClick({target:{closest:selector=>selector.startsWith('.editor-account-menu')?second:null}});assert.equal(first.open,false);assert.equal(second.open,true);});
 
-test('compact navigation groups historical examinations and tasks under one destination',async()=>{
+test('navigation has three places: Start, Aufgaben, Einstellungen; rare pages sit under Einstellungen',async()=>{
  const app=await ui();let html=app.html();
  const primary=html.match(/<div class="nav-primary">([\s\S]*?)<\/div>/)?.[1];
  assert.ok(primary,'primary navigation exists');
- assert.deepEqual([...primary.matchAll(/data-route="([^"]+)"/g)].map(m=>m[1]),['dashboard','results','catalog']);
- assert.match(html,/<details class="nav-more" data-ui-panel="administration"\s*>/);
+ assert.deepEqual([...primary.matchAll(/data-route="([^"]+)"/g)].map(m=>m[1]),['dashboard','catalog','admin']);
+ assert.doesNotMatch(html,/nav-more/,'no sub-menu');
+ await app.click('route','admin');html=app.html();assert.match(html,/<h1>Einstellungen<\/h1>/);
+ for(const r of ['groups','access','committees','settings','scope','import','results'])assert.match(html,new RegExp(`class="settings-tile" data-route="${r}"`),r);
  await app.click('route','catalog');html=app.html();assert.match(html,/<h1>Aufgaben & Archiv<\/h1>/);assert.match(html,/aria-label="Bestand durchsuchen"/);assert.match(html,/data-route="archive"/);
  await app.click('route','archive');html=app.html();assert.match(html,/<h1>Aufgaben & Archiv<\/h1>/);assert.match(html,/archive-from/);assert.match(html,/class="collection-tab active"[^>]*data-route="archive"/);
- await app.click('route','settings');assert.match(app.html(),/<details class="nav-more" data-ui-panel="administration" open>/);
+ await app.click('route','settings');assert.match(app.html(),/data-route="admin" aria-current="page"/,'Einstellungen stays highlighted');
 });

@@ -149,7 +149,10 @@ Ziel: viel einfacher und intuitiver. Prüfungseditor mit einer Aufgabe: sichtbar
 - [x] 3. Fertigstellen-Dialog statt Schritt 3
   - Ein Satz Zusammenfassung, „Noch offen“ mit genau einem Knopf je Punkt, „Erledigt“ als kurze Liste, Nachricht an die zuständige Stelle (speichert beim Tippen), Seitennotizen.
   - Unten „An die zuständige Stelle übergeben“ (Gruppe) bzw. „Prüfung freigeben“ (zuständige Stelle) und „Weiter bearbeiten“. Zeitplan, Punkteverteilung, Vorschau & Druck als Links. 10 Knöpfe, keine Aufklapper.
-- [ ] 4. Startseiten (Karten für Gruppen, Tabelle für die zuständige Stelle), Navigation Start · Aufgaben · Einstellungen
+- [x] 4. Startseiten (Karten für Gruppen, Tabelle für die zuständige Stelle), Navigation Start · Aufgaben · Einstellungen
+  - Arbeitsgruppe: je Prüfung eine Karte mit Fortschritt, „Als Nächstes: …“ und genau einem Knopf (Weiterarbeiten / Prüfung beginnen).
+  - Zuständige Stelle: Tabelle Fachrichtung × Prüfungsart mit Status (In Arbeit · n von m, Wartet auf Freigabe, Freigegeben); ein Klick öffnet die Prüfung. Oben „Arbeitsgruppen einladen“ und „Alles ausgeben (ZIP)“.
+  - Navigation: Start · Aufgaben · Einstellungen. Unter „Einstellungen“ liegen alle bisherigen Verwaltungsseiten als Kacheln auf einer Seite.
 - [ ] 5. Handy, einheitliche Begriffe, Hilfe statt i-Blasen; Test mit Anwendern
 
 ## Rückmeldungen
