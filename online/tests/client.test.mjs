@@ -762,3 +762,12 @@ test('new exam editor works for groups without coordinator-only actions and keep
  assert.match(html,/data-action="save-online"/);assert.match(html,/data-action="logout"/);assert.match(html,/data-action="editor-mode" data-id="klassisch"/);
  await u.click('action','editor-overlay','finish');assert.match(u.elements.get('#app').innerHTML,/Prüfung fertigstellen/);
 });
+
+test('groups see task details next to the sheet without approval, and the release items as "Prüft die zuständige Stelle"',async()=>{
+ const u=await ui('group',false,{editor:'neu'});await u.click('action','track-new','ZP');
+ const html=()=>u.elements.get('#app').innerHTML,gap=html().match(/data-editor-gap="gap-0"[\s\S]*?data-action="add" data-id="([^"]+)"/)?.[1];if(!gap)return;
+ await u.click('action','add',gap);const e=u.sandbox.testUI.getDb().exams.at(-1),item=e.items[0];
+ await u.click('action','item-edit',item.id);assert.match(html(),/editor-details/);assert.doesNotMatch(html(),/data-action="details-approve"/);assert.match(html(),/Die zuständige Stelle gibt die Aufgabe frei/);
+ await u.click('action','editor-overlay','finish');const f=html().slice(html().indexOf('class="finish"'));assert.doesNotMatch(f,/Mit der Freigabe bestätigst du/);assert.doesNotMatch(f,/data-action="release-exam"/);
+ if(/finish-confirm/.test(f))assert.match(f,/Prüft die zuständige Stelle/);
+});

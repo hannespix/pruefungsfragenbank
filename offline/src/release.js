@@ -2,15 +2,18 @@
 (function(root){'use strict';
 const C=typeof module!=='undefined'&&module.exports?require('./core.js'):root.HortiCore;
 const P=typeof module!=='undefined'&&module.exports?require('./planning.js'):root.HortiPlanning;
+// One task: text, points, source hints and an existing material list are confirmed together.
+function reviewTask(t,reviewedBy,reviewedAt){
+ if(t.materials?.text.trim())t.materials.status='confirmed';
+ t.reviewStatus='approved';t.solutionStatus=t.solution.trim()?'approved':'missing';t.reviewedBy=reviewedBy;t.reviewedAt=reviewedAt;
+ t.pointsReview={contentKey:C.pointsReviewKey(t),reviewedBy,reviewedAt};
+ const key=C.taskReviewKey(t);t.reviewKey=key;t.sourceReview={contentKey:key,reviewedBy,reviewedAt,flags:C.clone(t.flags)};
+ return t;
+}
 function markReviewed(e,reviewedBy,reviewedAt){
  const next=C.clone(e);
  if(next.pattern)next.pattern.status='confirmed';
- for(const {task:t} of C.examEntries(next,{alternatives:true})){
-  if(t.materials?.text.trim())t.materials.status='confirmed';
-  t.reviewStatus='approved';t.solutionStatus=t.solution.trim()?'approved':'missing';t.reviewedBy=reviewedBy;t.reviewedAt=reviewedAt;
-  t.pointsReview={contentKey:C.pointsReviewKey(t),reviewedBy,reviewedAt};
-  const key=C.taskReviewKey(t);t.reviewKey=key;t.sourceReview={contentKey:key,reviewedBy,reviewedAt,flags:C.clone(t.flags)};
- }
+ for(const {task:t} of C.examEntries(next,{alternatives:true}))reviewTask(t,reviewedBy,reviewedAt);
  const checklist=P.regulationChecklist(next);
  if(checklist.length){next.regulationReview=Object.fromEntries(checklist.map(c=>[c.id,true]));next.regulationReviewKey=P.regulationReviewKey(next);}
  return next;
@@ -38,5 +41,5 @@ function approve(e,{reviewedBy}={}){
  next.releaseReview={version:1,contentKey:C.examReviewKey(next),reviewedBy:reviewer,reviewedAt:at};
  return next;
 }
-const api={inspect,approve};root.HortiRelease=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
+const api={inspect,approve,reviewTask};root.HortiRelease=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
