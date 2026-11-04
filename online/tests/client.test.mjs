@@ -568,7 +568,7 @@ test('compact editor keeps required values discoverable without opening every co
  assert.match(html,/<details class="editor-checks" data-paper-panel="checks"\s*>/);
  assert.match(html,/Pflichtangaben/);assert.match(html,/data-action="timing-plan"/);
  assert.match(html,/<details class="editor-oral" data-paper-panel="oral"\s*>/);
- assert.match(html,/Mündliche Aufgabe.*noch offen/);
+ assert.match(html,/<summary><span>Mündliche Prüfungsaufgabe<\/span><span class="badge amber">Pflicht · noch offen<\/span>/,'one heading with its status');
  assert.doesNotMatch(html,/data-action="export-exam"|data-route="archive"|data-route="catalog"/);
  u.dispatch('toggle',{target:{dataset:{paperPanel:'checks'},open:true,isConnected:true}});
  await u.click('action','paper-pane','preview');html=u.elements.get('#app').innerHTML;
@@ -675,6 +675,19 @@ test('working groups build from the archive: choose a year and add its tasks to 
  assert.match(html,/<section class="archive-year" aria-label="Quelljahr 2023">[\s\S]*data-drag-task="demo-task-1"/);assert.doesNotMatch(html,/aria-label="Quelljahr 2024"/);
  assert.match(html,/Aus ZP Baumschule 2023\.pdf/);assert.doesNotMatch(html,/data-action="(download-source|source)"/,'no original PDF for groups');
  await u.click('action','add','demo-task-1');assert.ok(e.items.some(i=>i.originTaskId==='demo-task-1'),u.elements.get('#toast').textContent);C.validate(d);
+});
+
+test('oral templates are grouped by theme under one heading; the chosen task shows its theme everywhere',async()=>{
+ const u=await ui(),d=u.sandbox.testUI.getDb(),a=addOralFixture(d,{id:'oral-protect'}),b=addOralFixture(d,{id:'oral-plants'}),c=addOralFixture(d,{id:'oral-none'});a.category='Pflanzenschutz';b.category='Mündliche Aufgabe';b.tags=['Pflanzenkenntnisse'];
+ await createDraft(u,'AP');let html=u.elements.get('#app').innerHTML;const panel=html.slice(html.indexOf('<details class="editor-oral"'),html.indexOf('</details>',html.indexOf('class="oral-picker"'))+10);
+ assert.equal((panel.match(/Mündliche Prüfungsaufgabe/g)||[]).length,1,'no second heading inside the panel');assert.doesNotMatch(panel,/<h3>/);
+ const heads=[...panel.matchAll(/<h4>([^<]+)<span>/g)].map(m=>m[1]);assert.deepEqual(heads,['Pflanzenkenntnisse','Pflanzenschutz','Ohne Thema'],'themes in order, without theme last');
+ assert.ok(panel.indexOf(a.title)>panel.indexOf('>Pflanzenschutz<')&&panel.indexOf(c.title)>panel.indexOf('>Ohne Thema<'));
+ await u.click('action','oral-select',a.id);html=u.elements.get('#app').innerHTML;const e=d.exams.at(-1);
+ assert.match(html,/<span class="editor-oral-choice">SYNTHETIC_ORAL_oral-protect · Pflanzenschutz<\/span>/);assert.match(html,/Ausgewählt · Thema: Pflanzenschutz/);assert.match(html,/Andere Vorlage wählen \(3\)/);
+ assert.match(html,/<p class="paper-eyebrow">Mündliche Prüfungsaufgabe · Thema: Pflanzenschutz<\/p>/,'section heading on the sheet');
+ assert.match(html,/<strong>Mündliche Prüfungsaufgabe<\/strong><span>Thema: Pflanzenschutz · 37 Punkte · 17 Minuten<\/span>/,'cover line without "1 Aufgabe"');
+ assert.equal(C.oralTheme(e.oralItem.task),'Pflanzenschutz');
 });
 
 test('until the server accepts group tasks, groups keep the previous view without create buttons',async()=>{

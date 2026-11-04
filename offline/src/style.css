@@ -649,4 +649,20 @@ body.is-resizing .paper-stage,body.is-resizing .paper-library{pointer-events:non
 .word-workspace .sheet-toolbar .text-tool{padding:6px 7px;background:transparent;border-color:transparent}
 .word-workspace .sheet-toolbar .text-tool:hover{background:#eef3ea;border-color:#d5e0cf}
 .word-workspace .sheet-toolbar .text-tool svg{width:17px;height:17px}
+.editor-oral-choice{font-weight:500;color:#40513f;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.oral-picker .oral-note{margin:0 0 10px}
+.oral-chosen{display:flex;justify-content:space-between;align-items:center;gap:10px 16px;flex-wrap:wrap;padding:12px 14px;margin:0 0 12px;border-radius:12px;background:#eef5ea;border:1px solid #c9dcc0}
+.oral-chosen strong{display:block;font-size:15px}.oral-chosen .eyebrow{margin:0 0 2px}
+.oral-list-head{margin:14px 0 4px;font-size:13px;color:#40513f}
+.oral-change>summary{cursor:pointer;font-weight:600;font-size:13px;padding:6px 0}
+.oral-theme{margin:10px 0 0}
+.oral-theme h4{display:flex;align-items:baseline;gap:8px;margin:0 0 6px;padding-bottom:4px;border-bottom:2px solid #dfe8da;font-size:14px;color:#215c40}
+.oral-theme h4 span{font-size:11.5px;font-weight:500;color:var(--muted)}
+.oral-picker .oral-candidates{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.oral-candidate{display:flex;flex-direction:column;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.oral-candidate.is-selected{border-color:#2a6548;box-shadow:inset 0 0 0 1px #2a6548;background:#f5faf2}
+.oral-candidate h5{margin:0 0 4px;font-size:13.5px}
+.oral-excerpt{margin:0 0 6px;font-size:12px;color:#4a5848;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.oral-meta{display:flex;flex-wrap:wrap;gap:2px 10px;margin:0 0 8px;font-size:11px;color:var(--muted)}
+.oral-candidate .toolbar{margin-top:auto}
 @media print{.library-resizer,.sheet-statusbar,.sheet-toolbar{display:none!important}}
