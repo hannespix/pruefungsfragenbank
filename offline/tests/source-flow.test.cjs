@@ -13,11 +13,17 @@ class El{
   this.client=client;this.scroll=scroll;for(const c of children)this.append(c);
  }
  append(c){c.parentElement=this;this.children.push(c);}
+ set className(v){for(const c of String(v).split(/\s+/).filter(Boolean))this.classList.add(c);}
+ setAttribute(k,v){if(k==='style')this.styleText=v;}
+ remove(){const p=this.parentElement;if(p)p.children=p.children.filter(c=>c!==this);}
+ cloneNode(){const c=new El([]);c.tag=this.tag;Object.assign(c,{complete:this.complete,naturalWidth:this.naturalWidth,naturalHeight:this.naturalHeight,src:this.src,currentSrc:this.currentSrc});return c;}
+ addEventListener(){}
  get clientWidth(){return this.client?.w??0;}get clientHeight(){return this.client?.h??0;}
  get scrollWidth(){return this.scroll?.w??0;}get scrollHeight(){return this.scroll?.h??0;}
  removeAttribute(){}
  one(sel){
   if(sel===':focus-within'){const walk=e=>e.focus||e.children.some(walk);return walk(this);}
+  if(sel==='img:not(.source-slice-img)')return this.tag==='img'&&!this.classList.contains('source-slice-img');
   const m=/^(\.[\w-]+(?:\.[\w-]+)*)?(?:\[data-([\w-]+)\])?$/.exec(sel);if(!m)return false;
   const cls=(m[1]||'').split('.').filter(Boolean),attr=m[2]&&m[2].replace(/-([a-z])/g,(_,c)=>c.toUpperCase());
   return cls.every(c=>this.classList.contains(c))&&(!attr||this.dataset[attr]!==undefined)&&!!(cls.length||attr);
@@ -53,7 +59,7 @@ test('edited text grows at full size and moves everything below it down',()=>{
 test('table cells side by side push the next row only by the taller one',()=>{
  const left=point(200,26,{edited:true,need:52,width:228}),right=point(200,26,{edited:true,need:40,width:224}),below=point(240,26);
  S.fit(sheet([left,right,below]));
- assert.equal(below.style.translate,'0 26pt','max(26, 14), not the sum');assert.equal(left.style.translate,'');assert.equal(right.style.translate,'');
+ assert.equal(below.style.translate,'0 26.25pt','max(26, 14), not the sum; moves snap to whole screen pixels (0.75pt)');assert.equal(left.style.translate,'');assert.equal(right.style.translate,'');
 });
 
 test('several growing sections add up down the page',()=>{
@@ -87,4 +93,37 @@ test('the editor offers "+ Zeile" on every editable section, but print output do
  const editing=S.pages(item,{status:'draft'},d,0,false,P,I),printing=S.pages(item,{status:'draft'},d,0,true,P,I);
  assert.match(editing,/data-action="source-add-line" data-id="item-1\|point:b1:0"/);assert.match(editing,/Enter = neue Zeile/);
  assert.doesNotMatch(printing,/source-add-line|Enter = neue Zeile/);
+});
+
+// A page like the real templates: rows of dark pixels per pt as read from the background picture.
+function framedPage({frameTop=352,frameBottom=780,lines=[]}={}){
+ const rows=new Uint32Array(842);rows[80]=480;rows[frameTop]=rows[frameBottom]=480;for(let r=frameTop+1;r<frameBottom;r++)rows[r]=2;for(const y of lines)rows[y]=460;
+ const img=new El(['bg-img'],{});Object.assign(img,{tag:'img',complete:true,naturalWidth:595,naturalHeight:842,currentSrc:'data:image/png;base64,FRAME'+frameTop+'-'+lines.join('.')});
+ globalThis.__hortiSourceRows=new Map([[img.currentSrc.length+':'+img.currentSrc.slice(-96)+':595x842',rows]]);
+ globalThis.document={createElement:()=>{const e=new El([]);e.getContext=()=>({drawImage(){}});return e;}};
+ return img;
+}
+const pageWith=(img,items)=>{const doc=sheet(items);doc.children[0].children[0].append(img);return doc;};
+test('lines that overlap their neighbour by a point still follow the growing section',()=>{
+ const head=point(92,15,{edited:true,need:43}),next=point(106,29),list=point(206,14.2),item2=point(220,14.2);
+ S.fit(sheet([head,next,list,item2]));
+ assert.equal(next.style.translate,'0 28.5pt','the next paragraph moves although its box starts 1pt inside the heading');
+ const bullet=point(206,14.2,{edited:true,need:42}),after=point(220,14.2);S.fit(sheet([bullet,after]));assert.equal(after.style.translate,'0 28.5pt','27.8pt rounded up to whole pixels');
+});
+test('the planning field gets shorter instead of pushing the footer off the page',()=>{
+ try{
+  const img=framedPage(),text=point(100,30,{edited:true,need:230}),label=point(358,13),footer=point(800,10.6),doc=pageWith(img,[text,label,footer]);
+  assert.equal(S.fit(doc),0,'no overflow: the frame gives the 200pt back');
+  assert.equal(label.style.translate,'0 200.25pt','the frame top with its label moves down');assert.equal(footer.style.translate,'','footer and frame bottom stay');
+  const bg=doc.children[0].children[0];assert.ok(bg.classList.contains('source-shifted'));assert.ok(bg.children.some(c=>c.classList.contains('source-slice-band')),'gap below the text');
+  assert.equal(text.editor.dataset.sourceOverflow,'false');
+ }finally{delete globalThis.document;delete globalThis.__hortiSourceRows;}
+});
+test('writing lines in the planning field move closer evenly; only a full page is flagged',()=>{
+ try{
+  const lines=[400,450,500,550,600,650,700,750],img=framedPage({lines}),text=point(100,30,{edited:true,need:130}),footer=point(800,10.6),doc=pageWith(img,[text,footer]);
+  assert.equal(S.fit(doc),0);assert.equal(footer.style.translate,'');
+  const removed=doc.children[0].children[0].children.filter(c=>c.classList.contains('source-slice-part')).length;assert.ok(removed>=8,'every gap between writing lines gives some space: '+removed);
+  const tooMuch=point(100,30,{edited:true,need:700}),footer2=point(800,10.6);assert.equal(S.fit(pageWith(framedPage({lines}),[tooMuch,footer2])),1,'more text than the frame can give is flagged');
+ }finally{delete globalThis.document;delete globalThis.__hortiSourceRows;}
 });

@@ -60,6 +60,8 @@ Jedes Paket geht als eigener PR raus und wird nach grüner CI automatisch gemerg
 - [x] **Originalseiten: Inhalt rutscht nach unten statt kleinerer Schrift.**
   - Bearbeiteter Text behält seine Schriftgröße. Alles darunter rutscht mit: Text, Logos und der Hintergrund mit Rahmen, Linien, Tabellen und Planungsfeldern.
   - Tabellenzeilen wachsen mit, senkrechte Linien laufen durch, nebeneinanderliegende Zellen zählen nur einmal.
+  - Leere, umrahmte Planungsflächen (z. B. „Stichwortartige Durchführungsplanung“) werden kleiner statt verschoben. Ihr unterer Rand und die Fußzeile bleiben stehen, Schreiblinien rücken gleichmäßig zusammen.
+  - Absätze, die im PDF um etwa einen Punkt überlappen, rutschen zuverlässig mit. Neue Zeilen in Aufzählungen stehen unter dem Text, nicht unter dem Aufzählungszeichen.
   - Erst wenn der Platz bis zum Seitenende nicht reicht, wird die Stelle markiert und der Druck gesperrt.
   - Gleiches Verhalten in Editor, Druckvorschau, Druckdatei und Live-Vorschau des Aufgabenfensters.
   - Neue Zeilen:
