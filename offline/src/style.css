@@ -480,3 +480,26 @@ body.dnd-active #toast{visibility:hidden}
 .drop-dock.is-top{padding:8px 10px 10px}.drop-dock.is-top p{margin-bottom:4px}
 .drop-dock.is-top .dock-target{max-width:210px;min-height:40px;padding:6px 12px;font-size:12.5px}
 @media(max-width:600px){.drop-dock{padding:8px 8px 10px}.drop-dock-targets{display:grid;grid-template-columns:1fr 1fr;gap:6px}.dock-target{max-width:none;min-height:48px;padding:8px 10px;font-size:12px;gap:6px}}
+
+/* Deleting drafts in "Prüfungen & Ergebnisse": direct delete, multi-select, undo strip, trash tools */
+.trash-head{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 12px}
+.trash-undo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border-radius:12px;background:#203f2e;color:white}
+.trash-undo>svg{flex:none;width:18px;height:18px}
+.trash-undo span{flex:1;min-width:180px}
+.trash-undo button{background:white;color:#203f2e;border-color:white}
+.trash-bar{position:sticky;top:8px;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border-radius:12px;background:#fff7f5;border:1px solid #efb4a7;box-shadow:0 12px 30px -20px #6b1d0f80}
+.trash-bar .toolbar{margin:0}
+.result-row .result-main{flex:1;min-width:0}
+.pick-toggle{flex:none;align-self:flex-start;width:36px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:10px;border:2px solid #b9c9b4;background:white;color:transparent}
+.pick-toggle svg{width:18px;height:18px}
+.pick-toggle:hover{border-color:#c2381f}
+.pick-toggle[aria-pressed="true"]{background:#c2381f;border-color:#c2381f;color:white}
+.result-row.is-picked{outline:2px solid #e9a493;background:#fff7f5}
+button.quiet-danger{color:#b3361f;border-color:#efc9bf;background:white}
+button.quiet-danger:hover{background:#fde8e4;border-color:#c2381f;color:#8f2512}
+.trash-all{margin:8px 0 12px}
+.trash-list{margin:8px 0;padding-left:18px;max-height:220px;overflow:auto}
+.trash-list li{margin:3px 0}
+.trash-bar button.danger{background:#c2381f;border-color:#c2381f;color:white}
+.trash-bar button.danger:hover{background:#a52f19;border-color:#a52f19}
+.trash-bar button.danger svg{color:white}

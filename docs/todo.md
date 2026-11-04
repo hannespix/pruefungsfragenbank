@@ -52,6 +52,11 @@ Jedes Paket geht als eigener PR raus und wird nach grüner CI automatisch gemerg
   - Im Vollbild lässt sich die Aufgabenliste ausblenden, und ein Hinweis-Chip zeigt den Stand der Prüfungsordnung.
   - Der Baukasten lässt sich einklappen; bei wenig Höhe, im Vollbild oder wenn alles belegt ist, ist er automatisch eine kompakte Zeile.
   - Auf niedrigen Bildschirmen sind Kopf und Schritte kompakter, und der Arbeitsbereich ist höher.
+- [x] **Entwürfe löschen für die zuständige Stelle vereinfacht.**
+  - „Löschen“ direkt in jeder Zeile unter „Prüfungen & Ergebnisse“. Der Entwurf wandert ohne Umweg in den Papierkorb, eine Leiste mit „Rückgängig“ holt ihn sofort zurück.
+  - „Mehrere Entwürfe löschen …“: einzelne, alle oder nur die leeren Entwürfe auswählen und in einem Schritt verschieben.
+  - Der Papierkorb ist nach Löschdatum sortiert und hat „Alle wiederherstellen“ und „Papierkorb leeren“ (eine Bestätigung für alle).
+  - Eingesetzte Prüfungen bleiben geschützt, Arbeitsgruppen sehen die Aufräum-Funktionen nicht.
 - [ ] Rund 20 Formularfeldern fehlt ein `<label for>` (Barrierefreiheit).
 
 ## Technik & Sicherheit (aus `docs/code-audit-2026-11.md`)
