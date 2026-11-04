@@ -1,0 +1,20 @@
+name: Flask app checks
+on:
+  push:
+    paths: ['app.py', 'models.py', 'html_sanitizer.py', 'templates/**', 'tests/**', 'requirements.txt', '.github/workflows/flask-tests.yml']
+  pull_request:
+    paths: ['app.py', 'models.py', 'html_sanitizer.py', 'templates/**', 'tests/**', 'requirements.txt', '.github/workflows/flask-tests.yml']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install Flask==3.0.0 Flask-SQLAlchemy==3.1.1 "SQLAlchemy>=2.0.36" python-docx==1.1.0 "requests>=2.31.0" pdfplumber==0.11.5 "qrcode[pil]>=7.4.2"
+      - run: python -m unittest discover -s tests -v

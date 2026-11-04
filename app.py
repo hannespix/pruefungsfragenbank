@@ -4,14 +4,18 @@ import socket
 import re
 import json
 import io
+import secrets
+import html as html_lib
 import requests
 from datetime import datetime
+from urllib.parse import urlsplit
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file, Response
 from werkzeug.utils import secure_filename
 from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from models import db, Question, Exam, ExamItem, LLMConfig
+from html_sanitizer import sanitize_html
 from sqlalchemy import func, or_, text
 import qrcode
 
@@ -38,18 +42,44 @@ else:
     static_dir = 'static'
 
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
-app.config['SECRET_KEY'] = 'your-secret-key-change-in-production'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(
+# HORTIEXAM_INSTANCE_DIR erlaubt Tests und Mehrfachinstallationen einen eigenen Datenordner.
+INSTANCE_DIR = os.environ.get('HORTIEXAM_INSTANCE_DIR') or os.path.join(
     os.path.dirname(os.path.abspath(__file__)) if not getattr(sys, 'frozen', False) else os.path.dirname(sys.executable),
-    'instance',
-    'hortiexam.db'
+    'instance'
 )
+
+
+def _load_secret_key() -> str:
+    """SECRET_KEY aus Umgebung oder einmalig zufällig erzeugt und im instance-Ordner abgelegt.
+
+    Vorher war der Schlüssel fest im Quelltext und damit in jeder ausgelieferten .exe gleich.
+    """
+    env_key = os.environ.get('HORTIEXAM_SECRET_KEY')
+    if env_key:
+        return env_key
+    os.makedirs(INSTANCE_DIR, exist_ok=True)
+    key_file = os.path.join(INSTANCE_DIR, 'secret_key')
+    try:
+        with open(key_file, 'r', encoding='utf-8') as fh:
+            key = fh.read().strip()
+            if len(key) >= 32:
+                return key
+    except FileNotFoundError:
+        pass
+    key = secrets.token_hex(32)
+    with open(key_file, 'w', encoding='utf-8') as fh:
+        fh.write(key)
+    try:
+        os.chmod(key_file, 0o600)
+    except OSError:
+        pass
+    return key
+
+
+app.config['SECRET_KEY'] = _load_secret_key()
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(INSTANCE_DIR, 'hortiexam.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)) if not getattr(sys, 'frozen', False) else os.path.dirname(sys.executable),
-    'instance',
-    'uploads'
-)
+app.config['UPLOAD_FOLDER'] = os.path.join(INSTANCE_DIR, 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Erstelle Upload-Ordner falls nicht vorhanden
@@ -57,6 +87,31 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(os.path.dirname(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')), exist_ok=True)
 
 db.init_app(app)
+
+
+@app.before_request
+def _reject_cross_origin_writes():
+    """Einfacher CSRF-Schutz: schreibende Anfragen nur von derselben Herkunft.
+
+    Browser senden bei POST/DELETE einen Origin-Header (ältere ggf. nur Referer).
+    Fremde Webseiten können so keine Formulare (z. B. /settings) mehr unbemerkt absenden.
+    """
+    if request.method in ('GET', 'HEAD', 'OPTIONS'):
+        return None
+    source = request.headers.get('Origin') or request.headers.get('Referer')
+    if not source:
+        return None
+    if source == 'null' or urlsplit(source).netloc != request.host:
+        return jsonify({'error': 'Anfrage von fremder Herkunft abgelehnt'}), 403
+    return None
+
+
+@app.after_request
+def _security_headers(response):
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+    response.headers.setdefault('Referrer-Policy', 'same-origin')
+    return response
 
 # Erstelle Datenbank beim Start
 with app.app_context():
@@ -567,8 +622,8 @@ def questions():
 
             result.append({
                 'id': q.id,
-                'content': q.content or '',
-                'answer': q.answer or '',
+                'content': sanitize_html(q.content),
+                'answer': sanitize_html(q.answer),
                 'category': q.category or '',
                 'category_code': q.category_code,
                 'subcategory': q.subcategory or '',
@@ -594,8 +649,8 @@ def update_question(question_id):
         question = Question.query.get_or_404(question_id)
         data = request.json
         
-        content = data.get('content', '').strip()
-        answer = data.get('answer', '').strip()
+        content = sanitize_html((data.get('content') or '').strip())
+        answer = sanitize_html((data.get('answer') or '').strip())
         
         if not content:
             return jsonify({'error': 'Frage darf nicht leer sein'}), 400
@@ -603,7 +658,10 @@ def update_question(question_id):
         question.content = content
         question.answer = answer
         question.category = data.get('category', '')
-        question.category_code = data.get('category_code')
+        # Nur überschreiben, wenn mitgeschickt – der Editor sendet das Feld nicht
+        # und hat den Code bisher bei jeder Bearbeitung gelöscht.
+        if 'category_code' in data:
+            question.category_code = data.get('category_code')
         question.subcategory = data.get('subcategory', '')
         question.tags = data.get('tags', '')
         question.difficulty = max(1, min(5, int(data.get('difficulty', 3))))
@@ -647,8 +705,8 @@ def exam_items(exam_id):
         
         return jsonify([{
             'id': item.id,
-            'content': item.snapshot_content or '',
-            'answer': item.snapshot_answer or '',
+            'content': sanitize_html(item.snapshot_content),
+            'answer': sanitize_html(item.snapshot_answer),
             'category': item.snapshot_category or '',
             'subcategory': item.snapshot_subcategory or '',
             'tags': [t.strip() for t in item.snapshot_tags.split(',')] if item.snapshot_tags and item.snapshot_tags.strip() else [],
@@ -668,8 +726,8 @@ def get_question(question_id):
         q = Question.query.get_or_404(question_id)
         return jsonify({
             'id': q.id,
-            'content': q.content or '',
-            'answer': q.answer or '',
+            'content': sanitize_html(q.content),
+            'answer': sanitize_html(q.answer),
             'category': q.category or '',
             'subcategory': q.subcategory or '',
             'tags': q.tags or '',
@@ -690,12 +748,12 @@ def exam_item_update(exam_id, item_id):
         item = ExamItem.query.filter_by(id=item_id, exam_id=exam_id).first_or_404()
         data = request.json or {}
 
-        content = (data.get('content') or '').strip()
+        content = sanitize_html((data.get('content') or '').strip())
         if not content:
             return jsonify({'error': 'Frage darf nicht leer sein'}), 400
 
         item.snapshot_content = content
-        item.snapshot_answer = (data.get('answer') or '').strip()
+        item.snapshot_answer = sanitize_html((data.get('answer') or '').strip())
         item.snapshot_category = (data.get('category') or '').strip()
         item.snapshot_subcategory = (data.get('subcategory') or '').strip()
         item.snapshot_tags = (data.get('tags') or '').strip()
@@ -920,7 +978,14 @@ def exam_add_question(exam_id):
             return jsonify({'success': False, 'error': 'Frage ist bereits in dieser Prüfung'}), 400
         
         # Snapshot erstellen: Content und Answer kopieren
-        max_position = db.session.query(db.func.max(ExamItem.position)).filter_by(exam_id=exam_id).scalar() or -1
+        # Achtung: "or -1" machte aus einer gültigen Maximalposition 0 wieder -1,
+        # sodass alle neuen Items Position 0 bekamen.
+        current_max = db.session.query(db.func.max(ExamItem.position)).filter_by(exam_id=exam_id).scalar()
+        max_position = -1 if current_max is None else current_max
+        try:
+            points = max(1, int(request.json.get('points', 1)))
+        except (TypeError, ValueError):
+            points = 1
         
         exam_item = ExamItem(
             exam_id=exam_id,
@@ -931,7 +996,7 @@ def exam_add_question(exam_id):
             snapshot_subcategory=question.subcategory or '',
             snapshot_tags=question.tags or '',
             snapshot_difficulty=question.difficulty or 3,
-            points=max(1, request.json.get('points', 1)),  # Mindestens 1 Punkt
+            points=points,  # Mindestens 1 Punkt
             position=max_position + 1
         )
         
@@ -1141,14 +1206,18 @@ def save_import():
                 db.session.flush()
 
             for q_data in questions:
+                try:
+                    difficulty = max(1, min(5, int(q_data.get('difficulty', 3))))
+                except (TypeError, ValueError):
+                    difficulty = 3
                 question = Question(
-                    content=q_data.get('content', '').strip(),
-                    answer=q_data.get('answer', '').strip(),
+                    content=sanitize_html((q_data.get('content') or '').strip()),
+                    answer=sanitize_html((q_data.get('answer') or '').strip()),
                     category=q_data.get('category', ''),
                     category_code=q_data.get('category_code'),
                     subcategory=q_data.get('subcategory', ''),
                     tags=q_data.get('tags', ''),
-                    difficulty=q_data.get('difficulty', 3),
+                    difficulty=difficulty,
                     active=True
                 )
 
@@ -1617,7 +1686,9 @@ def settings():
             
             config.name = name
             config.api_url = api_url
-            config.api_key = request.form.get('api_key', '').strip()
+            new_key = request.form.get('api_key', '').strip()
+            if new_key or request.form.get('clear_api_key') == 'on':
+                config.api_key = new_key
             config.model = request.form.get('model', '').strip()
             config.provider = request.form.get('provider', 'custom')
             config.headers = request.form.get('headers', '').strip()
@@ -1668,7 +1739,10 @@ def get_api_config(config_id):
             'id': config.id,
             'name': config.name or '',
             'api_url': config.api_url or '',
-            'api_key': config.api_key or '',
+            # Der Schlüssel verlässt den Server nicht mehr; das Formular zeigt nur,
+            # dass einer hinterlegt ist. Leeres Feld beim Speichern = Schlüssel behalten.
+            'api_key': '',
+            'has_api_key': bool(config.api_key),
             'model': config.model or '',
             'provider': config.provider or 'custom',
             'headers': config.headers or '',
@@ -1684,12 +1758,23 @@ def get_api_config(config_id):
 def test_api_config():
     """API: Verbindung testen"""
     try:
-        data = request.json
-        
+        data = request.json or {}
+
+        # Beim Bearbeiten wird der gespeicherte Schlüssel nicht mehr an den Browser
+        # gegeben; für den Test ggf. serverseitig ergänzen.
+        api_key = data.get('api_key')
+        if not api_key and data.get('config_id'):
+            try:
+                stored = db.session.get(LLMConfig, int(data.get('config_id')))
+            except (TypeError, ValueError):
+                stored = None
+            if stored:
+                api_key = stored.api_key
+
         # Temporäres Config-Objekt erstellen
         config = LLMConfig(
             api_url=data.get('api_url'),
-            api_key=data.get('api_key'),
+            api_key=api_key,
             model=data.get('model'),
             provider=data.get('provider'),
             headers=data.get('headers'),
@@ -1755,7 +1840,7 @@ def export_exam(exam_id):
         content = item.snapshot_content
         content = content.replace('<br>', '\n').replace('<br/>', '\n').replace('<br />', '\n')
         content = re.sub(r'<[^>]+>', '', content)  # Entferne alle HTML-Tags
-        q_para.add_run(content)
+        q_para.add_run(html_lib.unescape(content))
         
         doc.add_paragraph()  # Leerzeile
     
@@ -1771,16 +1856,23 @@ def export_exam(exam_id):
         answer = item.snapshot_answer
         answer = answer.replace('<br>', '\n').replace('<br/>', '\n').replace('<br />', '\n')
         answer = re.sub(r'<[^>]+>', '', answer)  # Entferne alle HTML-Tags
-        sol_para.add_run(answer)
+        sol_para.add_run(html_lib.unescape(answer))
         doc.add_paragraph()
     
     # Speichern
-    safe_title = re.sub(r'[^\w\s-]', '', exam.title).strip().replace(' ', '_')
-    filename = f'exam_{exam_id}_{safe_title}.docx'
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    doc.save(filepath)
-    
-    return send_file(filepath, as_attachment=True, download_name=filename)
+    # \s enthält auch Zeilenumbrüche, die send_file als Header-Injection ablehnt (500).
+    safe_title = re.sub(r'\s+', '_', re.sub(r'[^\w\s-]', '', exam.title or '').strip())[:80]
+    filename = f'exam_{exam_id}_{safe_title}.docx' if safe_title else f'exam_{exam_id}.docx'
+    # Im Speicher erzeugen: Vorher blieb jede Exportdatei dauerhaft im Upload-Ordner liegen.
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    )
 
 
 if __name__ == '__main__':
@@ -1794,7 +1886,11 @@ if __name__ == '__main__':
     print(f"  LAN:      http://{local_ip}:{port}")
     print(f"{'='*60}\n")
     
-    # Auto-Reload aktiviert für automatische Neustarts bei Dateiänderungen
-    # Deaktiviere Reloader wenn HORTIEXAM_NO_RELOAD gesetzt ist (für Desktop-App)
-    use_reloader = os.environ.get('HORTIEXAM_NO_RELOAD') != '1'
-    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=use_reloader)
+    # Debug-Modus (Werkzeug-Debugger + Auto-Reload) nur auf ausdrücklichen Wunsch
+    # und dann nur lokal: Der Debugger erlaubt Codeausführung und darf nie im LAN hängen.
+    debug = os.environ.get('HORTIEXAM_DEBUG') == '1'
+    host = '127.0.0.1' if debug else os.environ.get('HORTIEXAM_HOST', '0.0.0.0')
+    use_reloader = debug and os.environ.get('HORTIEXAM_NO_RELOAD') != '1'
+    if debug:
+        print("Debug-Modus aktiv (HORTIEXAM_DEBUG=1): nur lokal erreichbar.\n")
+    app.run(host=host, port=port, debug=debug, use_reloader=use_reloader)

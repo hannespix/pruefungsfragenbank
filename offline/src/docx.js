@@ -8,7 +8,8 @@ const O=root.HortiOrganization||(typeof require==='function'?require('./organiza
 const X=root.docx||(typeof require==='function'?require('../vendor/docx.umd.min.js'):null);
 const Zip=root.JSZip||(typeof require==='function'?require('../vendor/jszip.min.js'):null);
 const tw=pt=>Math.round(pt*20),mm=n=>Math.round(n*1440/25.4),px=pt=>pt*4/3;
-const clean=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
+// U+FFFE/U+FFFF are not XML characters either; Word rejects document.xml containing them.
+const clean=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g,'');
 const ink='2A2623',muted='625E59',line='B8B4AF',soft='F4F3F3',paperWidth=mm(174);
 // Legacy page assets contain no source wording. Decode their lossless PNG once,
 // recover straight rules as native Word borders, and retain remaining figures.

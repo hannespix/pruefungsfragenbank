@@ -13,7 +13,7 @@ function visibleTotals(t){
  }
  return evidence;
 }
-function sourceIssues(e){return C.examEntries(e).flatMap(item=>{const totals=[...new Set(visibleTotals(item.task).map(q=>q.points))];return totals.length>1?[item.label+': Widersprüchliche Gesamtpunkte im sichtbaren Aufgabentext ('+totals.join(' / ')+'); ausdrücklich abgleichen.']:positive(item.task.points)&&totals.some(n=>n!==item.task.points)?[item.label+': '+item.task.points+' Gesamtpunkte im Punktefeld widersprechen dem sichtbaren Aufgabentext ('+totals.join(' / ')+'). Werte ausdrücklich abgleichen.']:[];});}
+function sourceIssues(e){return C.examEntries(e).flatMap(item=>{const totals=[...new Set(visibleTotals(item.task).map(q=>q.points))];return totals.length>1?[item.label+': Widersprüchliche Gesamtpunkte im sichtbaren Aufgabentext ('+totals.join(' / ')+'); ausdrücklich abgleichen.']:positive(item.task.points)&&totals.some(n=>Math.abs(n-item.task.points)>0.001)?[item.label+': '+item.task.points+' Gesamtpunkte im Punktefeld widersprechen dem sichtbaren Aufgabentext ('+totals.join(' / ')+'). Werte ausdrücklich abgleichen.']:[];});}
 function rowFor(item,context){
  const t=item.task,criteria=C.clone(t.criteria),known=criteria.filter(c=>c.points!=null),missing=criteria.filter(c=>c.points==null),sum=known.reduce((n,c)=>n+c.points,0);
  const row={itemId:item.id,label:item.label,title:t.title,component:item.component,currentPoints:t.points??null,points:t.points??null,criteria,method:'existing',explanation:'Gespeicherte Gesamt- und Teilpunkte bleiben unverändert.',evidence:[],issues:[],changed:false};
@@ -21,7 +21,7 @@ function rowFor(item,context){
  try{C.checkTask(t,context);}catch(error){return conflict(error.message);}
  row.evidence=visibleTotals(t);const sourceTotals=[...new Set(row.evidence.map(q=>q.points))];
  if(sourceTotals.length>1)return conflict('Widersprüchliche Gesamtpunkte im sichtbaren Aufgabentext ('+sourceTotals.join(' / ')+'); zuerst ausdrücklich abgleichen.');
- if(t.points!=null&&sourceTotals.some(n=>n!==t.points))return conflict(t.points+' Gesamtpunkte im Punktefeld widersprechen dem sichtbaren Aufgabentext ('+sourceTotals[0]+'). Werte ausdrücklich abgleichen.');
+ if(t.points!=null&&sourceTotals.some(n=>Math.abs(n-t.points)>0.001))return conflict(t.points+' Gesamtpunkte im Punktefeld widersprechen dem sichtbaren Aufgabentext ('+sourceTotals[0]+'). Werte ausdrücklich abgleichen.');
  if(t.points!=null&&!positive(t.points))return conflict('Gespeicherte Gesamtpunktzahl '+t.points+' ausdrücklich prüfen; benötigt wird eine positive Punktzahl.');
  if(t.points==null){
   if(sourceTotals.length&&positive(sourceTotals[0])){row.points=sourceTotals[0];row.method='source-explicit';row.explanation='Gesamtpunkte ausdrücklich im sichtbaren Aufgabentext belegt. Fehlende Gewichtungen bleiben fachliche Vorschläge.';}
@@ -29,7 +29,7 @@ function rowFor(item,context){
   else if(sum>=100)return conflict('Bereits '+sum+' Teilpunkte vorhanden, weitere Kriteriumspunkte fehlen. Gesamtpunktzahl ausdrücklich festlegen; die 100-Punkte-Arbeitsgrundlage reicht nicht aus.');
   else {row.points=100;row.method='working-scale-100-v1';row.explanation='Vorschlag: 100 Punkte als Arbeitsgrundlage, keine amtliche Vorgabe und keine Quellenbestätigung. Gesamtpunkte und Gewichtung fachlich prüfen.';}
  }
- if(sum>row.points)return conflict(sum+' vorhandene Teilpunkte überschreiten '+row.points+' Gesamtpunkte. Werte ausdrücklich abgleichen; nichts wird umverteilt.');
+ if(sum>row.points+0.001)return conflict(sum+' vorhandene Teilpunkte überschreiten '+row.points+' Gesamtpunkte. Werte ausdrücklich abgleichen; nichts wird umverteilt.');
  if(criteria.length&&!missing.length&&Math.abs(sum-row.points)>0.001)return conflict('Summe der vorhandenen Kriteriumspunkte ('+sum+') weicht von '+row.points+' Gesamtpunkten ab. Gesamt- oder Teilpunkte ausdrücklich korrigieren.');
  let targets=missing;
  if(!criteria.length){

@@ -5,7 +5,7 @@ const P=root.HortiPrint||(typeof require==='function'?require('./print.js'):null
 const NS='http://schemas.openxmlformats.org/';
 const namespaces=`xmlns:w="${NS}wordprocessingml/2006/main" xmlns:r="${NS}officeDocument/2006/relationships" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w10="urn:schemas-microsoft-com:office:word"`;
 const xml=s=>'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+s;
-const esc=s=>P.esc(String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,''));
+const esc=s=>P.esc(String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g,''));
 const tw=n=>Math.round(n*20),pt=n=>Math.round(n*1000)/1000;
 const bytes=s=>Uint8Array.from(atob(s.replace(/\s/g,'')),c=>c.charCodeAt(0));
 const rels=rs=>xml(`<Relationships xmlns="${NS}package/2006/relationships">${rs.map(r=>`<Relationship Id="${r.id}" Type="${NS}officeDocument/2006/relationships/${r.type}" Target="${esc(r.target)}"/>`).join('')}</Relationships>`);

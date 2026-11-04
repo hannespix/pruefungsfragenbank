@@ -54,9 +54,14 @@ Im Prüfungs-Editor gibt es Buttons **„🧹 Text prüfen“**. Diese Funktion 
 
 ### Entwicklung starten
 
-**Mit Auto-Reload (empfohlen für Entwicklung):**
+**Normaler Start (LAN-erreichbar, ohne Debugger):**
 ```bash
 python app.py
+```
+
+**Mit Debugger und Auto-Reload (nur lokal, nur für Entwicklung):**
+```bash
+HORTIEXAM_DEBUG=1 python app.py
 ```
 
 Oder mit dem Start-Skript:
@@ -70,7 +75,15 @@ Die Anwendung läuft dann auf:
 
 Die lokale IP-Adresse wird beim Start angezeigt.
 
-**Hinweis**: Im Debug-Modus (Standard) lädt die App automatisch neu, wenn Dateien geändert werden. Kein manueller Neustart nötig!
+**Hinweis**: Der Debug-Modus ist aus Sicherheitsgründen nicht mehr Standard. Der Werkzeug-Debugger erlaubt Codeausführung und bindet deshalb nur an `127.0.0.1`. Weitere Umgebungsvariablen: `HORTIEXAM_HOST` (Standard `0.0.0.0`), `HORTIEXAM_SECRET_KEY` (sonst wird einmalig `instance/secret_key` erzeugt), `HORTIEXAM_INSTANCE_DIR` (eigener Datenordner).
+
+**Sicherheit im LAN**: Die Flask-App hat keine Anmeldung. Jede Person im selben Netz kann Fragen lesen, ändern und löschen. Nur in vertrauenswürdigen Netzen betreiben. API-Schlüssel werden im Klartext in der lokalen SQLite-Datenbank gespeichert, aber nicht mehr an den Browser ausgeliefert. Fremde Webseiten können keine schreibenden Anfragen mehr auslösen (Origin-Prüfung), und Fragen-HTML wird serverseitig auf die Editor-Allowlist bereinigt.
+
+### Tests
+
+```bash
+python -m unittest discover -s tests
+```
 
 ## Build für Windows (.exe)
 
@@ -193,7 +206,7 @@ Die SQLite-Datenbank wird automatisch im `instance/` Ordner erstellt. Bei der .e
 
 ### Auto-Reload
 
-Die App läuft standardmäßig im Debug-Modus mit Auto-Reload. Änderungen an Python-Dateien, Templates oder CSS werden automatisch erkannt und die App startet neu. Kein manueller Neustart nötig!
+Mit `HORTIEXAM_DEBUG=1` läuft die App im Debug-Modus mit Auto-Reload. Änderungen an Python-Dateien, Templates oder CSS werden automatisch erkannt und die App startet neu. Kein manueller Neustart nötig!
 
 ### Datei-Änderungen werden automatisch erkannt:
 - ✅ Python-Dateien (.py)
