@@ -961,3 +961,24 @@ button.link{background:none;border:0;padding:2px 0;margin:0;color:var(--green);t
 .finish-rows li button{width:auto;margin:0;flex:none}
 .finish-chips{display:flex;flex-wrap:wrap;gap:4px;flex-basis:100%}
 .finish-chips i{font-style:normal;font-size:12px;padding:2px 8px;border-radius:999px;background:#eef1ec;color:#3e4a42}
+/* ---- Checkliste folgt dem Blatt: Karte der Aufgabe im Blick ---- */
+.checklist-task{--cat:hsl(var(--cat-h,150) 38% 40%);margin:0 0 16px;border:1px solid var(--line);border-left:4px solid var(--cat);border-radius:14px;background:white;padding:12px 12px 8px;box-shadow:0 8px 20px -16px #20392d66}
+.checklist-task.is-gap{border-left-color:#c98a3b;background:#fffaf2}
+.checklist-task-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:start;margin-bottom:6px}
+.checklist-task-head .eyebrow{grid-column:1/-1;margin:0;font-size:10.5px;letter-spacing:.08em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.checklist-task-head h3{margin:0;font-size:15px;line-height:1.3}
+.checklist-task .checklist-items li{padding:7px 4px;grid-template-columns:20px minmax(0,1fr);gap:8px}
+.checklist-task .checklist-items li.is-open strong{color:#8a4b08}
+.checklist-task .checklist-items li.is-optional .check-mark{border-style:dashed}
+.checklist-task .checklist-actions{margin-top:6px}
+.checklist-task-text{margin:4px 0 10px;font-size:13px;color:var(--muted)}
+.checklist-task-meta{margin:2px 4px 4px;font-size:12px;color:var(--muted)}
+.checklist-task-more{margin:4px 4px 2px}
+.checklist-task-more button{margin:0}
+.checklist-sub{margin:4px 2px 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.checklist-task.is-entering{animation:checklist-in .26s ease-out both}
+.checklist-task.is-entering.from-above{animation-name:checklist-in-above}
+@keyframes checklist-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes checklist-in-above{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.checklist-task.is-entering{animation:none}}
+@media(max-width:1000px){.editor-checklist:not(.is-open) .checklist-task,.editor-checklist:not(.is-open) .checklist-sub{display:none}}
