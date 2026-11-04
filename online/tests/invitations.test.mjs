@@ -26,12 +26,13 @@ function loginHarness(hash=''){
  return {o:context.HortiOnline,context,app,dialog,elements,calls,storage,timers,setStatus:value=>status=value,rejectJoin:value=>rejectJoin=value,submit:()=>{const form=elements.get('#login-form');return form.handlers.submit({preventDefault(){},target:form});}};
 }
 
-test('home offers manual word entry, posts phrase and device name, and waits for approval before reading tasks',async()=>{
+test('home asks for the role first, then posts phrase and name, and waits for approval before reading tasks',async()=>{
  const h=loginHarness(),started=h.o.start();await turn();
- assert.match(h.app.innerHTML,/Passwort der zuständigen Stelle/);
- assert.ok(h.elements.get('#login-group'),'The home screen needs a group-join action');
+ assert.match(h.app.innerHTML,/Wer meldet sich an\?/);assert.match(h.app.innerHTML,/Prüferin \/ Prüfer[\s\S]*fünf Zugangswörter/);assert.match(h.app.innerHTML,/Zuständige Stelle[\s\S]*Passwort/);
+ assert.ok(!h.elements.has('#login-value'),'no password field before the role is chosen');
+ assert.ok(h.app.innerHTML.indexOf('id="login-group"')<h.app.innerHTML.indexOf('id="login-admin"'),'examiners come first');
  h.elements.get('#login-group').onclick();
- assert.match(h.app.innerHTML,/Arbeitsgruppe beitreten/);assert.ok(h.elements.get('#login-invitation'));
+ assert.match(h.app.innerHTML,/Als Prüferin oder Prüfer anmelden/);assert.ok(h.elements.get('#login-invitation'));assert.doesNotMatch(h.app.innerHTML,/type="password"/);
  h.elements.get('#login-invitation').value='APFEL birne wolke anker besen';h.elements.get('#login-value').value='Mein Tablet';
  await h.submit();await turn();
  assert.deepEqual(h.calls.find(c=>c.url.endsWith('/api/join')).body,{invitation:'APFEL birne wolke anker besen',label:'Mein Tablet'});
@@ -43,18 +44,32 @@ test('home offers manual word entry, posts phrase and device name, and waits for
 
 test('manual invalid phrases remain editable and public help and administrator switching still work',async()=>{
  const h=loginHarness();h.o.start();await turn();
- assert.ok(h.elements.get('#login-group'),'The home screen needs a group-join action');h.elements.get('#login-group').onclick();
- h.elements.get('#login-invitation').value='wrong';h.elements.get('#login-value').value='Tablet';h.rejectJoin(true);await h.submit();
+ h.elements.get('#login-group').onclick();
+ // Not five words: explained right away, nothing is sent.
+ h.elements.get('#login-invitation').value='Passwort123';h.elements.get('#login-value').value='Tablet';await h.submit();
+ assert.match(h.elements.get('#login-error').textContent,/keine fünf Zugangswörter[\s\S]*Zuständige Stelle/);assert.ok(!h.calls.some(c=>c.url.endsWith('/api/join')));
+ h.elements.get('#login-invitation').value='apfel birne wolke anker xyzab';h.rejectJoin(true);await h.submit();
  assert.match(h.elements.get('#login-error').textContent,/ungültig/);assert.equal(h.elements.get('#login-form').button.disabled,false);
- assert.equal(h.elements.get('#login-invitation').value,'wrong');assert.equal(h.storage.size,0);
+ assert.equal(h.elements.get('#login-invitation').value,'apfel birne wolke anker xyzab');assert.equal(h.storage.size,0);
  h.elements.get('#login-help').onclick();assert.equal(h.dialog.open,true);assert.match(h.dialog.innerHTML,/Hilfe/);
- h.elements.get('#login-admin').onclick();assert.match(h.app.innerHTML,/Passwort der zuständigen Stelle/);assert.ok(!h.elements.has('#login-invitation'));
+ h.elements.get('#login-back').onclick();h.elements.get('#login-admin').onclick();assert.match(h.app.innerHTML,/Passwort der zuständigen Stelle/);assert.ok(!h.elements.has('#login-invitation'));
+});
+
+test('access words typed into the coordinator password field are recognised, never sent as a password, and carried over',async()=>{
+ const h=loginHarness();h.o.start();await turn();
+ h.elements.get('#login-admin').onclick();h.elements.get('#login-value').value='Apfel Birne Wolke Anker Besen';await h.submit();
+ assert.ok(!h.calls.some(c=>c.url.endsWith('/api/login')),'no login attempt is used up');
+ assert.match(h.app.innerHTML,/Das sind Zugangswörter für Prüferinnen und Prüfer/);
+ h.elements.get('#login-as-group').onclick();
+ assert.match(h.app.innerHTML,/Als Prüferin oder Prüfer anmelden/);assert.match(h.app.innerHTML,/value="Apfel Birne Wolke Anker Besen"/,'the words are already filled in');
+ h.elements.get('#login-invitation').value='Apfel Birne Wolke Anker Besen';h.elements.get('#login-value').value='Petra';await h.submit();
+ assert.deepEqual(h.calls.find(c=>c.url.endsWith('/api/join')).body,{invitation:'Apfel Birne Wolke Anker Besen',label:'Petra'});
 });
 
 test('scanned legacy and phrase invitations still go straight to device-name entry and clear the fragment',async()=>{
  for(const invitation of ['b'.repeat(64),'apfel-birne-wolke-anker-besen']){
   const h=loginHarness('#invite='+invitation);h.o.start();await turn();
-  assert.equal(h.context.location.hash,'');assert.match(h.app.innerHTML,/Arbeitsgruppe beitreten/);
+  assert.equal(h.context.location.hash,'');assert.match(h.app.innerHTML,/Ihre Einladung ist erkannt/);
   assert.ok(!h.elements.has('#login-invitation'));h.elements.get('#login-value').value='Scan Tablet';await h.submit();
   assert.deepEqual(h.calls.find(c=>c.url.endsWith('/api/join')).body,{invitation,label:'Scan Tablet'});
   assert.ok(!h.calls.some(c=>c.url.endsWith('/api/project')));

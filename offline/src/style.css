@@ -985,3 +985,21 @@ button.link{background:none;border:0;padding:2px 0;margin:0;color:var(--green);t
 .editor-details.is-entering{animation:checklist-in .26s ease-out both}
 .editor-details.is-entering.from-above{animation-name:checklist-in-above}
 @media(prefers-reduced-motion:reduce){.editor-details.is-entering{animation:none}}
+/* ---- Anmeldung: zuerst die Rolle, dann ein kurzes Formular ---- */
+.login-roles{display:grid;gap:12px;margin:18px 0 8px}
+.login-role{display:flex;gap:16px;align-items:center;width:100%;text-align:left;padding:18px 18px;border:1.5px solid var(--line);border-radius:16px;background:white;color:var(--ink);cursor:pointer;box-shadow:0 6px 18px -14px #20392d66;transition:border-color .15s,box-shadow .15s,transform .15s}
+.login-role:hover,.login-role:focus-visible{border-color:var(--green);box-shadow:0 10px 26px -14px #20392d88;transform:translateY(-1px)}
+.login-role.is-main{border-color:#9cc3a7;background:#f3f9f4}
+.login-role-icon{flex:none;display:grid;place-items:center;width:54px;height:54px;border-radius:14px;background:#e2efe5;color:var(--green)}
+.login-role-text{display:grid;gap:3px}
+.login-role-text strong{font-size:19px}
+.login-role-text span{font-size:14px;color:var(--muted);line-height:1.45}
+.login-role-text b{color:var(--ink)}
+.login-back{margin:18px 0 0;padding:0}
+.login-panel .login-words{font-size:18px;letter-spacing:.02em}
+.login-ok{color:var(--green);font-weight:600}
+.login-phrase-hint{margin:16px 0 8px;padding:14px 16px;border-radius:14px;background:#fdf3e3;border:1px solid #ead9bb}
+.login-phrase-hint p{margin:4px 0 12px;font-size:14px}
+.login-phrase-hint .link{display:block;margin-top:10px;padding:0}
+.login-foot{margin-top:22px}
+@media(prefers-reduced-motion:reduce){.login-role{transition:none}.login-role:hover{transform:none}}

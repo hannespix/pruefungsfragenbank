@@ -472,6 +472,10 @@ test('non-object JSON bodies and missing access ids are rejected with 400',async
  assert.equal(await raw('/api/login','null'),400);assert.equal(await raw('/api/login','[1]'),400);
  for(const path of ['/api/access/close','/api/access/approve','/api/access/revoke'])assert.equal(await raw(path,'{}',t.admin),400,path);
 });
+test('access words sent to the coordinator login get a hint and do not use up the coordinator attempts',async()=>{
+ const t=await setup();for(let i=0;i<8;i++){const r=await t.req('/api/login',{password:'apfel birne wolke anker besen'});assert.equal(r.status,401);assert.match(r.body.error,/Zugangswörter für Prüferinnen und Prüfer/);}
+ assert.equal((await t.req('/api/login',{password:'test-only-long-password-123456789'})).status,200,'the coordinator still gets in');
+});
 test('login limit groups IPv6 clients by /64 and expired limiter rows are removed',async()=>{
  const t=await setup();const login=ip=>handle(new Request('https://api.test/api/login',{method:'POST',headers:{Origin:t.env.ALLOWED_ORIGIN,'Content-Type':'application/json','CF-Connecting-IP':ip},body:JSON.stringify({password:'wrong'})}),t.env);
  const statuses=[];for(let i=1;i<=7;i++)statuses.push((await login('2001:db8:1:2::'+i.toString(16))).status);assert.deepEqual(statuses,[401,401,401,401,401,401,429]);
