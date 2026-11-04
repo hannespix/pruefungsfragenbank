@@ -161,6 +161,12 @@ Ziel: viel einfacher und intuitiver. Prüfungseditor mit einer Aufgabe: sichtbar
 
 ## Rückmeldungen
 
+- [x] **Anmeldung: Fast alle Prüfer haben ihre Zugangswörter in das Passwortfeld der zuständigen Stelle getippt; den Link „Arbeitsgruppe beitreten“ hat niemand gesehen.**
+  - Die Startseite fragt jetzt zuerst „Wer meldet sich an?“ mit zwei großen Karten: „Prüferin / Prüfer“ (zuerst, hervorgehoben: „Sie haben fünf Zugangswörter oder einen QR-Code bekommen.“) und „Zuständige Stelle“ („… und haben das Passwort“). Ein Passwortfeld gibt es erst nach der Wahl.
+  - Fünf Zugangswörter im Passwortfeld werden erkannt und nicht als Passwort abgeschickt. Stattdessen erscheint: „Das sind Zugangswörter für Prüferinnen und Prüfer.“ mit „Als Prüferin / Prüfer weiter“; die Wörter sind übernommen, der Cursor steht im Namensfeld.
+  - Im Prüferformular wird eine Eingabe, die keine fünf Wörter sind, sofort erklärt (mit dem Weg zur zuständigen Stelle), ohne Anfrage an den Server.
+  - Server: Zugangswörter, die an die Anmeldung der zuständigen Stelle gehen, zählen nicht mehr gegen deren 6 Versuche je 5 Minuten (im selben WLAN hatten sich die Prüfer gegenseitig und die zuständige Stelle ausgesperrt) und bekommen eine verständliche Antwort.
+  - Begriffe angeglichen: Einladungsblatt und Hilfe sagen jetzt „„Prüferin / Prüfer“ wählen“.
 - [x] **„Eine Textstelle passt nicht mehr auf die Seite“ tauchte immer wieder auf, ohne dass Text geändert wurde.** Ursache: Ein Klick in Originaltext schaltete auf das Bearbeitungsfeld. Dort fließt der Abschnitt als ein Absatz in der Ersatzschrift des Browsers (Arial statt „BaWue Sans“), die etwas breiter läuft. Eine im Original randvolle Zeile brach um, das Feld wurde auf die alte Höhe gestaucht (winziger Text), als „zu viel Text“ markiert, und der Druck war gesperrt. Die Markierung blieb nach dem Wegklicken stehen.
   - Angeklickter Originaltext wird jetzt nie mehr verkleinert. Er bekommt sofort seine Textspalte, und braucht er trotzdem eine Zeile mehr, rutscht der Inhalt darunter nach, wie beim Bearbeiten. Beim Verlassen ohne Änderung kehrt alles zum Original zurück und die Prüfung läuft neu, sodass keine Markierung stehen bleibt.
   - Gemeldet wird nur noch, was wirklich nicht mehr auf die Seite passt.
