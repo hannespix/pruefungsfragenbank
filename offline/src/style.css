@@ -311,3 +311,67 @@ dialog:has(.discard-guard){overflow:hidden}
 .dnd-touch,.dnd-touch *{-webkit-user-select:none;user-select:none}
 @media(pointer:coarse){.board-block,.paper-source-task.is-draggable{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}.board-grip,.card-grip{display:flex}}
 dialog:has([data-task-form]) .modal-body{min-height:min(64vh,600px)}
+/* WYSIWYG thumbnails in the task list and the full preview dialog */
+.task-thumb{--thumb-scale:.29;position:relative;height:190px;margin:6px 0 10px;overflow:hidden;border-radius:10px;border:1px solid #dfe7da;background:#eef2ea;box-shadow:inset 0 0 0 1px #ffffff80}
+.task-thumb-inner{position:absolute;left:50%;top:8px;width:210mm;transform:translateX(-50%) scale(var(--thumb-scale));transform-origin:top center;pointer-events:none}
+.task-thumb-inner .paper-sheet{margin:0 auto 6mm!important;box-shadow:0 6px 24px #20392d26!important}
+.task-thumb-inner .paper-task-tools,.task-thumb-inner .asset-placeholder,.task-thumb-inner .source-page-gap,.task-thumb-inner .source-blank{display:none!important}
+.task-thumb::after{content:"";position:absolute;inset:auto 0 0 0;height:56px;background:linear-gradient(#eef2ea00,#eef2ea);pointer-events:none}
+.task-thumb-open{position:absolute;inset:0;z-index:1;display:flex;align-items:flex-end;justify-content:flex-end;padding:8px;border:0;border-radius:inherit;background:transparent;cursor:zoom-in}
+.task-thumb-open span{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:white;border:1px solid #cfdccb;font-size:11.5px;font-weight:700;color:var(--green);box-shadow:0 4px 12px -6px #20392d55;transition:transform .15s}
+.task-thumb-open span svg{width:14px;height:14px}
+.task-thumb-open:hover span,.task-thumb-open:focus-visible span{transform:translateY(-2px);background:var(--green);color:white;border-color:var(--green)}
+.task-thumb-open:focus-visible{outline:3px solid #4f9a6b;outline-offset:2px}
+dialog.preview-dialog{max-width:1000px}
+.preview-dialog .modal-body{background:#e6e9e0}
+.preview-variants{display:flex;gap:6px;overflow-x:auto;margin:-4px 0 12px;padding-bottom:4px}
+.preview-variants button{flex:none;display:grid;gap:1px;text-align:left;max-width:240px;padding:7px 12px;border-radius:10px;background:white;font-size:12.5px;font-weight:600}
+.preview-variants button small{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+.preview-variants button.is-active{border-color:var(--green);box-shadow:0 0 0 2px #4f9a6b55;color:var(--dark)}
+.preview-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.preview-meta span{padding:3px 10px;border-radius:999px;background:white;border:1px solid #d9e3d5;font-size:12px;color:#41584a}
+.preview-sheets{display:grid;justify-items:center;gap:18px}
+.preview-sheets .paper-sheet{zoom:.82}
+.preview-sheets .paper-task-tools{display:none!important}
+.preview-issue{max-width:360px;color:#9a5a12}
+@media(max-width:900px){.preview-sheets .paper-sheet{zoom:.55}}
+@media(max-width:520px){.preview-sheets .paper-sheet{zoom:.42}}
+/* Quick start for new tasks */
+.quickstart{margin:0 0 18px;padding:14px;border-radius:14px;background:linear-gradient(135deg,#f3f8ef,#fbfdf9);border:1px solid #d9e6d3}
+.quickstart-title{margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--green)}
+.quickstart-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.qs-card{display:grid;gap:4px;align-content:start;text-align:left;padding:12px 14px;border-radius:12px;background:white;border:1px solid #d5e2cf;transition:transform .15s,box-shadow .15s,border-color .15s}
+.qs-card svg{width:22px;height:22px;color:var(--green)}
+.qs-card strong{font-size:13.5px;color:var(--dark)}
+.qs-card small{font-size:11.5px;line-height:1.4;color:var(--muted)}
+.qs-card:hover:not(:disabled){transform:translateY(-2px);border-color:#9fc29a;box-shadow:0 12px 24px -16px #20392d88}
+.qs-card:disabled{opacity:1;background:#f6f7f4}.qs-card:disabled svg{color:#a3ada6}
+.qs-panel{margin-top:12px;animation:stepIn .2s ease-out}
+.qs-templates{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.qs-templates button{display:grid;gap:2px;text-align:left;padding:9px 12px;border-radius:10px;background:white}
+.qs-templates button small{font-size:11px;color:var(--muted)}
+@media(max-width:760px){.quickstart-grid{grid-template-columns:1fr}}
+/* Live preview next to the form */
+.task-live{display:none}
+.task-live-title{display:flex;align-items:center;gap:6px;margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--green)}
+.task-live-title svg{width:15px;height:15px}
+.task-live-sheet{max-height:calc(92vh - 260px);overflow:auto;padding:10px;border-radius:12px;background:#e6e9e0}
+.task-live-sheet .paper-sheet{zoom:.42;margin:0 auto 12px!important}
+.task-live-sheet .paper-task-tools,.task-live-sheet .source-page-gap{display:none!important}
+.task-live-toggle{display:none}
+@media(min-width:1180px){
+ dialog:has([data-task-form]){width:min(1240px,calc(100% - 40px));max-width:none}
+ dialog:has([data-task-form]) .modal-body{display:grid;grid-template-columns:minmax(0,1fr) 360px;column-gap:24px;align-items:start}
+ dialog:has([data-task-form]) .task-steps{grid-column:1/-1}
+ dialog:has([data-task-form]) .task-step{grid-column:1}
+ .task-live{display:block;grid-column:2;grid-row:2/span 6;position:sticky;top:64px}
+}
+@media(max-width:1179px){
+ .task-live-toggle{display:inline-flex}
+ dialog.show-live-preview .task-live{display:block;margin-bottom:16px}
+ dialog.show-live-preview .task-live-sheet .paper-sheet{zoom:.5}
+}
+.quickstart .qs-card{display:grid!important;grid-template-columns:1fr;justify-items:start;align-content:start}
+.task-steps{position:relative;top:auto}
+@media(max-width:700px){.preview-dialog .modal-foot{flex-wrap:wrap}.preview-dialog .modal-foot .primary{order:-1;flex:1 1 100%}.preview-dialog .modal-foot>button:not(.primary){flex:1}}
+.task-thumb-open,.task-thumb-open:hover,.task-thumb-open:active,.task-thumb-open:focus{background:transparent!important;border-color:transparent!important}
