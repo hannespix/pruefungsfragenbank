@@ -467,15 +467,35 @@ async function preview(examiner){const outputDb=C.clone(db),e=outputDb.exams.fin
 function offerDownload(blob,name,message){const url=URL.createObjectURL(blob);openModal('Datei ist bereit',`<p>${E(message)}</p><p class="intro">Die Datei enthält vertrauliche Prüfungsunterlagen. Wählen Sie einen geeigneten Speicherort.</p><a class="download-link" id="ready-download" href="${url}" download="${E(name)}">↓ ZIP herunterladen</a>`,btn('close','Schließen'));$('#ready-download').addEventListener('click',()=>{setTimeout(()=>URL.revokeObjectURL(url),60000);toast('Download gestartet.');},{once:true});}
 // Hints shared by the single and the meeting package.
 const PACKAGE_NOTES='Word: Texte stehen in normalen Absätzen und Tabellen, ohne Textfelder. Zeichnungen bleiben eingebettete Bilder; erkannte Antwortfelder und Linien sind Word-Elemente. Längere Änderungen dürfen auf die nächste Seite umbrechen. Änderungen in Word verändern weder den Online-Entwurf noch die Aufgabenbank. Änderungen möglichst zuerst im Tool vornehmen und anschließend neu exportieren.\nDie Landesschriften werden bei vorhandenem CI-Datenbestand eingebettet. Word-Versionen, Browser-Word und andere Programme können unterschiedlich umbrechen; vor Ausgabe alle Seiten einschließlich Rückseiten kontrollieren.\nDrucken: A4, 100 %, beidseitig an langer Kante. In HTML Browser-Kopf-/Fußzeilen ausschalten. In LibreOffice beim PDF-Export automatisch eingefügte Leerseiten mit ausgeben.\nSeparate PDF-Anlagen beifügen. Eingepasste Bilder sind nicht automatisch maßstabsgetreu; für Maßstabsarbeit Original-PDF verwenden.\nENTWURF bedeutet: Informationen oder fachliche Freigaben fehlen. Fehlende Lösungen werden nicht erfunden.\nDas gesamte ZIP, Lösungen, Materiallisten, interne Bemerkungen und Zeitplan nicht an Prüflinge weitergeben.\n';
-// All documents of one exam, written into dir ('' for a single export). Everything is built before
-// anything is added, so an exam that fails leaves no half folder behind.
-async function examPackage(z,e,outputDb,dir=''){
- const files=[[dir+'01_Teilnehmerfassung.docx',await D.document(e,outputDb,false)],[dir+'02_Loesung_und_Bewertung.docx',await D.document(e,outputDb,true)],[dir+'01_Teilnehmerfassung.html',W.document(e,outputDb,false)],[dir+'02_Loesung_und_Bewertung.html',W.document(e,outputDb,true)]];
- for(const [kind,name]of [['materials','03_Materialliste'],['notes','04_Interne_Bemerkungen'],['timing','05_Zeitplan']])files.push([dir+name+'.docx',await D.organization(e,outputDb,kind)],[dir+name+'.html',O.document(e,outputDb,kind)]);
- const attachments=P.attachments(e,outputDb,true);files.push([dir+'00_Paketuebersicht.html',O.packageIndex(e,attachments)]);
+// All documents of one exam, written into dir ('' for a single export). With a tag (meeting export) every
+// file name carries the exam, and each task follows as its own Word file plus its own material list.
+// Everything is built before anything is added, so an exam that fails leaves no half folder behind.
+const PACKAGE_DOCS=[['01_Teilnehmerfassung','01 Pruefungsbogen'],['02_Loesung_und_Bewertung','02 Loesung und Bewertung'],['03_Materialliste','03 Materialliste'],['04_Interne_Bemerkungen','04 Interne Bemerkungen'],['05_Zeitplan','05 Zeitplan']];
+async function examPackage(z,e,outputDb,dir='',tag=''){
+ const names=Object.fromEntries(PACKAGE_DOCS.map(([stem,label])=>[stem,tag?`${tag} - ${label}`:stem])),index=tag?`${tag} - 00 Uebersicht.html`:'00_Paketuebersicht.html';
+ const files=[[dir+names['01_Teilnehmerfassung']+'.docx',await D.document(e,outputDb,false)],[dir+names['02_Loesung_und_Bewertung']+'.docx',await D.document(e,outputDb,true)],[dir+names['01_Teilnehmerfassung']+'.html',W.document(e,outputDb,false)],[dir+names['02_Loesung_und_Bewertung']+'.html',W.document(e,outputDb,true)]];
+ for(const [kind,stem]of [['materials','03_Materialliste'],['notes','04_Interne_Bemerkungen'],['timing','05_Zeitplan']])files.push([dir+names[stem]+'.docx',await D.organization(e,outputDb,kind)],[dir+names[stem]+'.html',O.document(e,outputDb,kind)]);
+ const singles=[],problems=[];
+ if(tag){
+  const draft=!C.readiness(e).ready;
+  for(const [n,entry]of C.examEntries(e).entries()){
+   const oral=entry.component==='oral',code=oral?'M':'A'+(n+1),base=`${tag} - ${code} ${folderName(entry.task.title,28)}`,one={...e,items:oral?[]:[{...e.items[n],exportLabel:entry.label}],oralItem:oral?e.oralItem:null},made=[];
+   try{
+    made.push({path:'Aufgaben einzeln/'+base+' - Pruefungsbogen.docx',label:'Prüfungsbogen',data:await D.document(one,outputDb,false,{single:true,draft})});
+    made.push({path:'Aufgaben einzeln/'+base+' - Loesung.docx',label:'Lösung & Bewertung',data:await D.document(one,outputDb,true,{single:true,draft})});
+    if(!oral)made.push({path:'Materiallisten einzeln/'+base+' - Materialliste.docx',label:'Materialliste',data:await D.organization(one,outputDb,'materials')});
+    for(const f of made)files.push([dir+f.path,f.data]);singles.push({label:entry.label,title:entry.task.title,files:made.map(({path,label})=>({path,label}))});
+   }catch(error){problems.push(entry.label+': '+(error.message||error));}
+  }
+ }
+ const attachments=P.attachments(e,outputDb,true);files.push([dir+index,O.packageIndex(e,attachments,{names,singles,problems})]);
  for(const [name,data]of files)z.file(name,data);
  for(const file of attachments){const a=outputDb.assets.find(a=>a.id===file.assetId);z.file(dir+file.path,a.data,{base64:true});}
+ return {names,index,singles:singles.reduce((n,x)=>n+x.files.length,0)};
 }
+// Short, unique tag of an exam for folder and file names: exam type, specialty and title without repetitions.
+const TYPE_SHORT={ZP:'ZP',AP:'AP',FW_AP:'FW-AP'};
+function examTag(e){const typ=TYPE_SHORT[e.examType]||e.examType,drop=new Set(['praktische','praktischer','prüfung','pruefung','-','–','—','·',typ.toLowerCase(),...C.examTypeLabel(e.examType).toLowerCase().split(/\s+/)]),rest=String(e.title||'').split(e.specialty).join(' ').split(/\s+/).filter(w=>w&&!drop.has(w.toLowerCase())).join(' ');return folderName(`${typ} ${e.specialty}${rest?' - '+rest:''}`,40);}
 async function exportExam(){
  if(isGroup)throw Error('Exporte sind der zuständigen Stelle vorbehalten.');
  if(online){await flush();await online.request('/api/export');}
@@ -487,7 +507,7 @@ async function exportExam(){
  offerDownload(blob,safeName(e.title)+'.zip','Das vollständige Paket ist bereit: Prüfungsbogen, Lösung & Bewertung, Materialliste, interne Bemerkungen und Zeitplan – jeweils als Word-Datei und Druckfassung. ZIP entpacken und 00_Paketuebersicht.html öffnen.');
 }
 // Folder names every system unpacks cleanly: umlauts spelled out, no special characters, short.
-function folderName(s,max=60){return safeName(String(s||'').replace(/[–—]/g,'-').replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/Ä/g,'Ae').replace(/Ö/g,'Oe').replace(/Ü/g,'Ue').replace(/ß/g,'ss')).replace(/[äöüÄÖÜß]/g,'_').replace(/_+/g,'_').replace(/\s+/g,' ').trim().slice(0,max).trim()||'Pruefung';}
+function folderName(s,max=60){let t=safeName(String(s||'').replace(/[–—]/g,'-').replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/Ä/g,'Ae').replace(/Ö/g,'Oe').replace(/Ü/g,'Ue').replace(/ß/g,'ss')).replace(/[äöüÄÖÜß]/g,'_').replace(/_+/g,'_').replace(/\s+/g,' ').trim();if(t.length>max){t=t.slice(0,max);const cut=t.lastIndexOf(' ');if(cut>max*.6)t=t.slice(0,cut);}return t.replace(/[\s_.-]+$/,'')||'Pruefung';}
 const EXAM_TYPE_ORDER=['ZP','AP','FW_AP'];
 let meetingExportRunning=false;
 // Every exam of one preparation meeting in one ZIP: a folder per specialty, a folder per exam.
@@ -502,13 +522,13 @@ async function exportMeeting(id){
   const exams=all.filter(e=>C.examEntries(e).length).sort((a,b)=>a.specialty.localeCompare(b.specialty,'de')||EXAM_TYPE_ORDER.indexOf(a.examType)-EXAM_TYPE_ORDER.indexOf(b.examType)||String(a.title).localeCompare(String(b.title),'de'));
   if(!exams.length)throw Error('Für diesen Vorbereitungstermin gibt es noch keine Prüfung mit Aufgaben.');
   await requireAssets([...new Set(exams.flatMap(e=>D.requiredAssetIds(e,outputDb,true)))],outputDb);
-  const z=new JSZip(),base=folderName(String(w.title||'').includes(String(w.examYear))?w.title:w.title+' '+(w.examYear||''),70),root=base+'/',groups=[],failed=[];let n=0;
+  const z=new JSZip(),base=folderName(String(w.title||'').includes(String(w.examYear))?w.title:w.title+' '+(w.examYear||''),40),root=base+'/',groups=[],failed=[];let n=0;
   for(const specialty of [...new Set(exams.map(e=>e.specialty))]){
    const dir=folderName(specialty)+'/',group={specialty,dir,exams:[]};
    for(const e of exams.filter(x=>x.specialty===specialty)){
     n++;toast(`Prüfung ${n} von ${exams.length} wird erstellt: ${e.title}`);
-    const sub=dir+String(group.exams.length+1).padStart(2,'0')+'_'+folderName(C.examTypeLabel(e.examType)+' '+e.title,56)+'/';
-    try{await D.prepareLogoMargins?.(e,outputDb);await examPackage(z,e,outputDb,root+sub);const r=C.readiness(e);group.exams.push({e,dir:sub,tasks:C.examEntries(e).length,status:e.status==='used'?'Einsatz dokumentiert':r.ready?'Freigaben vollständig':`Bearbeitung offen · ${r.issues.length} Hinweis${r.issues.length===1?'':'e'}`});}
+    const tag=examTag(e),sub=dir+String(group.exams.length+1).padStart(2,'0')+'_'+tag+'/';
+    try{await D.prepareLogoMargins?.(e,outputDb);const pkg=await examPackage(z,e,outputDb,root+sub,tag);const r=C.readiness(e);group.exams.push({e,dir:sub,files:pkg.names,index:pkg.index,singles:pkg.singles,tasks:C.examEntries(e).length,status:e.status==='used'?'Einsatz dokumentiert':r.ready?'Freigaben vollständig':`Bearbeitung offen · ${r.issues.length} Hinweis${r.issues.length===1?'':'e'}`});}
     catch(error){failed.push({e,error:error.message||String(error)});}
    }
    if(group.exams.length){group.materials=dir+'00_Materialuebersicht.html';z.file(root+group.materials,O.materialsOverview(group.exams.map(x=>x.e),outputDb,{meeting:w,specialty}));groups.push(group);}
@@ -522,7 +542,7 @@ async function exportMeeting(id){
  }finally{meetingExportRunning=false;}
 }
 function meetingReadme(w,base,groups,failed,empty){
- const tree=[base+'/','  00_Uebersicht.html          Übersicht aller Prüfungen mit Links','  LESEN.txt',...groups.flatMap(g=>['  '+g.dir+(g.dir.slice(0,-1)===g.specialty?'':'   '+g.specialty),'    00_Materialuebersicht.html   alle Materiallisten der Fachrichtung',...g.exams.map(x=>'    '+x.dir.slice(g.dir.length))]),'','In jedem Prüfungsordner:','  00_Paketuebersicht.html','  01_Teilnehmerfassung.docx / .html      Prüfungsbogen für Teilnehmende','  02_Loesung_und_Bewertung.docx / .html  vertrauliche Prüferfassung','  03_Materialliste.docx / .html','  04_Interne_Bemerkungen.docx / .html','  05_Zeitplan.docx / .html','  Anlagen in Unterordnern, falls vorhanden'];
+ const tree=[base+'/','  00_Uebersicht.html          Übersicht aller Prüfungen mit Links','  LESEN.txt',...groups.flatMap(g=>['  '+g.dir+(g.dir.slice(0,-1)===g.specialty?'':'   '+g.specialty),'    00_Materialuebersicht.html   alle Materiallisten der Fachrichtung',...g.exams.map(x=>'    '+x.dir.slice(g.dir.length))]),'','In jedem Prüfungsordner (jeder Dateiname beginnt mit Prüfungsart, Fachrichtung und Prüfung):','  … - 00 Uebersicht.html','  … - 01 Pruefungsbogen.docx / .html          Prüfungsbogen für Teilnehmende','  … - 02 Loesung und Bewertung.docx / .html   vertrauliche Prüferfassung','  … - 03 Materialliste.docx / .html','  … - 04 Interne Bemerkungen.docx / .html','  … - 05 Zeitplan.docx / .html','  Aufgaben einzeln/        je Aufgabe Prüfungsbogen und Lösung, z. B. „… - A1 <Aufgabe> - Pruefungsbogen.docx“','  Materiallisten einzeln/  je praktischer Aufgabe eine Materialliste','  Anlagen in Unterordnern, falls vorhanden'];
  return `PRÜFUNGSWERKSTATT GARTENBAU – ALLE PRÜFUNGEN EINES TERMINS\n\n${w.title} · Prüfungsjahr ${w.examYear||'offen'}\n\nZIP zuerst vollständig entpacken und 00_Uebersicht.html öffnen.\n\n${tree.join('\n')}\n${failed.length?`\nNicht ausgegeben:\n${failed.map(f=>'- '+f.e.title+' ('+f.e.specialty+'): '+f.error).join('\n')}\n`:''}${empty.length?`\nOhne Aufgaben, nicht enthalten:\n${empty.map(e=>'- '+e.title+' ('+e.specialty+')').join('\n')}\n`:''}\n`+PACKAGE_NOTES;
 }
 function trashDialog(id){const e=db.exams.find(e=>e.id===id&&!e.deletedAt);if(!e)throw Error('Prüfung fehlt.');openModal('Prüfung löschen?',`<p><strong>${E(e.title)}</strong> wird in den Papierkorb verschoben und ist für Arbeitsgruppen nicht mehr verfügbar.</p><p>Die zuständige Stelle kann sie unter „Prüfungen & Ergebnisse → Papierkorb“ wiederherstellen. Die Aufgabenbank bleibt erhalten.</p>`,btn('close','Abbrechen')+btn('confirm-trash-exam','In Papierkorb verschieben','danger',id));}
