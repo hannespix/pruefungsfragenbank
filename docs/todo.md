@@ -161,6 +161,9 @@ Ziel: viel einfacher und intuitiver. Prüfungseditor mit einer Aufgabe: sichtbar
 
 ## Rückmeldungen
 
+- [x] **Leerseiten im Editor sind Platzverschwendung.** Leere Rückseiten für den Duplexdruck und Originalseiten ohne Text erscheinen im Editor gar nicht mehr, auch nicht als Balken oder Markierung. „Vorschau & Druck“ und der Druck enthalten sie unverändert. Nur eine solche Seite mit Notiz bleibt eingeklappt erreichbar.
+- [x] **Checkliste passend zur Aufgabe im Blick.** Beim Scrollen wechselt oben in der Checkliste die Karte zur Aufgabe, die gerade auf dem Blatt zu sehen ist (kurze Animation, Farbe der Aufgabe, Markierung in der Gliederung). Die Karte zeigt Aufgabenstellung, Punkte & Zeit, Materialliste und Lösung dieser Aufgabe, je mit Knopf, falls etwas fehlt. Bei einer fehlenden Aufgabe zeigt sie den Vorschlag. Darunter steht „Ganze Prüfung“. Auf dem Handy erscheint die Karte im aufgeklappten Checklisten-Balken.
+- [x] Das Deckblatt zählt keine „Hinweise vor dem Einsatz“ mehr, sondern sagt nur „Entwurf · noch nicht freigegeben“.
 - [x] **Die Prüfpunkte nerven („Punkte klären“, „Fachliche Freigabe offen“, „Material bestätigen“) – einfacher machen.**
   - Punktevorschläge, Hinweise aus der Übernahme, Materialvorschläge und die fachliche Prüfung erscheinen nirgends mehr als offene Punkte: nicht unter „Fertigstellen“, nicht in der Checkliste („Angaben vollständig“) und nicht auf der Startseite. „Prüfung freigeben“ bestätigt sie stillschweigend, ein Satz unter dem Knopf sagt das.
   - Als offen zählt nur noch, was die Freigabe wirklich aufhält (z. B. fehlende Punkte, Zeiten, Texte oder Materialliste).

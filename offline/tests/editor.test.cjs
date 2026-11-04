@@ -48,7 +48,9 @@ test('a new ZP opens as a document: three themes chosen, one placeholder page wi
  const e=u.exam(),h=u.html();
  assert.equal(e.pattern.slots.length,3,'themes are chosen automatically');assert.equal(L.themeSelectionIssue(e),null);
  assert.match(h,/class="editor-v2"/);assert.match(h,/class="editor-outline"/);assert.match(h,/class="editor-checklist"/);
- assert.equal(count(h,/data-editor-gap="gap-\d"/g),3);assert.equal(count(h,/>Vorschlag übernehmen</g),3);
+ const sheet=h.slice(0,h.indexOf('class="editor-checklist'));assert.equal(count(sheet,/data-editor-gap="gap-\d"/g),3);assert.equal(count(sheet,/>Vorschlag übernehmen</g),3);
+ // The checklist starts with the card of the first page in view: here the first missing task.
+ assert.match(checklist(h),/data-checklist-task="gap-0"[\s\S]*Fehlt noch[\s\S]*Vorschlag übernehmen/);assert.match(checklist(h),/Ganze Prüfung/);
  // Nothing from the classic editor: no step tabs, no Baukasten, no permanent task list, no fold-out panels.
  for(const old of ['workflow-steps','exam-board','paper-library','editor-checks','Weitere Optionen'])assert.doesNotMatch(h,new RegExp(old));
  assert.equal(count(h,/class="is-next"/g),1,'exactly one next step');assert.match(checklist(h),/Aufgaben · 0 von 3/);assert.match(checklist(h),/Aufgabe 1 wählen/);
@@ -243,4 +245,17 @@ test('no info bubbles; their explanations are in the help; the checklist bar ope
  await u.click('action','picker-open','');await u.click('action','picker-tab','alle');assert.doesNotMatch(u.html(),/info-bubble/);await u.click('action','editor-overlay-close');
  assert.match(u.html(),/data-action="checklist-toggle" aria-expanded="false">Alle zeigen/);await u.click('action','checklist-toggle');assert.match(u.html(),/class="editor-checklist is-open"/);
  for(const group of [true,false]){const help=r('help.js').view({online:false,group});assert.match(help,/Gut zu wissen beim Zusammenstellen/);assert.match(help,/So entsteht eine Prüfung/);assert.match(help,/So bedient ihr das Prüfungsblatt/);assert.doesNotMatch(help,/Vorbereitungstermin|In drei Schritten/);}
+});
+
+test('the checklist opens with a card for the task in view: text, points & time, material list and solution of that task',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');await u.click('action','proposals-accept');
+ const e=u.exam(),first=e.items[0];let c=checklist(u.html());
+ assert.match(c,new RegExp(`class="checklist-task[^"]*" data-checklist-task="${first.id}"`));
+ for(const label of ['Aufgabenstellung','Punkte &amp; Zeit','Materialliste','Lösung','Details zur Aufgabe','Ganze Prüfung'])assert.match(c,new RegExp(label),label);
+ assert.ok(c.indexOf('data-checklist-task')<c.indexOf('Ganze Prüfung'),'the task card comes first');
+ // A missing material list shows up in the card of exactly this task, with a way to fill it in.
+ first.task.materials={...(first.task.materials||{}),text:''};await u.click('action','details-close');c=checklist(u.html());
+ const card=c.slice(c.indexOf('data-checklist-task'),c.indexOf('Ganze Prüfung'));
+ assert.match(card,/Materialliste<\/strong><span>fehlt noch/);assert.match(card,new RegExp(`data-action="details-open" data-id="${first.id}"`));
+ assert.match(u.html(),/class="checklist-count">\d von \d<\/span>/);
 });
