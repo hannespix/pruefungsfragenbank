@@ -1,0 +1,156 @@
+'use strict';
+// New exam editor: the exam is a document. Outline · sheet · checklist; missing tasks are placeholder pages
+// with a one-click proposal. Drafts from the classic editor must open and stay editable.
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const ROOT=path.join(__dirname,'..'),SRC=path.join(ROOT,'src'),r=f=>require(path.join(SRC,f));
+const C=r('core.js'),L=r('planning.js');
+
+function demoData(){
+ const data=C.validate(JSON.parse(fs.readFileSync(path.join(ROOT,'demo.json'),'utf8')));
+ const heads=['Durchführen von Arbeiten an der Pflanze','Einsatz von Werkzeug und Geräten','Vermehren von Pflanzen'];let n=0;
+ for(const t of data.tasks)if(t.examType==='ZP')t.text='Aufgabe: '+heads[n++%heads.length]+'\nHier: Synthetisches Beispiel\n'+t.text;
+ // The two demo ZP tasks share one family; two more families give every theme a proposal.
+ const zp=data.tasks.find(t=>t.examType==='ZP'&&t.specialty==='Baumschule'),base=data.tasks.find(t=>t.examType==='AP'&&t.specialty==='Baumschule');
+ const add=(src,id,over)=>{const t={...C.clone(src),id,familyId:'fam-'+id,title:over.title||id,...over};data.tasks.push(t);data.families.push({...C.clone(data.families.find(f=>f.id===src.familyId)),id:t.familyId,title:t.title});return t;};
+ add(zp,'zp-extra',{title:'Stecklinge schneiden',text:'Aufgabe: Vermehren von Pflanzen\nHier: Stecklinge\nSchneiden Sie zehn Stecklinge.',minutes:30});
+ add(zp,'zp-extra2',{title:'Heckenschere warten',text:'Aufgabe: Einsatz von Werkzeug und Geräten\nHier: Heckenschere\nReinigen und ölen Sie die Messer.',minutes:25});
+ // AP: four tasks for "Pflanzenproduktion", two for "Ernte und Vermarktung", one oral template.
+ const apHeads=['Vermehren von Gehölzen','Anlegen von Baumschulquartieren','Durchführen von Arbeiten an der Pflanze','Aufschulen und Aufpflanzen'];
+ apHeads.forEach((h,i)=>add(base,'ap1-'+i,{title:'Produktion '+(i+1),text:'Aufgabe: '+h+'\n'+base.text,minutes:40,practicalUnits:[{title:'Produktion '+(i+1),areaId:'area1',reason:'Pflanzenproduktion laut Aufgabenstellung'}]}));
+ [0,1].forEach(i=>add(base,'ap2-'+i,{title:'Verkauf '+(i+1),text:'Aufgabe: '+apHeads[i]+'\n'+base.text,minutes:40,practicalUnits:[{title:'Verkauf '+(i+1),areaId:'area2',reason:'Vermarktung laut Aufgabenstellung'}]}));
+ add(base,'oral-1',{kind:'oral',title:'Kundengespräch Rosen',text:'Thema: Kundenberatung\nBeraten Sie eine Kundin.',minutes:15,points:20});
+ data.workshops=[{id:'meeting',title:'Termin',examYear:2027,meetingDate:'',specialties:['Baumschule']}];
+ return C.validate(data);
+}
+
+async function ui({mode,data=demoData(),before}={}){
+ const stored=new Map(mode?[['hortiexam-editor',mode]]:[]),stubs=new Map(),listeners={},mk=id=>{const el={id,value:'',innerHTML:'',textContent:'',open:false,dataset:{},addEventListener(){},showModal(){this.open=true;},close(){this.open=false;},classList:{s:new Set(),add(...x){x.forEach(v=>this.s.add(v));},remove(...x){x.forEach(v=>this.s.delete(v));},contains(x){return this.s.has(x);}}};stubs.set(id,el);return el;};
+ for(const id of ['#app','#toast','#dialog','#project-input','#docx-input','#asset-input'])mk(id);
+ before?.(data);
+ stubs.set('#seed',{textContent:JSON.stringify(data)});stubs.set('meta[name=hortiexam-storage]',{content:'memory'});
+ const sandbox={localStorage:{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,String(v)),removeItem:k=>stored.delete(k)},HortiHistory:r('history.js'),HortiAdvisor:r('advisor.js'),HortiPointsPlan:r('points-plan.js'),HortiRelease:r('release.js'),HortiOrganization:r('organization.js'),HortiTimingPlan:r('timing-plan.js'),HortiMaterials:r('materials.js'),HortiArchive:r('archive.js'),HortiDocx:r('docx.js'),JSZip:require(path.join(ROOT,'vendor/jszip.min.js')),Blob,URL:{createObjectURL:()=>'blob:test',revokeObjectURL(){}},HortiSourceLayout:r('source-layout.js'),HortiIcons:r('icons.js'),HortiCatalog:r('catalog.js'),HortiHelp:r('help.js'),HortiPaper:r('paper.js'),HortiPlanning:r('planning.js'),HortiCore:C,HortiPrint:r('print.js'),console,setTimeout,clearTimeout,confirm:()=>true,
+  window:{addEventListener(){}},document:{querySelector:q=>stubs.get(q)||null,querySelectorAll:()=>[],addEventListener:(n,f)=>listeners[n]=f}};
+ await vm.runInNewContext(fs.readFileSync(path.join(SRC,'app.js'),'utf8').replace('await initStorage();','globalThis.testUI={getDb:()=>db};await initStorage();'),sandbox);
+ const click=(kind,value,id)=>listeners.click({target:{closest:s=>s===`[data-${kind}]`?{dataset:{[kind]:value,id}}:null}});
+ const exam=()=>sandbox.testUI.getDb().exams.at(-1);
+ return {sandbox,listeners,click,stored,exam,db:()=>sandbox.testUI.getDb(),html:()=>stubs.get('#app').innerHTML,toast:()=>stubs.get('#toast').textContent};
+}
+const count=(h,re)=>(h.match(re)||[]).length;
+const gapAdd=(h,gap)=>h.match(new RegExp(`data-editor-gap="${gap}"[\\s\\S]*?data-action="add" data-id="([^"]+)"`))?.[1];
+const checklist=h=>h.slice(h.indexOf('class="editor-checklist"'));
+const drop=(u,payload,dataset)=>u.listeners.drop({target:{closest:()=>({dataset,classList:{add(){},remove(){}}})},preventDefault(){},dataTransfer:{getData:()=>payload}});
+
+test('a new ZP opens as a document: three themes chosen, one placeholder page with a proposal per theme',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');
+ const e=u.exam(),h=u.html();
+ assert.equal(e.pattern.slots.length,3,'themes are chosen automatically');assert.equal(L.themeSelectionIssue(e),null);
+ assert.match(h,/class="editor-v2"/);assert.match(h,/class="editor-outline"/);assert.match(h,/class="editor-checklist"/);
+ assert.equal(count(h,/data-editor-gap="gap-\d"/g),3);assert.equal(count(h,/>Vorschlag übernehmen</g),3);
+ // Nothing from the classic editor: no step tabs, no Baukasten, no permanent task list, no fold-out panels.
+ for(const old of ['workflow-steps','exam-board','paper-library','editor-checks','Weitere Optionen'])assert.doesNotMatch(h,new RegExp(old));
+ assert.equal(count(h,/class="is-next"/g),1,'exactly one next step');assert.match(checklist(h),/Aufgaben · 0 von 3/);assert.match(checklist(h),/Aufgabe 1 wählen/);
+ assert.match(checklist(h),/GärtnAusbV § 8 Abs\. 4/);
+});
+
+test('one click takes a proposal; the placeholder becomes a page and the checklist moves on',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');
+ const id=gapAdd(u.html(),'gap-0');assert.ok(id);await u.click('action','add',id);
+ const e=u.exam(),h=u.html();assert.equal(e.items.length,1,u.toast());assert.equal(e.items[0].originTaskId,id);
+ assert.equal(count(h,/data-editor-gap="gap-\d"/g),2);assert.match(checklist(h),/Aufgaben · 1 von 3/);
+ assert.match(h,new RegExp(`class="outline-item"[^>]*data-board-item="${e.items[0].id}"`));
+ assert.match(h,/data-paper-field="text"/,'the task is editable on the sheet');
+});
+
+test('"Alle Vorschläge übernehmen" completes a ZP within the regulation',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');
+ assert.match(u.html(),/data-action="proposals-accept"/);await u.click('action','proposals-accept');
+ const e=u.exam(),c=L.structureCoverage(e),h=u.html();
+ assert.equal(c.total,3);assert.equal(c.themeCount,3);assert.ok(c.minutes<=180);assert.deepEqual(c.issues,[]);
+ assert.doesNotMatch(h,/data-editor-gap=/);assert.match(checklist(h),/Aufgaben · 3 von 3/);assert.match(checklist(h),/Zeit · \d+ von höchstens 180 Min\./);
+});
+
+test('"Andere Aufgabe wählen" opens the full-screen picker for that theme; choosing or Escape closes it',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');
+ const theme=u.exam().pattern.slots[1].categoryId;await u.click('action','picker-open',theme);
+ let h=u.html();assert.match(h,/class="editor-overlay"/);assert.match(h,/Aufgabe wählen · /);assert.match(h,/class="paper-library"/);
+ assert.doesNotMatch(h,/data-action="suggest"/,'gap pages replace the bulk proposal button');
+ u.listeners.keydown({key:'Escape',preventDefault(){},target:{closest:()=>null}});assert.doesNotMatch(u.html(),/class="editor-overlay"/);
+ await u.click('action','picker-open',theme);h=u.html();
+ const pick=[...h.slice(h.indexOf('class="paper-library"')).matchAll(/data-action="add" data-id="([^"]+)"/g)].map(m=>m[1])[0];assert.ok(pick);
+ await u.click('action','add',pick);assert.equal(u.exam().items.length,1,u.toast());assert.doesNotMatch(u.html(),/class="editor-overlay"/);
+ // A failed choice keeps the picker open with the message.
+ await u.click('action','picker-open','');await u.click('action','add',pick);assert.match(u.toast(),/bereits enthalten/);assert.match(u.html(),/class="editor-overlay"/);
+});
+
+test('themes change in an overlay; the old step buttons map to overlays',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');
+ await u.click('action','editor-overlay','themes');let h=u.html();assert.match(h,/data-workflow-theme/);assert.doesNotMatch(h,/1\. Welche Themen/);assert.doesNotMatch(h,/Weiter: passende Aufgaben/);
+ await u.click('action','workflow-step','3');h=u.html();assert.match(h,/Prüfung fertigstellen/);assert.match(h,/id="required-fields"/);assert.doesNotMatch(h,/3\. Prüfung durchsehen/);
+ await u.click('action','workflow-step','2');assert.doesNotMatch(u.html(),/class="editor-overlay"/);
+ await u.click('action','workflow-step','1');assert.match(u.html(),/data-overlay="themes"/);await u.click('action','editor-overlay-close');assert.doesNotMatch(u.html(),/class="editor-overlay"/);
+});
+
+test('AP: five tasks with the legal area minima, plus one oral task as its own placeholder',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','AP');
+ let h=u.html();const list=checklist(h);
+ assert.equal(count(h,/data-editor-gap="gap-\d"/g),5);assert.match(list,/Aufgaben · 0 von 5/);assert.match(list,/Pflanzenproduktion: 0 von mind\. 3/);assert.match(list,/Ernte und Vermarktung: 0 von mind\. 1/);
+ assert.match(list,/Mündliche Aufgabe/);assert.match(h,/data-editor-gap="oral-gap"/);assert.match(list,/Zeit · 0 von höchstens 300 Min\./);assert.match(list,/GärtnAusbV § 9/);
+ await u.click('action','proposals-accept');let c=L.structureCoverage(u.exam());assert.equal(c.total,5);assert.ok(c.areas.every(a=>a.actual>=a.min),JSON.stringify(c.areas));
+ h=u.html();const oral=h.match(/data-editor-gap="oral-gap"[\s\S]*?data-action="oral-select" data-id="([^"]+)"/)?.[1];assert.equal(oral,'oral-1');
+ await u.click('action','oral-select',oral);assert.equal(u.exam().oralItem.originTaskId,'oral-1');h=u.html();assert.doesNotMatch(h,/data-editor-gap=/);assert.match(checklist(h),/Kundengespräch Rosen/);
+ assert.match(h,/class="outline-item is-oral"/);
+});
+
+test('drafts from the classic editor open in the new editor and stay editable',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');
+ const db=u.db(),zp=db.tasks.filter(t=>t.examType==='ZP'&&t.specialty==='Baumschule'),p=L.snapshotPattern(db,L.pattern(db,'ZP','Baumschule'));
+ const draft=(over,items=[])=>{const e=C.newExam({...L.examDefaults(db,'ZP','Baumschule',2027),examType:'ZP',specialty:'Baumschule',examYear:2027,workshopId:'meeting',pattern:p,...over});for(const t of items)C.addItem(e,t);db.exams.push(e);return e;};
+ // Step 1 without themes (as the classic editor saved it): themes are the next step, nothing is lost.
+ const s1=draft({title:'Alt · Schritt 1',workflowStep:1,pattern:{...p,slots:[]}});await u.click('action','select-exam',s1.id);let h=u.html();
+ assert.match(h,/class="editor-v2"/);assert.match(checklist(h),/Themen · 0 von 3/);assert.match(checklist(h),/Themen vorschlagen/);assert.match(h,/Hier fehlt noch ein Thema/);
+ await u.click('action','suggest-themes');assert.equal(db.exams.find(e=>e.id===s1.id).pattern.slots.length,3);assert.match(u.html(),/>Vorschlag übernehmen</);
+ // Step 3 with tasks: opens on the sheet (no forced step), text fields stay editable, order and removal work.
+ const s3=draft({title:'Alt · Schritt 3',workflowStep:3},[zp[0],db.tasks.find(t=>t.id==='zp-extra')]);
+ await u.click('action','select-exam',s3.id);h=u.html();assert.doesNotMatch(h,/class="editor-overlay"/);
+ assert.equal(count(h,/contenteditable="plaintext-only"[^>]*data-paper-field="text"/g),2);
+ const [a,b]=s3.items.map(i=>i.id);drop(u,'item:'+b,{dropItem:a});assert.deepEqual(db.exams.find(e=>e.id===s3.id).items.map(i=>i.id),[b,a],'outline drop reorders');
+ u.listeners.keydown({key:'ArrowDown',altKey:true,preventDefault(){},target:{matches:s=>s==='.outline-entry',closest:s=>s==='[data-board-item][data-drag-item]'?{dataset:{boardItem:b}}:null}});
+ assert.deepEqual(db.exams.find(e=>e.id===s3.id).items.map(i=>i.id),[a,b],'Alt+arrow moves an outline entry');
+ assert.equal(W_edit(u,s3.id,a,'title','Neuer Titel'),true);assert.equal(db.exams.find(e=>e.id===s3.id).items[0].task.title,'Neuer Titel');
+ await u.click('action','item-remove',b);assert.equal(db.exams.find(e=>e.id===s3.id).items.length,1);assert.match(u.html(),/data-editor-gap="gap-0"/);
+ // An outdated theme snapshot shows the notice with the update button instead of hiding the draft.
+ const old=draft({title:'Alt · altes Muster',pattern:{...p,slots:[{categoryId:'plantwork',count:2}]}});await u.click('action','select-exam',old.id);h=checklist(u.html());
+ assert.match(h,/class="checklist-legacy"/);assert.match(h,/data-action="apply-pattern"/);
+ // A used exam stays read-only, offers a copy, and has no placeholders.
+ const used=draft({title:'Alt · eingesetzt'},zp.slice(0,1));used.status='used';await u.click('action','select-exam',used.id);h=u.html();
+ assert.doesNotMatch(h,/data-editor-gap=/);assert.doesNotMatch(h,/contenteditable="plaintext-only"/);assert.match(h,/Kopie zum Bearbeiten erstellen/);assert.doesNotMatch(h,/editor-finish/);
+});
+function W_edit(u,examId,itemId,field,value){const e=u.db().exams.find(x=>x.id===examId);return r('paper.js').edit(e,itemId,field,value);}
+
+test('the classic view stays switchable and is remembered on this device',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');
+ assert.match(u.html(),/data-action="editor-mode" data-id="klassisch"/);
+ await u.click('action','editor-mode','klassisch');assert.equal(u.stored.get('hortiexam-editor'),'klassisch');
+ let h=u.html();assert.doesNotMatch(h,/class="editor-v2"/);assert.match(h,/workflow-steps/);assert.match(h,/class="topbar"[\s\S]*data-action="editor-mode" data-id="neu"/);
+ await u.click('action','editor-mode','neu');assert.equal(u.stored.get('hortiexam-editor'),'neu');assert.match(u.html(),/class="editor-v2"/);
+ const c=await ui({mode:'klassisch'});await c.click('action','open-group','Baumschule');await c.click('action','track-new','ZP');assert.match(c.html(),/workflow-steps/);
+});
+
+test('the menu holds the rare actions; the header keeps one main action',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');
+ const h=u.html(),head=h.slice(h.indexOf('class="topbar editor-topbar"'),h.indexOf('id="editor-menu"')),menu=h.slice(h.indexOf('id="editor-menu"'),h.indexOf('class="editor-v2'));
+ assert.equal(count(head,/class="[^"]*primary[^"]*editor-finish"/g),1);assert.match(head,/popovertarget="editor-menu"/);assert.doesNotMatch(head,/<details/);
+ for(const action of ['timing-plan','points-plan','internal-notes','export-exam','duplicate-exam','paper-rules','history-open','trash-exam'])assert.match(menu,new RegExp(`data-action="${action}"`),action);
+ await u.click('action','history-open');await u.click('action','proposal-next');assert.match(u.toast(),/Neue Vorschläge|Keine weiteren passenden Vorschläge/);
+});
+
+test('guard for the redesign goals: with one task the controls around the sheet stay at ≤ 20 buttons and no fold-outs',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');await u.click('action','add',gapAdd(u.html(),'gap-0'));
+ const h=u.html(),part=(from,to)=>{const i=h.indexOf(from);return i<0?'':h.slice(i,to?h.indexOf(to,i):undefined);};
+ // Header without the closed menu, outline and checklist: what is always on screen next to the sheet.
+ const chrome=part('class="topbar editor-topbar"','id="editor-menu"')+part('class="editor-outline"','</nav>')+part('class="editor-checklist"','</aside>');
+ const buttons=count(chrome,/<button\b/g),words=chrome.replace(/<svg[\s\S]*?<\/svg>/g,'').replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ assert.ok(buttons<=20,`${buttons} buttons`);assert.equal(count(chrome,/<details\b/g),0);assert.equal(count(chrome,/info-bubble/g),0);assert.ok(words<=200,`${words} words`);
+});
