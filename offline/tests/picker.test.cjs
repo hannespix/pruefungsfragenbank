@@ -31,7 +31,8 @@ test('tasks are chosen from a card grid with a filter bar; nothing is hidden in 
  for(const part of ['class="library-filters"','id="paper-query"','id="paper-scope"','id="paper-year"','class="paper-task-list"','data-action="suggest"','Aufgaben automatisch ergänzen','data-action="new-task"'])assert.ok(lib.includes(part),part);
  assert.doesNotMatch(lib,/data-paper-panel="(task-|similar-|filters)/,'no "Ansehen & Herkunft", "Andere Ausführungen" or filter fold-outs');
  assert.match(lib,/data-action="task-template"/,'"Als Vorlage" sits on the card');
- assert.match(lib,/Quelle 2024|Quelle 2025/,'source year visible on the card');
+ assert.match(lib,/Vorlage aus 2024|Vorlage aus 2025/,'source year visible on the card');assert.match(lib,/Kein Einsatz erfasst/);
+ assert.doesNotMatch(h,/Familieneinsatz|Familienbelege|Quelldokument der Familie/,'plain words instead of "Familieneinsatz"');
  // Word-like sheet: one slim toolbar with direct buttons, zoom moved out of "Weitere Optionen"
  const bar=h.slice(h.indexOf('class="paper-preview-heading sheet-toolbar"'),h.indexOf('</div></div></div>',h.indexOf('sheet-toolbar')));
  for(const action of ['preview-candidate','export-exam','ai-paper','sheet-focus','library-toggle'])assert.match(bar,new RegExp(`data-action="${action}"`),action);
