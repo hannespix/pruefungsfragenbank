@@ -120,17 +120,22 @@ Aus den Rückmeldungen der Aufgabenersteller, präzisiert. Reihenfolge = Umsetzu
        - die Breite lässt sich am rechten Rand ziehen und rastet an Seitenrand und Spaltenkanten ein.
    - **Fertig wenn:** Listen lassen sich ohne Tippen von Zeichen anlegen, und Zeilen brechen nicht mehr unerwartet früh um.
    - **Stand:** erledigt in zwei Teilen – (1) Werkzeugleiste mit Aufzählung, Nummerierung, Einzug und neuer Zeile, Enter/Tab wie in Word, hängender Einzug in Blatt, Druck und Word; (2) bearbeitete Abschnitte auf Originalseiten in Spaltenbreite, Breite ziehbar mit Einrasten, auch in Word.
-5. [ ] **Mündliche Prüfung übersichtlicher.**
+5. [x] **Mündliche Prüfung übersichtlicher.**
    - **Umsetzung:**
      - Mündliche Vorlagen nach Themen gruppiert, mit klaren Überschriften.
      - Im Blatt und im Druck saubere Abschnittsüberschrift „Mündliche Prüfung“ mit Thema, Zeit und Punkten.
    - **Fertig wenn:** Auswahl und Ausdruck der mündlichen Aufgabe sind ohne doppelte oder missverständliche Überschriften.
+   - **Umgesetzt:** einheitlich „Mündliche Prüfungsaufgabe“ (statt teils „Mündliche Aufgabe“), Vorlagen nach Thema gruppiert, ausgewählte Aufgabe als Karte mit Thema, Punkten und Zeit; Thema auch auf Deckblatt, Aufgabenseite und in Word.
 6. [ ] **KI-Assistent: aus Vorschlägen neue Aufgaben erstellen, auch für Arbeitsgruppen.**
    - **Umsetzung:**
      - Vorschlag hochladen (Word, Text) oder einfügen. Die KI erstellt daraus Aufgabenentwürfe im Prüfungsformat (Titel, „Aufgabe: … Hier: …“, Punkte, Zeit, Material, Lösungshinweise als Entwurf) und stellt Rückfragen zu fehlenden Angaben.
      - Nach den Antworten wird der Entwurf verfeinert und mit einem Klick als Aufgabe übernommen; bei Gruppen als Entwurf zur Freigabe.
      - Läuft über den vorhandenen, abgesicherten KI-Zugang des Servers, ohne Speicherung beim Anbieter.
    - **Fertig wenn:** Aus einem eingefügten Vorschlag entsteht nach Rückfragen eine speicherbare Aufgabe, die direkt in die Prüfung übernommen werden kann.
+
+## Rückmeldungen
+
+- [x] Begriff „Familieneinsatz“ verwirrte: Einsatzhistorie jetzt in Klartext („Zuletzt in einer Prüfung eingesetzt am … (diese oder eine ähnliche Ausführung)“, „Jüngste Vorlage aus …“).
 
 ## Technik & Sicherheit (aus `docs/code-audit-2026-11.md`)
 
