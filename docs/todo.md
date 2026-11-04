@@ -23,8 +23,14 @@ Jedes Paket geht als eigener PR raus und wird nach grüner CI automatisch gemerg
 - [x] **Drag & Drop per Tastatur und Touch.**
   - Tastatur: Leertaste nimmt einen Baustein auf, die Pfeiltasten verschieben ihn, Leertaste legt ab und Esc bricht ab. Alt+Pfeil verschiebt direkt. Jeder Schritt wird für Screenreader angesagt.
   - Touch: kurz gedrückt halten, ziehen, loslassen. Die Vorschau folgt dem Finger, das Blatt scrollt am Rand mit. Ein schnelles Wischen scrollt weiterhin.
-- [ ] **WYSIWYG-Vorschau der Aufgaben in der Liste.** Vor dem Hinzufügen zeigt jede Aufgabe, auch jede „Andere Ausführung“, eine Blattvorschau.
-- [ ] **Neue Aufgaben einfacher erstellen.** Schnellstart und Live-Vorschau.
+- [x] **WYSIWYG-Vorschau der Aufgaben in der Liste.** Jede Karte, auch jede „Andere Ausführung“, zeigt ein Miniatur-Blatt aus dem echten Blatt-Renderer. „Vorschau“ öffnet das ganze Blatt mit Grafiken, Umschalter zwischen allen Ausführungen, Themen- und Punktechips sowie „Zur Prüfung hinzufügen“, „Für dieses Thema ersetzen“ oder „Als Vorlage verwenden“.
+- [x] **Neue Aufgaben einfacher erstellen.**
+  - Schnellstart mit drei Wegen:
+    - „Text einfügen“ aus Word oder PDF; Titel, Teilpunkte, Gesamtpunkte, Zeit und Lösung werden erkannt.
+    - „Mit Gerüst beginnen“: Aufgabe – Hier – Planen, Durchführen, Kontrollieren.
+    - „Ähnliche Aufgabe als Vorlage“.
+  - Live-Vorschau des Blatts neben dem Formular; auf schmalen Bildschirmen per Knopf „Vorschau“.
+  - Das Thema aus der aktuellen Auswahl wird vorbelegt.
 - [x] **Rückfrage bei ungespeicherten Eingaben.** Esc, ✕ und „Abbrechen“ zeigen eine Karte mit „Weiter bearbeiten“, „Verwerfen“ und „Speichern“. Auch beim Verlassen der Seite wird gefragt.
 - [ ] Rund 20 Formularfeldern fehlt ein `<label for>` (Barrierefreiheit).
 

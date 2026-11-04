@@ -17,10 +17,10 @@ async function ui(){
  for(const id of ['#app','#toast','#dialog','#project-input','#docx-input','#asset-input'])mk(id);
  stubs.set('#seed',{textContent:JSON.stringify(data)});stubs.set('meta[name=hortiexam-storage]',{content:'memory'});
  const dialog=stubs.get('#dialog');
- const formStubs=new Map(),querySelector=q=>{if(stubs.has(q))return stubs.get(q);if(/^#task-|^\[data-(criterion|asset|template)/.test(q)){if(!formStubs.has(q))formStubs.set(q,{value:'',checked:false,disabled:false,addEventListener(){}});return formStubs.get(q);}if(q==='#dialog [data-task-form]')return dialog.innerHTML.includes('data-task-form')?{}:null;if(q==='#dialog .discard-guard')return dialog.querySelector('.discard-guard');return null;};
+ const formStubs=new Map(),querySelector=q=>{if(stubs.has(q))return stubs.get(q);if(/^#task-|^#qs-|^\[data-(criterion|asset|template)/.test(q)){if(!formStubs.has(q))formStubs.set(q,{value:'',checked:false,disabled:false,addEventListener(){}});return formStubs.get(q);}if(q==='#dialog [data-task-form]')return dialog.innerHTML.includes('data-task-form')?{}:null;if(q==='#dialog .discard-guard')return dialog.querySelector('.discard-guard');return null;};
  const querySelectorAll=q=>q==='#dialog input,#dialog textarea,#dialog select'?fields:[];
  const createElement=()=>({className:'',innerHTML:'',setAttribute(){},querySelector:()=>({focus(){}}),remove(){const i=this.parent?.children.indexOf(this);if(i>=0)this.parent.children.splice(i,1);}});
- const sandbox={HortiHistory:r('history.js'),HortiAdvisor:r('advisor.js'),HortiPointsPlan:r('points-plan.js'),HortiRelease:r('release.js'),HortiOrganization:r('organization.js'),HortiTimingPlan:r('timing-plan.js'),HortiMaterials:r('materials.js'),HortiArchive:r('archive.js'),HortiDocx:r('docx.js'),JSZip:require(path.join(ROOT,'vendor/jszip.min.js')),Blob,URL:{createObjectURL:()=>'blob:test',revokeObjectURL(){}},HortiSourceLayout:r('source-layout.js'),HortiIcons:r('icons.js'),HortiCatalog:r('catalog.js'),HortiHelp:r('help.js'),HortiPaper:r('paper.js'),HortiPlanning:r('planning.js'),HortiCore:C,HortiPrint:r('print.js'),console,setTimeout,clearTimeout,confirm:()=>true,
+ const sandbox={HortiImport:r('import.js'),HortiHistory:r('history.js'),HortiAdvisor:r('advisor.js'),HortiPointsPlan:r('points-plan.js'),HortiRelease:r('release.js'),HortiOrganization:r('organization.js'),HortiTimingPlan:r('timing-plan.js'),HortiMaterials:r('materials.js'),HortiArchive:r('archive.js'),HortiDocx:r('docx.js'),JSZip:require(path.join(ROOT,'vendor/jszip.min.js')),Blob,URL:{createObjectURL:()=>'blob:test',revokeObjectURL(){}},HortiSourceLayout:r('source-layout.js'),HortiIcons:r('icons.js'),HortiCatalog:r('catalog.js'),HortiHelp:r('help.js'),HortiPaper:r('paper.js'),HortiPlanning:r('planning.js'),HortiCore:C,HortiPrint:r('print.js'),console,setTimeout,clearTimeout,confirm:()=>true,
   window:{addEventListener(){}},document:{querySelector,querySelectorAll,createElement,addEventListener:(n,f)=>listeners[n]=f}};
  await vm.runInNewContext(fs.readFileSync(path.join(SRC,'app.js'),'utf8').replace('await initStorage();','globalThis.testUI={getDb:()=>db};await initStorage();'),sandbox);
  const click=(kind,value,id)=>listeners.click({target:{closest:s=>s===`[data-${kind}]`?{dataset:{[kind]:value,id}}:null}});
@@ -57,4 +57,22 @@ test('building blocks move with the keyboard and Escape restores the order',asyn
  assert.ok(key(start[0],'ArrowRight',{altKey:true}));assert.deepEqual(order(),[start[1],start[0]]);
  assert.equal(key(start[0],'ArrowLeft'),false,'arrows without pick-up do nothing');
  assert.ok(key(start[0],' '));key(start[0],'ArrowLeft');assert.deepEqual(order(),start);key(start[0],'Escape');assert.deepEqual(order(),[start[1],start[0]]);
+});
+
+test('the task list shows WYSIWYG thumbnails and the preview dialog offers every variant',async()=>{
+ const u=await ui();await u.click('action','paper-category','');
+ const t=u.db().tasks.find(x=>x.id==='demo-task-0');
+ await u.click('action','task-preview','demo-task-0');
+ const d=u.dialog.innerHTML;assert.equal(u.dialog.open,true);assert.match(d,/class="preview-variants"/);assert.match(d,/data-action="task-preview" data-id="demo-task-1"/);assert.match(d,new RegExp(t.title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+ assert.match(d,/data-action="preview-add" data-id="demo-task-0"/);
+ await u.click('action','preview-add','demo-task-0');assert.equal(u.dialog.open,false);assert.equal(u.db().exams.at(-1).items.length,1,u.toast());
+});
+
+test('a new task offers a quick start; pasted text fills title, points, time and solution',async()=>{
+ const u=await ui();await u.click('action','new-task');assert.match(u.dialog.innerHTML,/class="quickstart"/);assert.match(u.dialog.innerHTML,/data-action="qs-scaffold"/);
+ for(const [q,v] of [['#task-fr','Baumschule'],['#task-type','ZP'],['#task-kind','practical'],['#task-title',''],['#task-text','']])u.form(q,v);
+ u.form('#qs-text','Aufgabe: Vermehren von Pflanzen\nHier: Stecklinge schneiden\nSchneiden (6 Pkt.)\nStecken (4 Pkt.)\nBearbeitungszeit: 45 Minuten\nLösung: Kopfstecklinge 8–10 cm.');
+ await u.click('action','qs-apply');assert.match(u.toast(),/Erkannt: Titel · 2 Teilpunkte · 10 Punkte · 45 Minuten · Lösung/);
+ const d=u.dialog.innerHTML;assert.match(d,/id="task-title" value="Stecklinge schneiden"/);assert.match(d,/id="task-points" type="number" min="0" step="0.5" value="10"/);assert.match(d,/id="task-minutes" type="number" min="0" value="45"/);assert.match(d,/Kopfstecklinge 8–10 cm\./);
+ assert.ok(!/class="quickstart"/.test(d),'quick start disappears once the task has text');
 });
