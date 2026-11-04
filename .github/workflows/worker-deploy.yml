@@ -1,0 +1,74 @@
+name: Worker ausrollen
+
+# Rolls out online/worker.js (Cloudflare Worker "hortiexam-access") from main.
+# Pages deploy separately through pages.yml; this workflow only runs when started by hand.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bestaetigung:
+        description: 'Zum Ausrollen „ausrollen“ eintippen'
+        required: true
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hortiexam-worker-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Same fixed account and Worker as online/tools/configure_ai_secret.mjs.
+      CLOUDFLARE_ACCOUNT_ID: 75bd02fca8d386c43fa477bfb15a4b67
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - name: Bestätigung prüfen
+        if: inputs.bestaetigung != 'ausrollen'
+        run: |
+          echo "::error::Bitte im Feld „ausrollen“ eintippen, damit der Worker wirklich ausgerollt wird."
+          exit 1
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Abhängigkeiten installieren
+        run: npm ci --prefix online --ignore-scripts
+      - name: Tests (Server und Oberfläche)
+        run: |
+          npm test --prefix online
+          node --test offline/tests/*.test.cjs
+      - name: Bündel prüfen (ohne Upload)
+        run: online/node_modules/.bin/wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker-dry" --config online/wrangler.jsonc
+      - name: Worker-Secrets prüfen
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "::error::Repository-Secret CLOUDFLARE_API_TOKEN fehlt (GitHub → Settings → Secrets and variables → Actions)."; exit 1; fi
+          # Only secret names are listed by Cloudflare; nothing is printed here.
+          if ! names="$(online/node_modules/.bin/wrangler secret list --config online/wrangler.jsonc 2>/dev/null)"; then
+            echo "::error::Cloudflare hat die Secret-Liste nicht geliefert. Das Token braucht die Berechtigung „Workers Scripts: Bearbeiten“ für dieses Konto."; exit 1
+          fi
+          for name in ADMIN_VERIFIER INVITATION_VAULT_KEY; do
+            if ! printf '%s' "$names" | grep -q "$name"; then echo "::error::Secret $name fehlt im Worker. Erst einrichten, dann erneut ausrollen."; exit 1; fi
+          done
+          echo "Erforderliche Worker-Secrets sind vorhanden."
+      - name: Worker ausrollen
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: online/node_modules/.bin/wrangler deploy --config online/wrangler.jsonc
+      - name: Erreichbarkeit prüfen
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsS https://hortiexam-access.hannes-75b.workers.dev/health | grep -q '"ok":true'; then echo "Worker ist ausgerollt und antwortet."; exit 0; fi
+            sleep 5
+          done
+          echo "::error::Der Worker antwortet nicht. Im Cloudflare-Dashboard unter „Deployments“ die vorherige Version wiederherstellen."
+          exit 1

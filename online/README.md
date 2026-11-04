@@ -100,6 +100,12 @@ The Cloudflare connector deployed the Worker and secret. With an authorized loca
 CLI session, `wrangler deploy --config online/wrangler.jsonc` deploys equivalent
 configuration; set `ADMIN_VERIFIER` securely without exposing it to command logs.
 Pages deploys through `.github/workflows/pages.yml`; it does not deploy the Worker.
+To roll out the Worker from GitHub, start the manual workflow "Worker ausrollen"
+(`.github/workflows/worker-deploy.yml`) on `main` and type `ausrollen`. It runs the tests,
+builds a dry-run bundle, checks that `ADMIN_VERIFIER` and `INVITATION_VAULT_KEY` exist,
+deploys with the repository secret `CLOUDFLARE_API_TOKEN` (needs "Workers Scripts: Edit")
+and checks `/health`. A faulty version is rolled back in the Cloudflare dashboard under
+Deployments.
 Deploy compatible backend changes before merging frontend changes. For persistent
 invitation redisplay, provision `INVITATION_VAULT_KEY` and apply the additive
 `invitation_codes` CREATE TABLE statement from `schema.sql` before deploying the
