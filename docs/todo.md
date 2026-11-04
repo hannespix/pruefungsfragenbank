@@ -74,7 +74,7 @@ Jedes Paket geht als eigener PR raus und wird nach grüner CI automatisch gemerg
     - nur mit sichtbaren Quellen und Anlagen;
     - keine Änderung bestehender Bankaufgaben;
     - keine Freigaben.
-  - Die Knöpfe erscheinen für Gruppen erst, wenn der Server die Funktion meldet (`capabilities: ['group-tasks']`). Der Worker wird getrennt von den Pages ausgeliefert: `wrangler deploy --config online/wrangler.jsonc`.
+  - Die Knöpfe erscheinen für Gruppen erst, wenn der Server die Funktion meldet (`capabilities: ['group-tasks']`). Der Worker wird getrennt von den Pages ausgeliefert: per Knopf über den GitHub-Workflow „Worker ausrollen“ (Actions → Worker ausrollen → Run workflow, „ausrollen“ eintippen) oder lokal mit `wrangler deploy --config online/wrangler.jsonc`.
   - Offen: Grafiken und Pläne können Gruppen weiterhin nicht hochladen.
 - [ ] Rund 20 Formularfeldern fehlt ein `<label for>` (Barrierefreiheit).
 
