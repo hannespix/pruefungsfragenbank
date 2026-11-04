@@ -127,9 +127,10 @@ test('AP editor shows legal area minima and five-task limit instead of mandatory
  d.workshops[0].specialties.push('Friedhofsgärtnerei');await u.click('action','open-group','Friedhofsgärtnerei');await createDraft(u,'AP');const fh=u.elements.get('#app').innerHTML;assert.match(fh,/Grabanlage/);assert.match(fh,/Pflanzenproduktion, Trauerbinderei und Dekoration/);assert.equal((fh.match(/mindestens 2/g)||[]).length>=2,true);
 });
 
-test('group cannot confirm legal review or create bank templates',async()=>{
+test('group cannot confirm legal review; templates create nothing before saving and need the server capability',async()=>{
  const u=await ui('group'),d=u.sandbox.testUI.getDb();await createDraft(u,'AP');const e=d.exams.at(-1);await u.click('action','paper-check');await u.click('action','regulation-review','conversation');
- assert.equal(e.regulationReview?.conversation,undefined);assert.equal(e.regulationReviewKey,undefined);const before=JSON.stringify(d.tasks);await u.click('action','task-template',d.tasks[0].id);assert.equal(JSON.stringify(d.tasks),before);assert.doesNotMatch(u.elements.get('#app').innerHTML,/data-action="task-template"/);
+ assert.equal(e.regulationReview?.conversation,undefined);assert.equal(e.regulationReviewKey,undefined);const before=JSON.stringify(d.tasks);await u.click('action','task-template',d.tasks[0].id);assert.equal(JSON.stringify(d.tasks),before,'opening a template changes nothing until it is saved as a draft');
+ const old=await ui('group',false,{capabilities:[]});await createDraft(old,'AP');assert.doesNotMatch(old.elements.get('#app').innerHTML,/data-action="task-template"|data-action="adopt-task"/,'without the server capability groups see no template or copy actions');
 });
 
 test('new manual AP task exposes legal assignment and structured drafting hints near the start',async()=>{
@@ -679,4 +680,25 @@ test('meeting export is coordinator-only, asks the server for export rights and 
  const before=JSON.stringify(d);await u.click('action','export-meeting','meeting');assert.ok(blob,u.elements.get('#toast').textContent);assert.ok(authorizations>=2,'checked before and after building');
  const z=await Zip.loadAsync(await blob.arrayBuffer()),files=Object.keys(z.files);assert.ok(files.some(f=>/^[^/]+\/Baumschule\/01_Zwischenpruefung [^/]+\/01_Teilnehmerfassung\.docx$/.test(f)),files.join(', '));assert.ok(files.some(f=>/^[^/]+\/00_Uebersicht\.html$/.test(f)));
  assert.equal(JSON.stringify(d),before);
+});
+
+test('"Weitere aus …" offers tasks of the other exam type; a group adopts one as a reviewed ZP copy',async()=>{
+ const u=await ui(),d=u.sandbox.testUI.getDb();await createDraft(u,'ZP');const e=d.exams.at(-1),ap=d.tasks.find(t=>t.examType==='AP'&&t.specialty==='Baumschule'&&t.kind==='practical');
+ let html=u.elements.get('#app').innerHTML;assert.match(html,/class="paper-more"/);assert.match(html,/data-action="paper-more" data-id="type:AP"/);
+ await u.click('action','paper-more','type:AP');html=u.elements.get('#app').innerHTML;
+ assert.match(html,new RegExp(`data-action="adopt-task" data-id="${ap.id}"`),'AP task offered for adoption');assert.match(html,/Abschlussprüfung · Baumschule/);
+ await u.click('action','adopt-task',ap.id);const dialog=u.elements.get('#dialog').innerHTML;assert.match(dialog,/id="task-title"/,u.elements.get('#toast').textContent);
+ const flags=(/id="task-flags"[^>]*>([^<]*)<\/textarea>/.exec(dialog)?.[1]||'').replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/&#39;/g,"'").split('\n').filter(Boolean);assert.ok(flags.some(f=>/Übernommen aus Abschlussprüfung/.test(f)),flags.join(' | '));
+ const theme=e.pattern.slots[0].categoryId,label=L.label(theme,e);
+ taskFormValues(u,{...structuredClone(ap),examType:'ZP',text:`Aufgabe: ${label}\nHier: Aus der Abschlussprüfung übernommen.`,flags,planningCategories:[theme],familyId:''});
+ const count=d.tasks.length;await u.click('action','save-task');assert.equal(d.tasks.length,count+1,u.elements.get('#toast').textContent);
+ const copy=d.tasks.at(-1);assert.equal(copy.examType,'ZP');assert.equal(copy.specialty,'Baumschule');assert.notEqual(copy.id,ap.id);assert.notEqual(copy.familyId,ap.familyId);assert.equal(copy.reviewStatus,'review');
+ assert.ok(copy.flags.some(f=>/Übernommen aus Abschlussprüfung · Baumschule/.test(f)),'origin stays visible for the review');
+ assert.ok(d.exams.find(x=>x.id===e.id).items.some(i=>i.originTaskId===copy.id),'added to the draft');assert.equal(d.tasks.find(t=>t.id===ap.id).examType,'AP','the original stays untouched');C.validate(d);
+});
+test('the coordinating body also sees tasks of other specialties; searching narrows every area',async()=>{
+ const u=await ui('admin');await u.click('action','open-group','Baumschule');await createDraft(u,'ZP');
+ assert.match(u.elements.get('#app').innerHTML,/data-action="paper-more" data-id="specialties"/);
+ await u.click('action','paper-more','specialties');assert.match(u.elements.get('#app').innerHTML,/Zwischenprüfung · (Garten- und Landschaftsbau|Zierpflanzenbau|Gemüsebau)/);
+ await u.click('action','paper-more','specialties');assert.doesNotMatch(u.elements.get('#app').innerHTML,/data-action="adopt-task"/,'clicking the open area again closes it');
 });
