@@ -117,12 +117,14 @@ Die Seitenleiste mit Verwaltungsmenü entfällt. Unter **Einstellungen** liegt a
 
 ## 4. Ziele, an denen wir messen
 
-| Messgröße (Prüfungseditor mit einer Aufgabe) | heute | Ziel |
-|---|---:|---:|
-| sichtbare Knöpfe/Links | 74 | ≤ 20 |
-| Aufklapper | 9 | 0 |
-| Wörter auf dem Bildschirm (ohne Blatt-Inhalt) | ≈ 650 | ≤ 200 |
-| Klicks von „Prüfung öffnen“ bis zur ersten Aufgabe auf dem Blatt | 4 | 2 |
+| Messgröße (Prüfungseditor mit einer Aufgabe) | vorher | Ziel | nach Schritt 1 |
+|---|---:|---:|---:|
+| sichtbare Knöpfe/Links | 74 | ≤ 20 | 16 |
+| Aufklapper | 9 | 0 | 0 |
+| Wörter auf dem Bildschirm (ohne Blatt-Inhalt) | ≈ 650 | ≤ 200 | 134 |
+| Klicks von „Prüfung öffnen“ bis zur ersten Aufgabe auf dem Blatt | 4 | 2 | 1 |
+
+Gezählt wie in Abschnitt 1. Die Platzhalter-Seiten gehören zum Blatt und sind nicht mitgezählt. Die „Rückseite anzeigen“-Leisten zwischen Originalseiten gehören ebenfalls zum Blatt.
 
 Dazu ein kurzer Test mit drei Mitgliedern einer Arbeitsgruppe ohne Einweisung. Aufgabe: „Stellt eine Zwischenprüfung zusammen und übergebt sie.“ Erfolg heißt: ohne Hilfe, unter 15 Minuten.
 
@@ -151,8 +153,9 @@ Daten, Exporte (Word, Druck, ZIP), Prüfregeln und der Worker bleiben unverände
    - i-Blasen in die Hilfe überführen.
    - Test mit Anwendern.
 
-## 6. Offene Entscheidungen
+## 6. Entscheidungen
 
-- Sollen Arbeitsgruppen „Aufgaben“ als eigenen Ort sehen? Im Entwurf erreichen sie Aufgaben nur über „Aufgabe wählen“ und einen Link auf der Startseite.
-- Themen der Zwischenprüfung: Sollen sie immer automatisch gewählt werden (änderbar), oder soll die Gruppe beim ersten Öffnen kurz bestätigen?
-- Soll die alte Oberfläche für eine Übergangszeit umschaltbar bleiben?
+- Arbeitsgruppen bekommen keinen eigenen Ort „Aufgaben“. Sie erreichen Aufgaben über „Aufgabe wählen“ und einen Link auf der Startseite.
+- Die Themen der Zwischenprüfung werden automatisch gewählt und sind in der Checkliste über „ändern“ anpassbar. Eine Bestätigung beim ersten Öffnen entfällt.
+- Die alte Oberfläche bleibt für eine Übergangszeit umschaltbar: Menü „⋯ → Klassische Ansicht“, zurück über „Neue Ansicht“ in der Kopfzeile. Die Wahl gilt je Gerät.
+- Bestehende Entwürfe öffnen in der neuen Ansicht und bleiben bearbeitbar. Das Datenformat ändert sich nicht.

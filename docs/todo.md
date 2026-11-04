@@ -138,7 +138,11 @@ Aus den Rückmeldungen der Aufgabenersteller, präzisiert. Reihenfolge = Umsetzu
 
 Ziel: viel einfacher und intuitiver. Prüfungseditor mit einer Aufgabe: sichtbare Knöpfe 74 → ≤ 20, Aufklapper 9 → 0.
 
-- [ ] 1. Neuer Prüfungsbildschirm: Gliederung · Blatt · Checkliste, Platzhalter-Seiten mit „Vorschlag übernehmen“
+- [x] 1. Neuer Prüfungsbildschirm: Gliederung · Blatt · Checkliste, Platzhalter-Seiten mit „Vorschlag übernehmen“
+  - Gemessen (Zwischenprüfung mit einer Aufgabe, 1366 × 900): 16 sichtbare Knöpfe statt 74, 0 Aufklapper in der Bedienung, 134 Wörter in Kopfzeile, Gliederung und Checkliste. Von der neuen Prüfung zur ersten Aufgabe auf dem Blatt: 1 Klick.
+  - ZP: drei Themen werden automatisch gewählt und sind in der Checkliste änderbar. AP: fünf Aufgaben mit den Mindestzahlen je Prüfungsbereich, dazu die mündliche Aufgabe als eigene Seite. FW: vier Aufgaben, genau 180 Minuten.
+  - Bestehende Entwürfe öffnen unverändert in der neuen Ansicht und bleiben bearbeitbar. Ältere Themenstände zeigen einen Hinweis mit „Aktuelle Vorgaben übernehmen“.
+  - Die klassische Ansicht bleibt umschaltbar (Menü „⋯ → Klassische Ansicht“, zurück mit „Neue Ansicht“). Die Wahl gilt je Gerät.
 - [ ] 2. „Aufgabe wählen“ als Vollbild mit Reitern (Vorschläge, Alle, Nach Jahr, Selbst schreiben, KI)
 - [ ] 3. Fertigstellen-Dialog statt Schritt 3
 - [ ] 4. Startseiten (Karten für Gruppen, Tabelle für die zuständige Stelle), Navigation Start · Aufgaben · Einstellungen
