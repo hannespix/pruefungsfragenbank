@@ -112,14 +112,14 @@ Aus den Rückmeldungen der Aufgabenersteller, präzisiert. Reihenfolge = Umsetzu
      - Nutzbar für Arbeitsgruppen mit den Aufgaben ihrer Fachrichtung.
      - Original-PDFs bleiben vorerst der zuständigen Stelle vorbehalten.
    - **Fertig wenn:** Eine Gruppe wählt „2023“ und übernimmt daraus Aufgaben in ihren Entwurf.
-4. [ ] **Textbearbeitung wie in Word.**
+4. [x] **Textbearbeitung wie in Word.**
    - **Umsetzung:**
      - Werkzeugleiste für Textfelder auf dem Blatt: Aufzählung, Nummerierung, Einzug vergrößern/verkleinern, neue Zeile. Listen erscheinen in Blatt, Druck und Word mit hängendem Einzug.
      - Originalseiten:
        - bearbeitete Abschnitte nutzen die Breite der Textspalte, statt an der zufälligen PDF-Zeilenbreite umzubrechen;
        - die Breite lässt sich am rechten Rand ziehen und rastet an Seitenrand und Spaltenkanten ein.
    - **Fertig wenn:** Listen lassen sich ohne Tippen von Zeichen anlegen, und Zeilen brechen nicht mehr unerwartet früh um.
-   - **Stand:** Teil 1 erledigt – Werkzeugleiste mit Aufzählung, Nummerierung, Einzug und neuer Zeile; Enter/Tab wie in Word; hängender Einzug in Blatt, Druck und Word. Teil 2 (Breite bearbeiteter Abschnitte auf Originalseiten mit Einrasten) folgt.
+   - **Stand:** erledigt in zwei Teilen – (1) Werkzeugleiste mit Aufzählung, Nummerierung, Einzug und neuer Zeile, Enter/Tab wie in Word, hängender Einzug in Blatt, Druck und Word; (2) bearbeitete Abschnitte auf Originalseiten in Spaltenbreite, Breite ziehbar mit Einrasten, auch in Word.
 5. [ ] **Mündliche Prüfung übersichtlicher.**
    - **Umsetzung:**
      - Mündliche Vorlagen nach Themen gruppiert, mit klaren Überschriften.
