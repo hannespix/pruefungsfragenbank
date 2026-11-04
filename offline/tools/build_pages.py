@@ -18,7 +18,7 @@ if any(f.is_symlink() or not f.is_file() for f in [args.sealed/'manifest.json',*
 if any(f.stat().st_size!=1024*1024 for f in parts[:-1]) or not 16<parts[-1].stat().st_size<=1024*1024:raise SystemExit('Unexpected chunk sizes for a sealed package.')
 html=(ROOT/'src/index.html').read_text().replace('<head>','<head><meta name="hortiexam-storage" content="memory">',1)
 replacements={'CSS':(ROOT/'src/style.css').read_text(),'SEED':'/*PRIVATE_SEED*/','VENDOR':(ROOT/'vendor/jszip.min.js').read_text()+'\n'+(ROOT/'vendor/docx.umd.min.js').read_text()+'\n'+(ROOT/'vendor/pdf-lib.min.js').read_text()}
-for name in ['SOURCE-LAYOUT','ICONS','PLANNING','MATERIALS','CORE','TIMING-PLAN','POINTS-PLAN','RELEASE','PRINT','ORGANIZATION','CATALOG','PAPER','DOCX-ASSETS','DOCX','ARCHIVE','HELP','AI','HASH','IMPORT','APP']:replacements[name]=(ROOT/'src'/f'{name.lower()}.js').read_text()
+for name in ['SOURCE-LAYOUT','ICONS','PLANNING','MATERIALS','CORE','TIMING-PLAN','POINTS-PLAN','RELEASE','PRINT','ORGANIZATION','CATALOG','PAPER','DOCX-ASSETS','DOCX','ARCHIVE','HELP','AI','HASH','HISTORY','IMPORT','APP']:replacements[name]=(ROOT/'src'/f'{name.lower()}.js').read_text()
 # One pass only: inserted seed text or module code must never be scanned for further placeholders.
 html=re.sub(r'/\*([A-Z][A-Z_-]*)\*/',lambda m:replacements.get(m[1],m[0]),html)
 wrapper=(ROOT/'pages/index.html').read_text()
