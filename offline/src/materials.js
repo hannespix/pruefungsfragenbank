@@ -78,6 +78,52 @@ function extractMaterials(task,sources=[]){
  return null;
 }
 
+// Separate material list documents (e.g. "Materialliste ZP 2024") of the same specialty and exam type.
+// Their sections ("Aufgabe 2: …", "Station 3 …" or a task title) are matched to tasks by title words.
+// Only a clear, unique match becomes a proposal; everything else is reported as unclear.
+const listName=/material|bereitstell|ger(?:ä|ae)t|werkzeug|vorbereitung/i;
+const blockStart=/^\s*(?:(?:prüfungs|pruefungs)?aufgabe|station|arbeitsplatz)\s*(?:nr\.?\s*)?\d+\b/i;
+const fold=value=>String(value||'').toLocaleLowerCase('de').replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss');
+const stop=new Set(['aufgabe','pruefung','pruefungsaufgabe','praktische','station','arbeitsplatz','material','materialien','materialliste','werkzeuge','geraete','hilfsmittel','fuer','oder','eine','einer','einem','einen','sowie','nach','unter','ueber','beim','durch','zwischenpruefung','abschlusspruefung','originalvorlage','original']);
+const words=value=>[...new Set(fold(value).split(/[^a-z0-9]+/).filter(w=>w.length>=4&&!stop.has(w)))];
+const plain=value=>fold(value).replace(/[^a-z0-9]+/g,' ').trim();
+function sourceYear(task,sources){return sources.find(s=>task.sourceIds?.includes(s.id)&&Number.isInteger(s.year))?.year??null;}
+function listDocuments(sources){return sources.filter(s=>s&&typeof s.text==='string'&&s.text.trim()&&listName.test(`${s.name||''} ${s.role||''}`));}
+function listBlocks(source,titles){
+ const blocks=[];let current=null;
+ for(const raw of source.text.split(/\r?\n/)){const line=raw.trim();if(!line)continue;if(blockStart.test(line)||titles.has(plain(line))){current={header:line,lines:[]};blocks.push(current);continue;}if(current)current.lines.push(line);}
+ return blocks.filter(b=>b.lines.length);
+}
+function blockText(block,title){
+ const units=block.lines.map(text=>({text})),own=combine(sections(units,{}));if(own)return own.text;
+ const lines=block.lines.filter((line,n)=>!(n===0&&plain(line)===plain(title))).slice(0,40);
+ return lines.map(line=>marked.test(line)?line.replace(/^/,'•'):'• '+line).join('\n');
+}
+function scanSourceLists(tasks,sources){
+ const practicalTasks=tasks.filter(t=>practical(t)&&!t.supersededBy),documents=[],matches=[],unclear=[];
+ for(const doc of listDocuments(sources)){
+  const scope=practicalTasks.filter(t=>t.specialty===doc.specialty&&t.examType===doc.examType&&!t.sourceIds?.includes(doc.id)&&(doc.year==null||sourceYear(t,sources)==null||sourceYear(t,sources)===doc.year));
+  const blocks=listBlocks(doc,new Set(scope.map(t=>plain(t.title))));if(!blocks.length)continue;documents.push({sourceId:doc.id,name:doc.name,blocks:blocks.length});
+  for(const block of blocks){
+   const head=words(block.header+' '+(block.lines[0]||'')),scored=scope.map(t=>{const w=words(t.title),hit=w.filter(x=>head.includes(x)).length;return {t,score:w.length?hit/w.length:0,hit};}).filter(x=>x.hit).sort((a,b)=>b.score-a.score);
+   const best=scored[0],next=scored[1];
+   if(best&&best.score>=0.6&&(!next||next.score<best.score)){const text=blockText(block,best.t.title);if(text.trim())matches.push({taskId:best.t.id,sourceId:doc.id,reference:doc.name,header:block.header,score:best.score,text:text.slice(0,20000),quote:(block.header+'\n'+block.lines.join('\n')).slice(0,20000)});else unclear.push({sourceId:doc.id,reference:doc.name,header:block.header});}
+   else unclear.push({sourceId:doc.id,reference:doc.name,header:block.header});
+  }
+ }
+ // One section per task: a second, weaker section for the same task counts as unclear.
+ const kept=new Map();for(const m of matches){const prev=kept.get(m.taskId);if(!prev||m.score>prev.score){if(prev)unclear.push({sourceId:prev.sourceId,reference:prev.reference,header:prev.header});kept.set(m.taskId,m);}else unclear.push({sourceId:m.sourceId,reference:m.reference,header:m.header});}
+ return {documents,matches:[...kept.values()],unclear};
+}
+// Confirmed or hand-written lists are never replaced; a list from the task's own text stays first choice.
+function canTakeSourceList(task){const m=task.materials;return practical(task)&&(m===undefined||m.status!=='confirmed'&&m.method==='general-title-v1');}
+function applySourceList(task,match){
+ if(!canTakeSourceList(task))return task;const next=clone(task);
+ next.sourceIds=[...new Set([...(next.sourceIds||[]),match.sourceId])];
+ next.materials={text:match.text,status:'proposal',method:'explicit-heading-v1',evidence:[{sourceId:match.sourceId,reference:match.reference,quote:match.quote}]};
+ return validate(next);
+}
+
 function generalProposal(task){
  const title=[task.title,task.category].filter(Boolean).join(' ').toLocaleLowerCase('de');let lines;
  if(/aussaat|säen|saeen/.test(title))lines=['Saatgut laut Arbeitsauftrag','Geeignete Aussaatgefäße und Aussaatsubstrat','Etiketten und Schreibmittel','Geeignete Gießmöglichkeit'];
@@ -122,6 +168,6 @@ function documentHtml(exam){
  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><title>Materialübersicht · ${esc(exam.title)}</title><style>@page{size:A4;margin:18mm}*{box-sizing:border-box}body{font:11pt/1.5 Arial,sans-serif;color:#203c31;max-width:850px;margin:32px auto;padding:0 20px}header{border-bottom:2px solid #365d47;padding-bottom:14px}h1{font-size:25pt;margin:8px 0}h2{font-size:15pt;margin:6px 0}p{margin:8px 0}.meta{color:#53645b;font-size:10pt}.task{margin-top:24px;break-inside:avoid}.status{display:inline-block;border:1px solid #668172;padding:3px 8px;font-size:10pt}.proposal,.missing{border-color:#996a29;background:#fff4df}.materials{white-space:pre-wrap;overflow-wrap:anywhere;border-left:3px solid #d6dfd9;padding:10px 14px}.toolbar{margin:0 0 20px}button{font:inherit;padding:10px 14px;cursor:pointer}footer{border-top:1px solid #ccd4ce;font-size:9pt;margin-top:24px;padding-top:10px}@media print{body{margin:0;padding:0;max-width:none}.toolbar{display:none}h2{break-after:avoid}.status{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><div class="toolbar"><button onclick="window.print()">Drucken / als PDF speichern</button></div><header><p class="meta">Vertrauliche Organisationsunterlage für Prüfungsausschuss und zuständige Stelle</p><h1>Materialübersicht</h1><h2>${esc(exam.title)}</h2><p class="meta">${esc(exam.specialty)}${exam.date?' · '+esc(exam.date):''}</p><p>Materialien je praktischer Aufgabe. Vorschläge vor der Bereitstellung prüfen, ergänzen und ausdrücklich bestätigen.</p></header>${items.map((item,n)=>{const t=item.task,m=t.materials,present=!!m?.text.trim(),status=!present?'missing':m.status,caption=!present?'Noch festzulegen':m.status==='confirmed'?'Bestätigt':'Vorschlag',origin=m?.method==='general-title-v1'?'Allgemeiner Vorschlag · Eignung, Mengen und Bereitstellung festlegen.':m?.method==='explicit-heading-v1'?'Aus vorhandener Materialrubrik übernommen · für diese Prüfung prüfen.':'';return `<section class="task"><p class="meta">Praktische Aufgabe ${n+1}</p><h2>${esc(t.title)}</h2><p><span class="status ${status}">${caption}</span></p><div class="materials">${esc(present?m.text:'Materialliste durch den Prüfungsausschuss ergänzen.')}</div>${origin?`<p class="meta">${esc(origin)}</p>`:''}</section>`;}).join('')||'<p>Keine praktischen Aufgaben ausgewählt.</p>'}<footer>Organisatorische Materialplanung · Mengen, Verfügbarkeit und Sicherheit vor Ort prüfen.</footer></body></html>`;
 }
 
-const api={validate,extractMaterials,proposeMaterials,setMaterials,resetMaterialsConfirmation,materialsIssues,document:documentHtml};
+const api={scanSourceLists,applySourceList,canTakeSourceList,validate,extractMaterials,proposeMaterials,setMaterials,resetMaterialsConfirmation,materialsIssues,document:documentHtml};
 root.HortiMaterials=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(globalThis);
