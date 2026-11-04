@@ -151,6 +151,11 @@ Ziel: viel einfacher und intuitiver. Prüfungseditor mit einer Aufgabe: sichtbar
 ## Rückmeldungen
 
 - [x] Begriff „Familieneinsatz“ verwirrte: Einsatzhistorie jetzt in Klartext („Zuletzt in einer Prüfung eingesetzt am … (diese oder eine ähnliche Ausführung)“, „Jüngste Vorlage aus …“).
+- [x] **Notizen zu jeder Seite.** Ein Knopf „Notiz“ erscheint in der Seitenleiste, sobald man an einer Seite arbeitet.
+  - Die Notiz steht als gelber Zettel über der Seite; Originalseiten haben je Vorder- und Rückseite eine eigene Notiz.
+  - Sie wird nie gedruckt und landet nicht in Word. Die zuständige Stelle sieht alle Notizen unter „Fertigstellen“ und im Ausgabepaket unter „Interne Bemerkungen“.
+  - Eine leer gelassene Notiz verschwindet wieder. Notizen ändern keine erteilte Freigabe.
+- [ ] **Alternative Aufgaben** zu einer Aufgabe, z. B. mehrere mündliche Aufgaben für die Gemüsebau-Prüfung. Folgt als eigenes Paket.
 
 ## Technik & Sicherheit (aus `docs/code-audit-2026-11.md`)
 

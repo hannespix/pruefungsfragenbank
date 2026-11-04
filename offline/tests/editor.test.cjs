@@ -154,3 +154,12 @@ test('guard for the redesign goals: with one task the controls around the sheet 
  const buttons=count(chrome,/<button\b/g),words=chrome.replace(/<svg[\s\S]*?<\/svg>/g,'').replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
  assert.ok(buttons<=20,`${buttons} buttons`);assert.equal(count(chrome,/<details\b/g),0);assert.equal(count(chrome,/info-bubble/g),0);assert.ok(words<=200,`${words} words`);
 });
+
+test('a note is added to a page with one button and removed again; outline and "Fertigstellen" show it',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');await u.click('action','add',gapAdd(u.html(),'gap-0'));
+ const id=u.exam().items[0].id,add=new RegExp(`data-action="page-note-add" data-id="${id}\\|0"`);assert.match(u.html(),add);
+ await u.click('action','page-note-add',id+'|0');assert.equal(u.exam().items[0].pageNotes['0'],'');let h=u.html();assert.match(h,/class="page-note"/);assert.doesNotMatch(h,add);
+ u.exam().items[0].pageNotes['0']='Material am Vortag bestellen';await u.click('action','editor-overlay-close');assert.match(u.html(),/class="outline-note"[^>]*>1 Notiz</);
+ await u.click('action','editor-overlay','finish');assert.match(u.html(),/Notizen auf den Seiten[\s\S]*Material am Vortag bestellen/);await u.click('action','editor-overlay-close');
+ await u.click('action','page-note-remove',id+'|0');assert.equal(u.exam().items[0].pageNotes,undefined);h=u.html();assert.doesNotMatch(h,/class="page-note"/);assert.match(h,add);
+});

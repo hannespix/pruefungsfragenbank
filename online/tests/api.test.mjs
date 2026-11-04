@@ -191,6 +191,13 @@ test('new ZP patterns round-trip and reject group selections of combinations or 
  e.title+=' · bearbeitet';assert.equal((await save(e,1)).status,200);
 });
 
+test('page notes of a group round-trip, stay out of the release key and reject malformed values',async()=>{
+ const t=await setup(),g=await group(t),e=await completeStructureExam(t),save=(value,version,token=g.token)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},token);
+ e.items[0].pageNotes={0:'Material am Vortag bestellen.',1:'Rückseite: <Linien> zu knapp.'};
+ assert.equal((await save(e,0)).status,200);for(const token of [g.token,t.admin])assert.deepEqual((await t.req('/api/project',undefined,token)).body.project.exams.find(x=>x.id===e.id).items[0].pageNotes,e.items[0].pageNotes);
+ for(const pageNotes of [[],'Text',{x:'a'},{0:42},{0:'x'.repeat(5001)}])assert.equal((await save({...e,items:[{...e.items[0],pageNotes},...e.items.slice(1)]},1)).status,400,JSON.stringify(pageNotes).slice(0,30));
+});
+
 test('internal exam remarks round-trip within group permissions and reject malformed values',async()=>{
  const t=await setup(),g=await group(t),e=await completeStructureExam(t);e.internalNotes='Ausschuss an Koordination:\n<Material> & Termin klären.';const save=(value,version,token=g.token)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},token);
  assert.equal((await save(e,0)).status,200);for(const token of [g.token,t.admin])assert.equal((await t.req('/api/project',undefined,token)).body.project.exams.find(x=>x.id===e.id).internalNotes,e.internalNotes);
