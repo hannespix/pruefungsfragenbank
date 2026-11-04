@@ -929,3 +929,12 @@ button.link{background:none;border:0;padding:2px 0;margin:0;color:var(--green);t
 .material-matches li{display:grid;gap:3px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:white}
 .material-matches li.is-kept{opacity:.65}
 .material-matches pre{margin:4px 0 0;white-space:pre-wrap;font:13px/1.45 inherit;color:var(--ink)}
+/* ---- Handy: Checkliste als Leiste unten, aufziehbar ---- */
+.checklist-toggle{display:none}
+@media(max-width:1000px){
+ .editor-checklist .checklist-toggle{display:inline-block;margin-left:auto}
+ .editor-checklist .checklist-head{gap:10px}
+ .editor-checklist.is-open{max-height:70dvh;overflow:auto}
+ .editor-checklist.is-open .checklist-items li:not(.is-next),.editor-checklist.is-open .checklist-rule{display:grid}
+ .editor-checklist.is-open .checklist-rule{display:block}
+}
