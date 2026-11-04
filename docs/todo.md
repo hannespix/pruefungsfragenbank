@@ -157,6 +157,10 @@ Ziel: viel einfacher und intuitiver. Prüfungseditor mit einer Aufgabe: sichtbar
 
 ## Rückmeldungen
 
+- [x] **Materiallisten aus den Quellen den Aufgaben zuordnen.**
+  - Unter „Einstellungen → Import & Quellen“ steht „Materiallisten aus den Quellen“ mit dem Knopf „Quellen durchsuchen“. Der Bericht zeigt, wie viele eigene Materiallisten-Dokumente es gibt und welche Aufgaben bereits eine Material-Rubrik im eigenen Text haben. Er listet außerdem jede Zuordnung mit Vorschau und alle nicht eindeutigen Abschnitte.
+  - Zuordnung nur bei eindeutig passendem Titel, gleicher Fachrichtung und Prüfungsart, bei bekanntem Jahr nur im selben Jahr.
+  - Übernommen wird mit einem Klick als Vorschlag mit Herkunft; die Liste wird als Quelle an die Aufgabe gebunden, auch in offenen Prüfungen. Bestätigte oder selbst geschriebene Listen bleiben unverändert.
 - [x] Begriff „Familieneinsatz“ verwirrte: Einsatzhistorie jetzt in Klartext („Zuletzt in einer Prüfung eingesetzt am … (diese oder eine ähnliche Ausführung)“, „Jüngste Vorlage aus …“).
 - [x] **Notizen zu jeder Seite.** Ein Knopf „Notiz“ erscheint in der Seitenleiste, sobald man an einer Seite arbeitet.
   - Die Notiz steht als gelber Zettel über der Seite; Originalseiten haben je Vorder- und Rückseite eine eigene Notiz.

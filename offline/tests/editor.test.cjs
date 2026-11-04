@@ -36,7 +36,7 @@ async function ui({mode,data=demoData(),before}={}){
  await vm.runInNewContext(fs.readFileSync(path.join(SRC,'app.js'),'utf8').replace('await initStorage();','globalThis.testUI={getDb:()=>db};await initStorage();'),sandbox);
  const click=(kind,value,id)=>listeners.click({target:{closest:s=>s===`[data-${kind}]`?{dataset:{[kind]:value,id}}:null}});
  const exam=()=>sandbox.testUI.getDb().exams.at(-1);
- return {sandbox,listeners,click,stored,exam,db:()=>sandbox.testUI.getDb(),html:()=>stubs.get('#app').innerHTML,toast:()=>stubs.get('#toast').textContent};
+ return {sandbox,listeners,click,stored,exam,db:()=>sandbox.testUI.getDb(),html:()=>stubs.get('#app').innerHTML,dialog:()=>stubs.get('#dialog').innerHTML,toast:()=>stubs.get('#toast').textContent};
 }
 const count=(h,re)=>(h.match(re)||[]).length;
 const gapAdd=(h,gap)=>h.match(new RegExp(`data-editor-gap="${gap}"[\\s\\S]*?data-action="add" data-id="([^"]+)"`))?.[1];
@@ -204,4 +204,16 @@ test('"Fertigstellen": open points with one button each, done list, message save
  for(const a of ['timing-plan','points-plan','preview-candidate','export-exam','editor-overlay-close'])assert.match(f,new RegExp(`data-action="${a}"`),a);
  assert.doesNotMatch(f,/<details/,'no fold-outs');
  await u.click('action','proposals-accept');await u.click('action','editor-overlay','finish');f=u.html().slice(u.html().indexOf('class="finish"'));assert.match(f,/Aufgaben · 3 von 3/);
+});
+
+test('material lists in the sources: the report says what exists and takes matching lists over as proposals',async()=>{
+ const u=await ui({before:d=>{const t=d.tasks.find(x=>x.id==='zp-extra'),src=d.sources.find(x=>t.sourceIds.includes(x.id));d.sources.push({...JSON.parse(JSON.stringify(src)),id:'list-x',name:'Materialliste ZP Baumschule.docx',role:'Anlage',year:null,assetId:undefined,attachmentIds:[],flags:[],text:'Aufgabe 1: Stecklinge schneiden\n• 20 Mutterpflanzen\n• Gartenschere\nAufgabe 5: Rasen mähen\n• Rasenmäher'});}});
+ await u.click('route','import');assert.match(u.html(),/data-action="materials-scan"/);
+ await u.click('action','materials-scan');const d=u.dialog();
+ assert.match(d,/1 Materiallisten-Dokument/);assert.match(d,/Stecklinge schneiden/);assert.match(d,/Nicht eindeutig zugeordnet \(1\)[\s\S]*Rasen mähen/);assert.match(d,/data-action="materials-apply"/);
+ await u.click('action','materials-apply');const t=u.db().tasks.find(x=>x.id==='zp-extra');
+ assert.match(t.materials.text,/Gartenschere/);assert.equal(t.materials.status,'proposal');assert.ok(t.sourceIds.includes('list-x'));assert.match(u.toast(),/1 Materialliste als Vorschlag übernommen/);
+ // A new exam takes the list along.
+ await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');await u.click('action','proposals-accept');
+ const item=u.exam().items.find(i=>i.originTaskId==='zp-extra');assert.match(item.task.materials.text,/Gartenschere/);
 });
