@@ -85,6 +85,51 @@ Jedes Paket geht als eigener PR raus und wird nach grüner CI automatisch gemerg
   - Prüfungen ohne Aufgaben und Prüfungen, die sich nicht ausgeben ließen, stehen mit Grund in der Übersicht; der Rest wird trotzdem exportiert.
 - [ ] Rund 20 Formularfeldern fehlt ein `<label for>` (Barrierefreiheit).
 
+## Anwenderwünsche vom 4. November 2026
+
+Aus den Rückmeldungen der Aufgabenersteller, präzisiert. Reihenfolge = Umsetzungsreihenfolge.
+
+1. [x] **Flexiblere Aufgabenauswahl.**
+   - **Ziel:** Eine bestimmte Aufgabe finden, ohne die Kategorie zu kennen.
+   - **Umsetzung:**
+     - Die Suche durchsucht immer alle Themen der Prüfung.
+     - Gibt es zu wenige Treffer, bietet die Liste „Weitere aus …“ an: aus anderen Themen, aus der anderen Prüfungsart (z. B. Abschlussprüfungsaufgaben in der Zwischenprüfung) und, für die zuständige Stelle, aus anderen Fachrichtungen.
+     - Aufgaben, die nicht direkt passen, werden mit „Für diese Prüfung übernehmen“ als neue Variante kopiert. Die Kopie erscheint als Entwurf zur Freigabe, die Herkunft bleibt nachvollziehbar, Regeln und Freigaben bleiben gewahrt.
+   - **Fertig wenn:**
+     - Suchbegriffe ohne Treffer im Thema zeigen Treffer aus anderen Bereichen mit Herkunftsangabe.
+     - Eine AP-Aufgabe lässt sich in einer ZP mit einem Klick als ZP-Variante übernehmen, auch von Arbeitsgruppen.
+2. [ ] **Übersichtlichere Aufgabenauswahl im Papier-Look.**
+   - **Ziel:** weniger Unterfenster, kein Gedränge in der schmalen Seitenleiste.
+   - **Umsetzung:**
+     - Große Aufgabenauswahl als breite Ansicht neben dem Blatt mit Kartenraster, Miniaturvorschau, Filterleiste oben (Thema, Prüfungsart, Jahr) und Aktionen direkt auf der Karte.
+     - Das Blatt wirkt wie in Word: grauer Arbeitsbereich, zentrierte Seiten, schlanke Werkzeugleiste oben.
+   - **Fertig wenn:** Aufgaben werden ohne verschachtelte Aufklapper gefunden, verglichen und hinzugefügt, am Laptop wie am Tablet.
+3. [ ] **Historienzentriertes Arbeiten aus dem Archiv, auch für Arbeitsgruppen.**
+   - **Ziel:** Prüfungen aus früheren Jahrgängen heraus erstellen.
+   - **Umsetzung:**
+     - Die Aufgabenauswahl erhält die Ansicht „Archiv nach Jahr“: Aufgaben, gruppiert nach Quelljahr und letztem Einsatz, mit optionalem Themenfilter darüber.
+     - Nutzbar für Arbeitsgruppen mit den Aufgaben ihrer Fachrichtung.
+     - Original-PDFs bleiben vorerst der zuständigen Stelle vorbehalten.
+   - **Fertig wenn:** Eine Gruppe wählt „2023“ und übernimmt daraus Aufgaben in ihren Entwurf.
+4. [ ] **Textbearbeitung wie in Word.**
+   - **Umsetzung:**
+     - Werkzeugleiste für Textfelder auf dem Blatt: Aufzählung, Nummerierung, Einzug vergrößern/verkleinern, neue Zeile. Listen erscheinen in Blatt, Druck und Word mit hängendem Einzug.
+     - Originalseiten:
+       - bearbeitete Abschnitte nutzen die Breite der Textspalte, statt an der zufälligen PDF-Zeilenbreite umzubrechen;
+       - die Breite lässt sich am rechten Rand ziehen und rastet an Seitenrand und Spaltenkanten ein.
+   - **Fertig wenn:** Listen lassen sich ohne Tippen von Zeichen anlegen, und Zeilen brechen nicht mehr unerwartet früh um.
+5. [ ] **Mündliche Prüfung übersichtlicher.**
+   - **Umsetzung:**
+     - Mündliche Vorlagen nach Themen gruppiert, mit klaren Überschriften.
+     - Im Blatt und im Druck saubere Abschnittsüberschrift „Mündliche Prüfung“ mit Thema, Zeit und Punkten.
+   - **Fertig wenn:** Auswahl und Ausdruck der mündlichen Aufgabe sind ohne doppelte oder missverständliche Überschriften.
+6. [ ] **KI-Assistent: aus Vorschlägen neue Aufgaben erstellen, auch für Arbeitsgruppen.**
+   - **Umsetzung:**
+     - Vorschlag hochladen (Word, Text) oder einfügen. Die KI erstellt daraus Aufgabenentwürfe im Prüfungsformat (Titel, „Aufgabe: … Hier: …“, Punkte, Zeit, Material, Lösungshinweise als Entwurf) und stellt Rückfragen zu fehlenden Angaben.
+     - Nach den Antworten wird der Entwurf verfeinert und mit einem Klick als Aufgabe übernommen; bei Gruppen als Entwurf zur Freigabe.
+     - Läuft über den vorhandenen, abgesicherten KI-Zugang des Servers, ohne Speicherung beim Anbieter.
+   - **Fertig wenn:** Aus einem eingefügten Vorschlag entsteht nach Rückfragen eine speicherbare Aufgabe, die direkt in die Prüfung übernommen werden kann.
+
 ## Technik & Sicherheit (aus `docs/code-audit-2026-11.md`)
 
 - [ ] Flask-App stilllegen oder mit Anmeldung absichern.

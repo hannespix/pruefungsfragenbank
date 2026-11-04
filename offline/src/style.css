@@ -517,3 +517,12 @@ button.quiet-danger:hover{background:#fde8e4;border-color:#c2381f;color:#8f2512}
 /* Export of all exams of a preparation meeting */
 .meeting-export{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:2px 0 16px;padding:12px 14px;border-radius:12px;background:#eef5ef;border:1px solid #cfe0d3}
 .meeting-export p{margin:0;max-width:620px}
+
+/* "Weitere aus …" below the task list */
+.paper-more{margin:14px 0 6px;padding:12px;border-radius:12px;background:#f4f7f2;border:1px dashed #b9c9b4}
+.paper-more-head{margin:0 0 8px;font-size:13px}
+.paper-more-scopes{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.paper-more-scope{font-size:12.5px;padding:5px 10px;border-radius:999px;background:white;border:1px solid #cfdccb}
+.paper-more-scope .count{display:inline-block;min-width:18px;margin-left:4px;padding:0 6px;border-radius:999px;background:#e3ecdf;font-weight:700}
+.paper-more-scope.selected{background:#215c40;border-color:#215c40;color:white}.paper-more-scope.selected .count{background:#ffffff33}
+.adopt-card .adopt-scope{display:inline-block;padding:2px 8px;border-radius:999px;background:#fff4df;color:#7a4b00;font-size:11px;font-weight:700;letter-spacing:.3px}
