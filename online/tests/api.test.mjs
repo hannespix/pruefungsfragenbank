@@ -191,6 +191,17 @@ test('new ZP patterns round-trip and reject group selections of combinations or 
  e.title+=' · bearbeitet';assert.equal((await save(e,1)).status,200);
 });
 
+test('groups save alternatives like main tasks: own area, right kind, no self-approval',async()=>{
+ const t=await setup(),g=await group(t),e=await completeStructureExam(t,'AP'),save=(value,version,token=g.token)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},token);
+ const [oral]=await workflowTasks(t,[{id:'alternative-oral',examType:'AP',specialty:'Baumschule',kind:'oral',minutes:15}]);
+ e.oralItem.alternatives=[{id:'alternative-1',originTaskId:oral.id,task:structuredClone(oral)}];
+ assert.equal((await save(e,0)).status,200);assert.equal((await t.req('/api/project',undefined,g.token)).body.project.exams.find(x=>x.id===e.id).oralItem.alternatives[0].originTaskId,oral.id);
+ const practical=e.items[0].task,forged=(alternative)=>({...e,oralItem:{...e.oralItem,alternatives:[alternative]}});
+ assert.equal((await save(forged({id:'alternative-1',originTaskId:practical.id,task:structuredClone(practical)}),1)).status,403,'a practical task cannot be an oral alternative');
+ assert.equal((await save(forged({id:'alternative-1',originTaskId:oral.id,task:{...structuredClone(oral),text:'Geänderter Auftrag',reviewStatus:'approved'}}),1)).status,403,'changed alternatives stay drafts');
+ assert.equal((await save(forged({id:'alternative-1',originTaskId:oral.id,task:{...structuredClone(oral),reviewKey:'self-approved'}}),1)).status,403,'no review marks from groups');
+});
+
 test('page notes of a group round-trip, stay out of the release key and reject malformed values',async()=>{
  const t=await setup(),g=await group(t),e=await completeStructureExam(t),save=(value,version,token=g.token)=>t.req('/api/save',{changes:[{kind:'exams',id:e.id,version,value}]},token);
  e.items[0].pageNotes={0:'Material am Vortag bestellen.',1:'Rückseite: <Linien> zu knapp.'};

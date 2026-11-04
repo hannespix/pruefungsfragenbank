@@ -155,7 +155,12 @@ Ziel: viel einfacher und intuitiver. Prüfungseditor mit einer Aufgabe: sichtbar
   - Die Notiz steht als gelber Zettel über der Seite; Originalseiten haben je Vorder- und Rückseite eine eigene Notiz.
   - Sie wird nie gedruckt und landet nicht in Word. Die zuständige Stelle sieht alle Notizen unter „Fertigstellen“ und im Ausgabepaket unter „Interne Bemerkungen“.
   - Eine leer gelassene Notiz verschwindet wieder. Notizen ändern keine erteilte Freigabe.
-- [ ] **Alternative Aufgaben** zu einer Aufgabe, z. B. mehrere mündliche Aufgaben für die Gemüsebau-Prüfung. Folgt als eigenes Paket.
+- [x] **Alternative Aufgaben** zu einer Aufgabe, z. B. mehrere mündliche Aufgaben für die Gemüsebau-Prüfung.
+  - Im Seitenmenü steht „Alternative hinzufügen“. Es öffnet eine Vollbild-Auswahl mit drei Wegen: „Kopie zum Umschreiben“, „Neue Aufgabe schreiben“ oder eine Aufgabe aus dem Bestand. Bei der ZP sind das nur Einzelaufgaben aus demselben Thema, bei der mündlichen Aufgabe die mündlichen Vorlagen.
+  - Alternativen stehen als eigene Seiten direkt hinter ihrer Aufgabe („Aufgabe 2 · Alternative B“) und sind in der Gliederung eingerückt. Im Seitenmenü gibt es „Als Hauptaufgabe verwenden“ und „Entfernen“.
+  - Sie zählen nie zur Aufgabenzahl, Zeit oder Punktzahl der Prüfungsordnung. Sie werden aber gedruckt, nach Word exportiert, in den Pflichtangaben geprüft und mit freigegeben.
+  - Der Server prüft Alternativen wie Hauptaufgaben: eigene Fachrichtung, richtige Art, keine Freigabe durch die Arbeitsgruppe.
+- [x] Seitenmenü „Weitere Aktionen“ in der neuen Ansicht: Einträge reagierten auf echte Mausklicks nicht, weil die Leiste beim Klick kurz unsichtbar wurde. Ein geöffnetes Menü bleibt jetzt sichtbar.
 
 ## Technik & Sicherheit (aus `docs/code-audit-2026-11.md`)
 

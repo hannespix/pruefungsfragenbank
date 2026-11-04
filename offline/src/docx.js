@@ -30,7 +30,7 @@ async function pngPixels(asset){
 const logoMarginCache=new WeakMap();
 async function prepareLogoMargins(e,d){
  let changed=false;
- for(const item of C.examEntries(e))for(const [index,page]of (item.task.sourceLayout?.pages||[]).entries()){
+ for(const item of C.examEntries(e,{alternatives:true}))for(const [index,page]of (item.task.sourceLayout?.pages||[]).entries()){
   const task=item.task,box=S.logoMarginCandidate(task,page,index);if(!box)continue;
   const asset=d.assets.find(a=>a.id===page.backgroundAssetId);let safe=false;
   if(asset?.mime==='image/png'&&asset.data){
@@ -96,7 +96,7 @@ async function sourceElements(page,d){
  return {graphics,rules};
 }
 async function documentFile(e,input,examiner=false,opts={}){
- const entries=C.examEntries(e);if(!entries.length)throw Error('Die Prüfung enthält keine Aufgaben.');C.assertExamPolicy(e);S.assertExport(e);
+ const entries=C.examEntries(e,{alternatives:true});if(!entries.length)throw Error('Die Prüfung enthält keine Aufgaben.');C.assertExamPolicy(e);S.assertExport(e);
  const d=await A.wordImages(e,input,examiner),fonts=A.fontAssets(d),regular=fonts.find(a=>a.docxFontKey==='sansRegular'),bold=fonts.find(a=>a.docxFontKey==='sansBold'),serif=fonts.find(a=>a.docxFontKey==='serifBold');
  if(entries.some(i=>i.task.assetLinks.some(l=>l.design==='bw-2024'))&&(!regular||!bold||!serif))throw Error('Die geschützten Word-Schriften fehlen. Bitte den Datenbestand aktualisieren.');
  if(entries.some(i=>i.task.sourceLayout)&&!regular)throw Error('Word-Schriften fehlen für die bearbeitbaren Originalseiten. Bitte den Datenbestand aktualisieren.');

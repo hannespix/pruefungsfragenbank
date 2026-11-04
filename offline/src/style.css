@@ -839,3 +839,17 @@ button.link{background:none;border:0;padding:2px 0;margin:0;color:var(--green);t
 .note-list{margin:6px 0 12px;padding-left:18px;font-size:13px}
 .note-list li{margin:4px 0}
 @media print{.page-note,.page-note-add{display:none!important}}
+/* ---- Alternativen: eingerückt in der Gliederung, dezent markiert auf dem Blatt ---- */
+.alt-start{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px;padding:16px 18px;margin-bottom:18px;background:white;border:1px solid var(--line);border-radius:14px}
+.alt-start strong{font-size:16px}
+.alt-start p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.alt-start-actions{display:flex;flex-wrap:wrap;gap:8px}
+.alt-start-actions button{width:auto;margin:0;padding:10px 16px;font-weight:600}
+.alt-list-head{margin:6px 0 10px;font-size:15px}
+.outline-item.is-alternative{margin-left:22px}
+.outline-item.is-alternative .outline-num{width:22px;height:30px;font-size:11px;border-left-color:#c9b25a;background:#fffdf2}
+.paper-stage .paper-sheet.paper-alternative{outline:2px dashed #d9c77a;outline-offset:5px}
+@media print{.paper-sheet.paper-alternative{outline:none}}
+.paper-stage .source-sheet.paper-alternative::after{content:attr(data-alternative);position:absolute;top:8px;left:8px;z-index:3;padding:3px 10px;border-radius:999px;background:#fff6b8;border:1px solid #d9c77a;color:#5b4c0f;font:700 11px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+/* An open page menu stays visible even when the pointer or focus leaves the page (the menu sits in the top layer). */
+.editor-v2 .paper-task-tools:has(.paper-item-menu[open]),.editor-v2 .paper-item-menu[open],.editor-v2 .paper-item-menu[open] *{visibility:visible}

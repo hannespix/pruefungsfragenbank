@@ -71,7 +71,7 @@ function approve(e,{reviewedBy}={}){
  for(const {task:t,label} of entries){if(!positive(t.points))issues.push(label+': Positive Gesamtpunktzahl fehlt; Punktevorschlag zuerst übernehmen oder Punkte ergänzen.');if(!Array.isArray(t.criteria)||t.criteria.some(c=>!Number.isFinite(c.points)||c.points<0))issues.push(label+': Kriteriumspunkte fehlen oder sind ungültig.');else if(t.criteria.length&&Math.abs(t.criteria.reduce((n,c)=>n+c.points,0)-t.points)>0.001)issues.push(label+': Summe der Kriteriumspunkte weicht von Gesamtpunkten ab.');}
  if(issues.length)throw Error('Punktverteilung noch nicht freigebbar:\n'+issues.join('\n'));
  const next=C.clone(e),reviewer=typeof reviewedBy==='string'&&reviewedBy.trim()?reviewedBy.trim():'Zuständige Stelle',at=C.now();let changed=false;
- for(const {task:t} of C.examEntries(next)){if(C.pointsReviewCurrent(t)&&t.pointsReview?.reviewedBy===reviewer)continue;t.pointsReview={contentKey:C.pointsReviewKey(t),reviewedBy:reviewer,reviewedAt:at};changed=true;}
+ for(const {task:t} of C.examEntries(next,{alternatives:true})){if(C.pointsReviewCurrent(t)&&t.pointsReview?.reviewedBy===reviewer)continue;t.pointsReview={contentKey:C.pointsReviewKey(t),reviewedBy:reviewer,reviewedAt:at};changed=true;}
  if(changed)next.updatedAt=at;return next;
 }
 const api={propose,apply,approve,sourceIssues};root.HortiPointsPlan=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;

@@ -5,7 +5,7 @@ const P=typeof module!=='undefined'&&module.exports?require('./planning.js'):roo
 function markReviewed(e,reviewedBy,reviewedAt){
  const next=C.clone(e);
  if(next.pattern)next.pattern.status='confirmed';
- for(const {task:t} of C.examEntries(next)){
+ for(const {task:t} of C.examEntries(next,{alternatives:true})){
   if(t.materials?.text.trim())t.materials.status='confirmed';
   t.reviewStatus='approved';t.solutionStatus=t.solution.trim()?'approved':'missing';t.reviewedBy=reviewedBy;t.reviewedAt=reviewedAt;
   t.pointsReview={contentKey:C.pointsReviewKey(t),reviewedBy,reviewedAt};
@@ -20,7 +20,7 @@ function inspect(e){
  if(e.status==='used')issues.push('Bereits dokumentierte Prüfungen bleiben unverändert.');
  if(!e.title?.trim())issues.push('Prüfungstitel ergänzen.');
  try{if(e.pattern)P.checkPattern(e.pattern);}catch(error){issues.push(error.message);}
- for(const item of C.examEntries(e)){
+ for(const item of C.examEntries(e,{alternatives:true})){
   const t=item.task;try{C.checkTask(t,P.examContext(e));}catch(error){issues.push(item.label+': '+error.message);continue;}
   if(!t.text.trim())issues.push(item.label+': Aufgabenstellung ergänzen.');
   if(item.component==='practical'&&(t.kind===undefined||t.kind==='practical')&&!t.materials?.text.trim())issues.push(item.label+': Materialliste noch festlegen.');
