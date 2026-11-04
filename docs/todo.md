@@ -161,6 +161,9 @@ Ziel: viel einfacher und intuitiver. Prüfungseditor mit einer Aufgabe: sichtbar
 
 ## Rückmeldungen
 
+- [x] **„Fertigstellen“ war verwirrend, das Aufgaben-Popup soll weg.**
+  - „Fertigstellen“ trennt jetzt „Noch zu erledigen“ (nur, was wirklich fehlt; die Freigabe wartet darauf) von „Mit der Freigabe bestätigst du“. Letzteres zeigt je Aufgabe kurz Punkte, Hinweise aus der Übernahme, Materialliste und fachliche Prüfung mit „Ansehen“. Arbeitsgruppen sehen diesen Teil als „Prüft die zuständige Stelle“; das sind keine Aufgaben für sie.
+  - Statt des Popups öffnet sich rechts neben dem Blatt das Feld „Details“: Punkte und Minuten, Lösung auf dem Blatt, Hinweise aus der Übernahme, Materialliste (bearbeiten, bestätigen) und für die zuständige Stelle „Aufgabe fachlich freigeben“. Das Formular bleibt nur als Link „Alle Angaben im Formular“ für Seltenes.
 - [x] **Materiallisten aus den Quellen den Aufgaben zuordnen.**
   - Unter „Einstellungen → Import & Quellen“ steht „Materiallisten aus den Quellen“ mit dem Knopf „Quellen durchsuchen“. Der Bericht zeigt, wie viele eigene Materiallisten-Dokumente es gibt und welche Aufgaben bereits eine Material-Rubrik im eigenen Text haben. Er listet außerdem jede Zuordnung mit Vorschau und alle nicht eindeutigen Abschnitte.
   - Zuordnung nur bei eindeutig passendem Titel, gleicher Fachrichtung und Prüfungsart, bei bekanntem Jahr nur im selben Jahr.

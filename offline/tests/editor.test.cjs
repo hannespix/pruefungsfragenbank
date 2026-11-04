@@ -196,14 +196,31 @@ test('ZP: "Alternative hinzufügen" lists the same theme, offers no copies from 
  await u.click('action','picker-open','');assert.doesNotMatch(u.html(),/Als Alternative übernehmen/,'the normal picker is back');
 });
 
-test('"Fertigstellen": open points with one button each, done list, message saved as typed, release for the coordinating body',async()=>{
- const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');
- await u.click('action','editor-finish');await u.click('action','editor-overlay','finish');let h=u.html(),f=h.slice(h.indexOf('class="finish"'));
- assert.match(f,/Baumschule · 0 Prüfungsaufgaben/);assert.match(f,/Noch \d+ Punkte? offen/);assert.match(f,/class="rule-card/);assert.match(f,/class="rule-fixes"/,'each open point brings its fix');
- assert.match(f,/<h3>Erledigt<\/h3>[\s\S]*3 Themen/);assert.match(f,/id="finish-note"/);assert.match(f,/data-action="release-exam"[^>]*disabled/,'release waits for the open points');
+test('"Fertigstellen": real to-dos first, then what the release confirms per task; message saved as typed',async()=>{
+ const u=await ui({before:d=>{for(const t of d.tasks.filter(x=>x.examType==='ZP')){t.flags=['Punktevorschlag: 100 Punkte als Arbeitsgrundlage, keine amtliche Vorgabe.'];t.reviewStatus='review';}}});
+ await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');
+ await u.click('action','editor-overlay','finish');let f=u.html().slice(u.html().indexOf('class="finish"'));
+ assert.match(f,/Baumschule · 0 Prüfungsaufgaben/);assert.match(f,/Noch \d+ Punkte? zu erledigen/);assert.match(f,/Aufgaben fehlen/);assert.match(f,/data-action="release-exam"[^>]*disabled/,'release waits for the to-dos');
+ await u.click('action','proposals-accept');await u.click('action','editor-overlay','finish');f=u.html().slice(u.html().indexOf('class="finish"'));
+ // Source hints and open reviews are not to-dos: the release confirms them, one row per task with "Ansehen".
+ assert.match(f,/Alles Nötige ist da/);assert.match(f,/Mit der Freigabe bestätigst du/);assert.match(f,/Hinweis aus der Übernahme|Punkte/);assert.match(f,/data-action="details-open"/);assert.doesNotMatch(f,/data-action="release-exam"[^>]*disabled/);
+ assert.match(f,/<h3>Erledigt<\/h3>[\s\S]*3 Themen/);assert.match(f,/id="finish-note"/);assert.doesNotMatch(f,/<details/,'no fold-outs');
  for(const a of ['timing-plan','points-plan','preview-candidate','export-exam','editor-overlay-close'])assert.match(f,new RegExp(`data-action="${a}"`),a);
- assert.doesNotMatch(f,/<details/,'no fold-outs');
- await u.click('action','proposals-accept');await u.click('action','editor-overlay','finish');f=u.html().slice(u.html().indexOf('class="finish"'));assert.match(f,/Aufgaben · 3 von 3/);
+});
+
+test('task details open next to the sheet instead of a pop-up; one click approves a task with its hints',async()=>{
+ const u=await ui({before:d=>{const t=d.tasks.find(x=>x.id==='zp-extra');t.flags=['Punktevorschlag: 100 Punkte als Arbeitsgrundlage, keine amtliche Vorgabe.'];t.reviewStatus='review';}});
+ await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');await u.click('action','proposals-accept');
+ const e=u.exam(),item=e.items.find(i=>i.originTaskId==='zp-extra');
+ await u.click('action','item-edit',item.id);let h=u.html();
+ assert.equal(u.sandbox.document.querySelector('#dialog').open,false,'no pop-up');assert.match(h,/class="editor-checklist editor-details is-open"/);assert.doesNotMatch(h,/<h2>Checkliste<\/h2>/);
+ assert.match(h,/data-detail-field="points"/);assert.match(h,/data-detail-field="materials"/);assert.match(h,/Hinweise aus der Übernahme[\s\S]*Punktevorschlag/);assert.match(h,/data-action="details-approve"/);
+ await u.click('action','details-materials-confirm',item.id);assert.equal(item.task.materials.status,'confirmed');
+ await u.click('action','details-approve',item.id);assert.deepEqual(r('core.js').openTaskFlags(item.task),[]);assert.ok(r('core.js').taskReviewCurrent(item.task));h=u.html();assert.doesNotMatch(h,/data-action="details-approve"/);
+ // Fix buttons of the advisor lead to the panel, not to the form.
+ await u.click('action','required-field',JSON.stringify([item.id,'points']));assert.equal(u.sandbox.document.querySelector('#dialog').open,false);assert.match(u.html(),/editor-details/);
+ await u.click('action','details-close');assert.match(u.html(),/<h2>Checkliste<\/h2>/);
+ await u.click('action','details-form',item.id);assert.equal(u.sandbox.document.querySelector('#dialog').open,true,'the full form stays reachable');
 });
 
 test('material lists in the sources: the report says what exists and takes matching lists over as proposals',async()=>{
