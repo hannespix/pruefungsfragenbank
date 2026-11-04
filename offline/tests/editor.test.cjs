@@ -21,6 +21,7 @@ function demoData(){
  apHeads.forEach((h,i)=>add(base,'ap1-'+i,{title:'Produktion '+(i+1),text:'Aufgabe: '+h+'\n'+base.text,minutes:40,practicalUnits:[{title:'Produktion '+(i+1),areaId:'area1',reason:'Pflanzenproduktion laut Aufgabenstellung'}]}));
  [0,1].forEach(i=>add(base,'ap2-'+i,{title:'Verkauf '+(i+1),text:'Aufgabe: '+apHeads[i]+'\n'+base.text,minutes:40,practicalUnits:[{title:'Verkauf '+(i+1),areaId:'area2',reason:'Vermarktung laut Aufgabenstellung'}]}));
  add(base,'oral-1',{kind:'oral',title:'Kundengespräch Rosen',text:'Thema: Kundenberatung\nBeraten Sie eine Kundin.',minutes:15,points:20});
+ add(base,'oral-2',{kind:'oral',title:'Kundengespräch Gehölze',text:'Thema: Kundenberatung\nBeraten Sie einen Kunden.',minutes:15,points:20});
  data.workshops=[{id:'meeting',title:'Termin',examYear:2027,meetingDate:'',specialties:['Baumschule']}];
  return C.validate(data);
 }
@@ -162,4 +163,27 @@ test('a note is added to a page with one button and removed again; outline and "
  u.exam().items[0].pageNotes['0']='Material am Vortag bestellen';await u.click('action','editor-overlay-close');assert.match(u.html(),/class="outline-note"[^>]*>1 Notiz</);
  await u.click('action','editor-overlay','finish');assert.match(u.html(),/Notizen auf den Seiten[\s\S]*Material am Vortag bestellen/);await u.click('action','editor-overlay-close');
  await u.click('action','page-note-remove',id+'|0');assert.equal(u.exam().items[0].pageNotes,undefined);h=u.html();assert.doesNotMatch(h,/class="page-note"/);assert.match(h,add);
+});
+
+test('alternatives to the oral task: chosen in the overlay, copied to rewrite, promoted and removed from the page menu',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','AP');
+ let h=u.html();await u.click('action','oral-select',h.match(/data-editor-gap="oral-gap"[\s\S]*?data-action="oral-select" data-id="([^"]+)"/)[1]);
+ const e=u.exam(),owner=e.oralItem.id;assert.match(u.html(),new RegExp(`data-action="alt-open" data-id="${owner}"`));
+ await u.click('action','alt-open',owner);h=u.html();assert.match(h,/Alternative zur mündlichen Aufgabe/);assert.match(h,/data-action="alt-copy"/);assert.match(h,/data-action="new-oral-task"/);
+ const pick=h.match(/data-action="alt-add" data-id="([^"]+)"/)?.[1];assert.equal(pick,'oral-2');assert.doesNotMatch(h,/data-action="oral-select"/);
+ await u.click('action','alt-add',pick);assert.equal(e.oralItem.alternatives.length,1,u.toast());h=u.html();
+ assert.doesNotMatch(h,/class="editor-overlay"/);assert.match(h,/class="outline-item is-alternative"[\s\S]*?Alternative B/);assert.match(checklist(h),/1 Alternative/);assert.match(checklist(h),/Aufgaben · 0 von 5/,'alternatives never count');
+ await u.click('action','alt-open',owner);await u.click('action','alt-copy',owner);assert.equal(e.oralItem.alternatives.length,2);assert.match(u.html(),/Mündliche Prüfungsaufgabe · Alternative C/);
+ const b=e.oralItem.alternatives[0];await u.click('action','alt-promote',b.id);assert.equal(e.oralItem.task.title,'Kundengespräch Gehölze');assert.equal(b.task.title,'Kundengespräch Rosen');
+ await u.click('action','alt-remove',b.id);assert.equal(e.oralItem.alternatives.length,1);assert.match(e.oralItem.alternatives[0].task.title,/– Alternative$/,'the copy remains');assert.doesNotMatch(u.html(),/>Kundengespräch Rosen</);
+});
+
+test('ZP: "Alternative hinzufügen" lists the same theme, offers no copies from other areas and closes with Escape',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');await u.click('action','proposals-accept');
+ const e=u.exam(),owner=e.items.find(i=>i.originTaskId==='zp-extra2');assert.ok(owner,'tool theme task present');
+ await u.click('action','alt-open',owner.id);let h=u.html();assert.match(h,/Alternative hinzufügen/);assert.match(h,/class="alt-start"/);assert.doesNotMatch(h,/id="paper-scope"/);assert.doesNotMatch(h,/data-action="paper-replace"|data-action="adopt-task"/);
+ assert.match(h,/data-action="alt-add" data-id="zp-extra2" disabled/,'the task itself cannot be its own alternative');
+ await u.click('action','alt-add','demo-task-1');assert.equal(owner.alternatives?.length,1,u.toast());assert.equal(L.structureCoverage(e).total,3);
+ await u.click('action','alt-open',owner.id);u.listeners.keydown({key:'Escape',preventDefault(){},target:{closest:()=>null}});h=u.html();assert.doesNotMatch(h,/class="editor-overlay"/);
+ await u.click('action','picker-open','');assert.doesNotMatch(u.html(),/Als Alternative übernehmen/,'the normal picker is back');
 });
