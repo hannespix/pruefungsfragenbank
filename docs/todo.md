@@ -153,7 +153,11 @@ Ziel: viel einfacher und intuitiver. Prüfungseditor mit einer Aufgabe: sichtbar
   - Arbeitsgruppe: je Prüfung eine Karte mit Fortschritt, „Als Nächstes: …“ und genau einem Knopf (Weiterarbeiten / Prüfung beginnen).
   - Zuständige Stelle: Tabelle Fachrichtung × Prüfungsart mit Status (In Arbeit · n von m, Wartet auf Freigabe, Freigegeben); ein Klick öffnet die Prüfung. Oben „Arbeitsgruppen einladen“ und „Alles ausgeben (ZIP)“.
   - Navigation: Start · Aufgaben · Einstellungen. Unter „Einstellungen“ liegen alle bisherigen Verwaltungsseiten als Kacheln auf einer Seite.
-- [ ] 5. Handy, einheitliche Begriffe, Hilfe statt i-Blasen; Test mit Anwendern
+- [x] 5. Handy, einheitliche Begriffe, Hilfe statt i-Blasen
+  - Keine i-Blasen mehr; ihre Erklärungen stehen in der Hilfe unter „Gut zu wissen beim Zusammenstellen“. Die Hilfe beschreibt den neuen Ablauf („So entsteht eine Prüfung“, „So bedient ihr das Prüfungsblatt“).
+  - Einheitliche Begriffe: „Termin“ statt „Vorbereitungstermin“, „Zugänge & QR-Codes“, „Ausführungen“, „Termin & Arbeitsgruppen“.
+  - Handy: Checkliste als Leiste unten mit dem nächsten Schritt; „Alle zeigen“ klappt sie auf.
+- [ ] Test mit drei Mitgliedern einer Arbeitsgruppe ohne Einweisung („Stellt eine Zwischenprüfung zusammen und übergebt sie.“ – ohne Hilfe, unter 15 Minuten).
 
 ## Rückmeldungen
 

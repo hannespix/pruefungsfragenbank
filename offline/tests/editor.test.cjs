@@ -217,3 +217,11 @@ test('material lists in the sources: the report says what exists and takes match
  await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');await u.click('action','proposals-accept');
  const item=u.exam().items.find(i=>i.originTaskId==='zp-extra');assert.match(item.task.materials.text,/Gartenschere/);
 });
+
+test('no info bubbles; their explanations are in the help; the checklist bar opens on phones',async()=>{
+ const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');
+ await u.click('action','editor-overlay','themes');assert.doesNotMatch(u.html(),/info-bubble/);
+ await u.click('action','picker-open','');await u.click('action','picker-tab','alle');assert.doesNotMatch(u.html(),/info-bubble/);await u.click('action','editor-overlay-close');
+ assert.match(u.html(),/data-action="checklist-toggle" aria-expanded="false">Alle zeigen/);await u.click('action','checklist-toggle');assert.match(u.html(),/class="editor-checklist is-open"/);
+ for(const group of [true,false]){const help=r('help.js').view({online:false,group});assert.match(help,/Gut zu wissen beim Zusammenstellen/);assert.match(help,/So entsteht eine Prüfung/);assert.match(help,/So bedient ihr das Prüfungsblatt/);assert.doesNotMatch(help,/Vorbereitungstermin|In drei Schritten/);}
+});
