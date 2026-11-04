@@ -670,3 +670,13 @@ test('until the server accepts group tasks, groups keep the previous view withou
  const u=await ui('group',false,{capabilities:[]}),d=u.sandbox.testUI.getDb();await createDraft(u,'ZP');const html=u.elements.get('#app').innerHTML;
  assert.doesNotMatch(html,/data-action="new-task"|class="paper-new-task"/);const count=d.tasks.length;await u.click('action','new-task');assert.equal(d.tasks.length,count);assert.doesNotMatch(u.elements.get('#dialog').innerHTML,/id="task-title"/);
 });
+
+test('meeting export is coordinator-only, asks the server for export rights and does not mutate the project',async()=>{
+ const g=await ui();await createDraft(g,'ZP');g.online.request=()=>{throw Error('Unexpected export authorization');};await g.click('action','export-meeting','meeting');assert.equal(g.elements.get('#dialog').innerHTML,'');assert.doesNotMatch(g.elements.get('#app').innerHTML,/data-action="export-meeting"/);
+ const u=await ui('admin');await u.click('action','open-group','Baumschule');await createDraft(u,'ZP');const d=u.sandbox.testUI.getDb(),e=d.exams.at(-1),t=d.tasks.find(t=>t.specialty===e.specialty&&t.examType==='ZP');await u.click('action','add',t.id);
+ let blob,authorizations=0;u.sandbox.JSZip=Zip;u.sandbox.URL={createObjectURL:b=>{blob=b;return 'blob:test';},revokeObjectURL(){}};u.elements.set('#ready-download',{addEventListener(){}});u.online.ensureAssets=async()=>{};u.online.request=async path=>{assert.equal(path,'/api/export');authorizations++;};
+ await u.click('route','results');assert.match(u.elements.get('#app').innerHTML,/data-action="export-meeting" data-id="meeting"/);
+ const before=JSON.stringify(d);await u.click('action','export-meeting','meeting');assert.ok(blob,u.elements.get('#toast').textContent);assert.ok(authorizations>=2,'checked before and after building');
+ const z=await Zip.loadAsync(await blob.arrayBuffer()),files=Object.keys(z.files);assert.ok(files.some(f=>/^[^/]+\/Baumschule\/01_Zwischenpruefung [^/]+\/01_Teilnehmerfassung\.docx$/.test(f)),files.join(', '));assert.ok(files.some(f=>/^[^/]+\/00_Uebersicht\.html$/.test(f)));
+ assert.equal(JSON.stringify(d),before);
+});

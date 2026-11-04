@@ -78,6 +78,11 @@ Jedes Paket geht als eigener PR raus und wird nach grüner CI automatisch gemerg
     - keine Freigaben.
   - Die Knöpfe erscheinen für Gruppen erst, wenn der Server die Funktion meldet (`capabilities: ['group-tasks']`). Der Worker wird getrennt von den Pages ausgeliefert: per Knopf über den GitHub-Workflow „Worker ausrollen“ (Actions → Worker ausrollen → Run workflow, „ausrollen“ eintippen) oder lokal mit `wrangler deploy --config online/wrangler.jsonc`.
   - Offen: Grafiken und Pläne können Gruppen weiterhin nicht hochladen.
+- [x] **Alle Prüfungen eines Termins als ZIP exportieren (zuständige Stelle).**
+  - Knopf „Alle Prüfungen dieses Termins exportieren (ZIP)“ unter „Prüfungen & Ergebnisse“.
+  - Aufbau: `<Termin>/<Fachrichtung>/<NN>_<Prüfungsart> <Titel>/`. Je Prüfung liegen dort Prüfungsbogen, Lösung & Bewertung, Materialliste, interne Bemerkungen und Zeitplan (jeweils Word und Druckfassung) sowie die Anlagen.
+  - Je Fachrichtung `00_Materialuebersicht.html`, oben `00_Uebersicht.html` mit Links und Stand sowie `LESEN.txt`.
+  - Prüfungen ohne Aufgaben und Prüfungen, die sich nicht ausgeben ließen, stehen mit Grund in der Übersicht; der Rest wird trotzdem exportiert.
 - [ ] Rund 20 Formularfeldern fehlt ein `<label for>` (Barrierefreiheit).
 
 ## Technik & Sicherheit (aus `docs/code-audit-2026-11.md`)
