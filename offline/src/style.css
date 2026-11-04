@@ -823,3 +823,19 @@ button.link{background:none;border:0;padding:2px 0;margin:0;color:var(--green);t
 .history-list .is-current>span{display:flex;gap:6px;align-items:center;color:var(--green);font-weight:600;padding:8px 13px}
 .history-list .is-current svg{width:16px;height:16px}
 .history-list .is-future button{opacity:.65}
+/* ---- Notizen zu den Seiten: gelber Zettel über der Seite, wird nie gedruckt ---- */
+.page-note{position:relative;width:calc(210mm * var(--paper-scale,1));max-width:100%;box-sizing:border-box;margin:0 auto 8px;padding:9px 34px 11px 14px;background:#fff6b8;border:1px solid #ecd97a;border-radius:6px 6px 2px 2px;box-shadow:0 6px 14px -10px #6b5a0080;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#3b3412;text-align:left}
+.page-note-label{display:block;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#7a6512;margin-bottom:3px}
+.page-note-text{white-space:pre-wrap;outline:none;min-height:1.45em;overflow-wrap:anywhere}
+.page-note-text:empty::before{content:attr(data-placeholder);color:#9a8a4a}
+.page-note:focus-within{border-color:#c9a91f;box-shadow:0 0 0 3px #f5dc6b80}
+.page-note-remove{position:absolute;top:5px;right:5px;width:26px;height:26px;padding:0;margin:0;border:0;background:transparent;color:#7a6512;font-size:18px;line-height:1;visibility:hidden}
+.page-note:hover .page-note-remove,.page-note:focus-within .page-note-remove{visibility:visible}
+.page-note-remove:hover{background:#f3e48e}
+.paper-task-tools .page-note-add{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;margin:0;font-size:11px;background:#fff6b8;border:1px solid #ecd97a;color:#5b4c0f;border-radius:6px}
+.page-note-add svg{width:14px;height:14px}
+.outline-note{font-weight:600;color:#8a6d00}
+.outline-note:not(:empty)::before{content:" · ";color:var(--muted);font-weight:400}
+.note-list{margin:6px 0 12px;padding-left:18px;font-size:13px}
+.note-list li{margin:4px 0}
+@media print{.page-note,.page-note-add{display:none!important}}
