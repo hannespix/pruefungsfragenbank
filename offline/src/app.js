@@ -487,7 +487,7 @@ function editorOutline(e,gaps,oralGap){
 }
 function editorRuleNote(e,c){if(!c)return '';const p=c.profile;return `<p class="checklist-rule">${E(p.sourceLabel||'Prüfungsordnung')} ${E(p.section||'')}: ${p.themeCount?`${p.totalTasks} Aufgaben aus ${p.themeCount} verschiedenen Themen, höchstens ${p.maxMinutes} Minuten.`:e.examType==='AP'?`${p.totalTasks} komplexe Aufgaben mit Mindestzahl je Prüfungsbereich, dazu eine mündliche Aufgabe.`:`${p.totalTasks} Aufgaben, ${p.exactMinutes!=null?'genau '+p.exactMinutes:'höchstens '+p.maxMinutes} Minuten, dazu eine mündliche Aufgabe.`} ${btn('regulation-help','Warum?','link')}</p>`;}
 // The only place for progress. Every open point has exactly one button that does it.
-function editorChecklist(e,gaps,oralGap){
+function checklistItems(e,gaps,oralGap){
  const c=L.structureCoverage(e),ready=C.readiness(e),oral=C.oralStatus(e),used=e.status==='used',items=[];
  if(c?.profile.themeCount){const ids=selectedThemes(e),issue=L.themeSelectionIssue(e);items.push({done:!issue,title:issue?`Themen · ${ids.length} von ${c.profile.themeCount}`:`${c.profile.themeCount} Themen`,detail:ids.map(id=>L.label(id,e)).join(' · ')||'Noch keine Themen gewählt',action:btn('suggest-themes','Themen vorschlagen','primary small'),link:btn('editor-overlay','ändern','link','themes')});}
  const total=c?c.total:e.items.length,need=c?c.profile.totalTasks:(L.coverage(e).slots||[]).reduce((n,s)=>n+s.count,0),first=gaps[0],offers=gaps.filter(g=>g.task).length;
@@ -497,6 +497,10 @@ function editorChecklist(e,gaps,oralGap){
  if(c){const p=c.profile,limit=p.exactMinutes!=null?'genau '+p.exactMinutes:'höchstens '+p.maxMinutes,ok=!c.unknownMinutes&&c.total>=p.totalTasks&&(p.exactMinutes!=null?c.minutes===p.exactMinutes:c.minutes<=p.maxMinutes);items.push({done:ok,title:`Zeit · ${c.minutes}${c.unknownMinutes?' + ?':''} von ${limit} Min.`,detail:c.unknownMinutes?`${c.unknownMinutes} ${c.unknownMinutes===1?'Zeitangabe fehlt':'Zeitangaben fehlen'}`:e.examType==='AP'?'einschließlich Prüfungsgesprächen':'',action:c.total?btn('timing-plan','Zeitplan öffnen','primary small'):''});}
  const known=new Set([...(c?.issues||[]),...oral.issues,'Keine Aufgaben ausgewählt.']),rest=ready.issues.filter(s=>!known.has(s));
  items.push({done:!rest.length&&e.items.length>0,title:rest.length?`Angaben · ${rest.length} offen`:e.items.length?'Angaben vollständig':'Angaben',detail:rest.length?rest[0]:e.items.length?'Zeiten, Punkte, Material und Freigaben':'Nach der Aufgabenwahl: Zeiten, Punkte, Material und Freigaben',action:btn('editor-overlay','Offene Angaben ansehen','primary small','finish')});
+ return {items,c,ready,used};
+}
+function editorChecklist(e,gaps,oralGap){
+ const {items,c,ready,used}=checklistItems(e,gaps,oralGap);
  const done=items.filter(x=>x.done).length,next=used?-1:items.findIndex(x=>!x.done);
  const advice=Adv?Adv.advise(ready.issues,C.examEntries(e)):[],violations=advice.filter(x=>x.kind==='violation');
  // Older drafts keep their saved themes and texts; a notice offers the current rules without forcing them.
@@ -518,12 +522,27 @@ function pickerView(e,parts){if(!parts?.library)return '';const tab=pickerTab;le
  else if(tab==='ki')body=`<section class="picker-panel"><h3>Aus eurem Vorschlag</h3><p>Fügt eure Idee als Text ein oder ladet eine Word-Datei. Der KI-Assistent macht daraus einen Entwurf im Prüfungsformat und fragt nach, was fehlt. Ihr prüft den Entwurf, bevor er übernommen wird.</p>${btn('ai-draft-open','KI-Assistent öffnen','primary')}</section>`;
  else body=parts.library;
  return pickerTabs(e)+body;}
+function finishView(e){
+ const used=e.status==='used',{items,c,ready}=checklistItems(e,editorGaps(e),editorOralGap(e)),tot=C.totals(e),entries=C.examEntries(e,{alternatives:true}),oral=C.oralStatus(e);
+ const advice=Adv?Adv.advise(ready.issues,entries):ready.issues.map(text=>({kind:'open',title:text,text:'',fixes:[]})),notes=C.pageNoteList(e);
+ const limit=c?(c.profile.exactMinutes!=null?'genau '+c.profile.exactMinutes:'höchstens '+c.profile.maxMinutes):'',summary=[`${C.examTypeLabel(e.examType)} ${e.examYear||''}`.trim(),e.specialty,paperTaskCount(e),`${tot.points}${tot.unknownPoints?' + offene':''} Punkte`,c?`${c.minutes}${c.unknownMinutes?' + ?':''} von ${limit} Minuten`:`${tot.minutes} Minuten`].join(' · ');
+ const blocked=!!c&&!c.complete||oral.required&&!e.oralItem,inspect=isGroup?null:R.inspect(e),approved=!isGroup&&e.releaseReview?.contentKey===C.examReviewKey(e)&&ready.ready;
+ const open=advice.length?`<section class="finish-open"><h3>${advice.length===1?'Noch 1 Punkt offen':`Noch ${advice.length} Punkte offen`}</h3><div class="rule-board">${adviceCards(e,advice)}</div></section>`:'<section class="finish-open is-clear"><h3>Alles vollständig</h3><p>Die hinterlegten Prüfungen der Prüfungsordnung sind erfüllt.</p></section>';
+ const done=items.filter(x=>x.done).map(x=>x.title);
+ const message=used?'':`<section class="finish-message"><label for="finish-note"><strong>${isGroup?'Nachricht an die zuständige Stelle':'Interne Bemerkungen'}</strong> <span class="tiny">(optional, wird nicht gedruckt)</span></label><textarea id="finish-note" rows="3" maxlength="20000" placeholder="z. B. Rückfragen, benötigtes Material, Hinweise zur Durchführung">${E(e.internalNotes||'')}</textarea></section>`;
+ const noteList=notes.length?`<section class="finish-notes"><h3>Notizen auf den Seiten</h3><ul class="note-list">${notes.map(n=>`<li><strong>${E(n.label)}, Seite ${n.page+1}:</strong> ${E(n.text.slice(0,240))}${n.text.length>240?' …':''}</li>`).join('')}</ul></section>`:'';
+ const submitted=e.submittedAt?`<p class="tiny">Übergeben am ${E(new Date(e.submittedAt).toLocaleDateString('de-DE'))}. Ihr könnt weiter ändern, bis die zuständige Stelle freigibt.</p>`:'';
+ const main=used?'':isGroup?btn('finish-editing',finishing?'Wird gespeichert …':'An die zuständige Stelle übergeben','primary finish-main').replace('>',finishing||blocked?' disabled>':'>'):btn('release-exam',approved?'Aktuelle Fassung ist freigegeben':'Prüfung freigeben','primary finish-main').replace('>',inspect?.ready&&!approved?'>':' disabled>');
+ const why=used?'':isGroup?(blocked?'<p class="tiny">Übergeben geht, sobald alle Aufgaben und die mündliche Aufgabe gewählt sind. Andere offene Punkte dürfen mit übergeben werden; die zuständige Stelle sieht sie.</p>':'<p class="tiny">Offene Punkte dürfen mit übergeben werden; die zuständige Stelle sieht sie.</p>'):approved?'<p class="tiny">Nach inhaltlichen Änderungen ist eine neue Freigabe nötig.</p>':inspect&&!inspect.ready?'<p class="tiny">Freigeben geht, sobald die offenen Punkte oben erledigt sind.</p>':'<p class="tiny">Mit der Freigabe bestätigst du die fachliche Durchsicht von Aufgaben, Punkten, Zeiten und Materiallisten.</p>';
+ const links=`<p class="finish-links">${btn('timing-plan','Zeitplan','link')}${btn('points-plan','Punkteverteilung','link')}${btn(paperSolutions?'preview-solution':'preview-candidate','Vorschau & Druck','link')}${isGroup?'':btn('export-exam','Word & Druck','link')}</p>`;
+ return `<div class="finish"><p class="finish-summary">${E(summary)}</p>${open}${done.length?`<section class="finish-done"><h3>Erledigt</h3><ul>${done.map(t=>`<li>${I.icon('check')}${E(t)}</li>`).join('')}</ul></section>`:''}${message}${noteList}${links}<div class="finish-actions">${main}${btn('editor-overlay-close','Weiter bearbeiten','ghost')}${submitted}${why}</div></div>`;
+}
 function editorOverlayView(e,library){
  if(!editorOverlay)return '';let title='',body='';
  if(editorOverlay==='picker'){title=altOwner(e)?'Alternative hinzufügen':'Aufgabe wählen'+(paperCategory&&!paperScope?' · '+L.label(paperCategory,e):'');body=`${altStart(e)}<div class="word-workspace editor-picker" data-picker-tab="${pickerTab}">${editorMode==='klassisch'?library?.library||library:pickerView(e,library)}</div>`;}
  else if(editorOverlay==='themes'){title='Themen der Prüfung';body=workflowThemeView(e,true)+`<div class="editor-overlay-foot">${btn('editor-overlay-close','Fertig','primary')}</div>`;}
  else if(editorOverlay==='oral'){title=altOwner(e)?'Alternative zur mündlichen Aufgabe':'Mündliche Aufgabe wählen';body=altStart(e)+oralPicker(e)||'<p>Für diese Prüfung ist keine mündliche Aufgabe vorgesehen.</p>';}
- else if(editorOverlay==='finish'){title='Prüfung fertigstellen';body=requiredFields(e)+reviewWorkflow(e,true);}
+ else if(editorOverlay==='finish'){title='Prüfung fertigstellen';body=finishView(e);}
  else return '';
  return `<div class="editor-overlay" role="dialog" aria-modal="true" aria-labelledby="editor-overlay-title" data-overlay="${editorOverlay}"><header class="editor-overlay-head"><div><p class="eyebrow">${E(e.title)}</p><h2 id="editor-overlay-title">${E(title)}</h2></div><button class="editor-overlay-close" data-action="editor-overlay-close" aria-label="Schließen und zurück zur Prüfung" title="Schließen (Esc)">${I.icon('close')}</button></header><div class="editor-overlay-body">${body}</div></div>`;
 }
@@ -547,6 +566,7 @@ function wireEditor(){
  const menu=$('#editor-menu'),anchor=$('.editor-menu-button');
  if(menu&&anchor)menu.addEventListener('toggle',ev=>{if(ev.newState!=='open')return;const a=anchor.getBoundingClientRect(),w=menu.offsetWidth||260,vw=globalThis.innerWidth||1024;menu.style.left=Math.max(8,Math.min(a.right-w,vw-w-8))+'px';menu.style.top=Math.round(a.bottom+6)+'px';menu.style.right='auto';});
  if(menu&&anchor&&typeof HTMLElement!=='undefined'&&!('popover' in HTMLElement.prototype))anchor.addEventListener('click',()=>menu.classList.toggle('is-open'));
+ $('#finish-note')?.addEventListener('input',ev=>{const e=editableExam(),value=ev.target.value.slice(0,20000);if((e.internalNotes||'')===value)return;e.internalNotes=value;e.updatedAt=C.now();changed();});
  const stage=$('.editor-stage');if(stage){stage.addEventListener('focusin',ev=>{if(ev.target?.closest?.('[data-rich-text],[data-paper-field="source-block"]'))stage.classList.add('is-writing');});stage.addEventListener('focusout',ev=>{if(!ev.relatedTarget?.closest?.('.float-text-tools'))stage.classList.remove('is-writing');});}
 }
 // Notes per page: '' while a new note is being written, removed again when left empty.
