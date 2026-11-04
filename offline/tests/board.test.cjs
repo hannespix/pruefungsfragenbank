@@ -60,3 +60,60 @@ test('full-screen focus gives the sheet the room and the Baukasten folds into on
  await u.click("action","sheet-focus");h=u.html();assert.doesNotMatch(h,/class="shell[^"]*sheet-focus/);assert.match(h,/>Vollbild</);
  await u.click('action','board-toggle');assert.match(u.html(),/class="exam-board is-compact"/);assert.match(u.html(),/aria-expanded="false"/);
 });
+
+// ---- Drag & drop everywhere: precise positions, dock targets, replace by drag, sheet grips ----
+// Stub drop target with geometry: sheets split at half height, Baukasten blocks at half width.
+const target=(dataset,{block=false,cls=[]}={})=>({dataset,getBoundingClientRect:()=>({left:0,top:0,right:200,bottom:100,width:200,height:100}),matches:s=>block&&s==='[data-board-item]',classList:{contains:c=>cls.includes(c),add(){},remove(){},toggle(){}}});
+const dropAt=(u,payload,el,x=100,y=10)=>u.listeners.drop({target:{closest:()=>el},clientX:x,clientY:y,preventDefault(){},dataTransfer:{getData:()=>payload}});
+function themedTasks(u){
+ const d=u.db(),base=d.tasks.find(t=>t.id==='demo-task-0');
+ const mk=(id,head)=>{const t=structuredClone(base);t.id=id;t.familyId='fam-'+id;t.title=id;t.text='Aufgabe: '+head+'\nHier: Synthetisches Beispiel\nZählen Sie die Pflanzen.';d.tasks.push(t);return t;};
+ return {plant:mk('t-plant','Durchführen von Arbeiten an der Pflanze'),tool:mk('t-tool','Einsatz von Werkzeug und Geräten'),prop:mk('t-prop','Vermehren von Pflanzen'),plant2:mk('t-plant2','Durchführen von Arbeiten an der Pflanze')};
+}
+const origins=u=>u.db().exams.at(-1).items.map(i=>i.originTaskId);
+
+test('drop positions: lower half inserts after, cover goes first, blocks split left/right, dock end and remove',async()=>{
+ const u=await ui(),t=themedTasks(u);
+ for(const x of [t.plant,t.tool,t.prop])dropAt(u,'task:'+x.id,target({dropEnd:''}));
+ assert.deepEqual(origins(u),['t-plant','t-tool','t-prop'],u.toast());
+ const items=()=>u.db().exams.at(-1).items,id=o=>items().find(i=>i.originTaskId===o).id;
+ dropAt(u,'item:'+id('t-prop'),target({paperBefore:items()[0].id}),100,80);
+ assert.deepEqual(origins(u),['t-plant','t-prop','t-tool'],'lower half of the first sheet = after it');
+ dropAt(u,'item:'+id('t-tool'),target({paperBefore:items()[0].id}),100,10);
+ assert.deepEqual(origins(u),['t-tool','t-plant','t-prop'],'upper half = before it');
+ dropAt(u,'item:'+id('t-prop'),target({paperBefore:items()[0].id},{cls:['paper-cover']}),100,90);
+ assert.deepEqual(origins(u),['t-prop','t-tool','t-plant'],'the cover always means first');
+ dropAt(u,'item:'+id('t-prop'),target({dropItem:id('t-tool')},{block:true}),150,10);
+ assert.deepEqual(origins(u),['t-tool','t-prop','t-plant'],'right half of a block = after it');
+ const board=[...u.html().matchAll(/data-board-item="([^"]+)"/g)].map(m=>m[1]);
+ assert.deepEqual(board,items().map(i=>i.id),'the Baukasten follows the order on the sheet');
+ dropAt(u,'item:'+id('t-tool'),target({dropEnd:''}));
+ assert.deepEqual(origins(u),['t-prop','t-plant','t-tool'],'dock "Ans Ende"');
+ dropAt(u,'item:'+id('t-plant'),target({dropRemove:''}));
+ assert.deepEqual(origins(u),['t-prop','t-tool']);assert.match(u.toast(),/entfernt.*Strg\+Z/);
+ dropAt(u,'task:t-plant',target({dropRemove:''}));
+ assert.deepEqual(origins(u),['t-prop','t-tool'],'a library card on "remove" changes nothing');
+});
+
+test('dragging another task of an occupied theme replaces it after asking; the same task is refused',async()=>{
+ const u=await ui(),t=themedTasks(u);
+ dropAt(u,'task:'+t.plant.id,target({dropSlot:'plantwork'}));assert.deepEqual(origins(u),['t-plant']);
+ await u.click('action','paper-category','');
+ assert.match(u.html(),/class="paper-source-task[^"]*is-draggable"[^>]*draggable="true" data-drag-task="t-plant2"/,'occupied theme stays draggable');
+ assert.doesNotMatch(u.html(),/draggable="true" data-drag-task="t-plant"/,'the task already in the exam is not draggable');
+ assert.match(u.html(),/class="sheet-grip" draggable="true" data-drag-item="/,'sheets carry a grip');
+ u.sandbox.confirm=()=>false;dropAt(u,'task:'+t.plant2.id,target({dropEnd:''}));
+ assert.deepEqual(origins(u),['t-plant'],'declined replacement keeps the exam');
+ u.sandbox.confirm=()=>true;dropAt(u,'task:'+t.plant2.id,target({paperBefore:u.db().exams.at(-1).items[0].id}));
+ assert.deepEqual(origins(u),['t-plant2']);assert.match(u.toast(),/ersetzt/);
+ dropAt(u,'task:'+t.plant2.id,target({dropEnd:''}));
+ assert.deepEqual(origins(u),['t-plant2']);assert.match(u.toast(),/bereits in der Prüfung/);
+});
+
+test('a drop outside every target during a drag is swallowed and never pastes the payload',async()=>{
+ const u=await ui(),data={};let prevented=false;
+ u.listeners.dragstart({target:{closest:()=>({dataset:{dragTask:'demo-task-0'},matches:()=>false,classList:{add(){},remove(){}}})},dataTransfer:{setData:(k,v)=>data[k]=v}});
+ assert.equal(data['text/plain'],'task:demo-task-0');
+ u.listeners.drop({target:{closest:()=>null},preventDefault(){prevented=true;},dataTransfer:{getData:()=>data['text/plain']}});
+ assert.equal(prevented,true,'the browser must not insert the payload as text');assert.equal(u.db().exams.at(-1).items.length,0);
+});
