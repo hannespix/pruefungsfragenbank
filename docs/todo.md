@@ -143,7 +143,9 @@ Ziel: viel einfacher und intuitiver. Prüfungseditor mit einer Aufgabe: sichtbar
   - ZP: drei Themen werden automatisch gewählt und sind in der Checkliste änderbar. AP: fünf Aufgaben mit den Mindestzahlen je Prüfungsbereich, dazu die mündliche Aufgabe als eigene Seite. FW: vier Aufgaben, genau 180 Minuten.
   - Bestehende Entwürfe öffnen unverändert in der neuen Ansicht und bleiben bearbeitbar. Ältere Themenstände zeigen einen Hinweis mit „Aktuelle Vorgaben übernehmen“.
   - Die klassische Ansicht bleibt umschaltbar (Menü „⋯ → Klassische Ansicht“, zurück mit „Neue Ansicht“). Die Wahl gilt je Gerät.
-- [ ] 2. „Aufgabe wählen“ als Vollbild mit Reitern (Vorschläge, Alle, Nach Jahr, Selbst schreiben, KI)
+- [x] 2. „Aufgabe wählen“ als Vollbild mit Reitern (Vorschläge, Alle, Nach Jahr, Selbst schreiben, KI)
+  - Vorschläge zuerst: Suchfeld und höchstens sechs passende Karten, lange nicht eingesetzte zuerst. 17 sichtbare Knöpfe statt 28.
+  - „Alle Aufgaben“ enthält andere Prüfungsarten und Fachrichtungen (als Kopie). „Nach Jahr“ ist das Archiv. „Selbst schreiben“ und „Aus Vorschlag (KI)“ haben je einen Knopf.
 - [ ] 3. Fertigstellen-Dialog statt Schritt 3
 - [ ] 4. Startseiten (Karten für Gruppen, Tabelle für die zuständige Stelle), Navigation Start · Aufgaben · Einstellungen
 - [ ] 5. Handy, einheitliche Begriffe, Hilfe statt i-Blasen; Test mit Anwendern

@@ -75,11 +75,19 @@ test('"Alle Vorschläge übernehmen" completes a ZP within the regulation',async
 test('"Andere Aufgabe wählen" opens the full-screen picker for that theme; choosing or Escape closes it',async()=>{
  const u=await ui();await u.click('action','open-group','Baumschule');await u.click('action','track-new','ZP');
  const theme=u.exam().pattern.slots[1].categoryId;await u.click('action','picker-open',theme);
- let h=u.html();assert.match(h,/class="editor-overlay"/);assert.match(h,/Aufgabe wählen · /);assert.match(h,/class="paper-library"/);
+ let h=u.html();assert.match(h,/class="editor-overlay"/);assert.match(h,/Aufgabe wählen · /);
+ // Suggestions first: a search field, at most six cards, the other ways as tabs.
+ assert.match(h,/data-action="picker-tab" data-id="vorschlaege"[^>]*>|aria-selected="true" data-action="picker-tab" data-id="vorschlaege"/);assert.match(h,/class="picker-suggest"/);assert.doesNotMatch(h,/class="paper-library"/);
+ for(const tab of ['alle','jahr','neu'])assert.match(h,new RegExp(`data-action="picker-tab" data-id="${tab}"`));
+ assert.ok(count(h.slice(h.indexOf('class="picker-suggest"')),/class="paper-source-task/g)<=6);
+ await u.click('action','picker-tab','alle');h=u.html();assert.match(h,/class="paper-library"/);assert.match(h,/id="paper-scope"/,'other exam types and specialties');
+ await u.click('action','picker-tab','jahr');assert.match(u.html(),/class="archive-years"/);
+ await u.click('action','picker-tab','neu');h=u.html();assert.match(h,/class="picker-panel"[\s\S]*data-action="new-task"/);
+ await u.click('action','picker-tab','vorschlaege');h=u.html();
  assert.doesNotMatch(h,/data-action="suggest"/,'gap pages replace the bulk proposal button');
  u.listeners.keydown({key:'Escape',preventDefault(){},target:{closest:()=>null}});assert.doesNotMatch(u.html(),/class="editor-overlay"/);
  await u.click('action','picker-open',theme);h=u.html();
- const pick=[...h.slice(h.indexOf('class="paper-library"')).matchAll(/data-action="add" data-id="([^"]+)"/g)].map(m=>m[1])[0];assert.ok(pick);
+ const pick=[...h.slice(h.indexOf('class="editor-overlay"')).matchAll(/data-action="add" data-id="([^"]+)"/g)].map(m=>m[1])[0];assert.ok(pick);
  await u.click('action','add',pick);assert.equal(u.exam().items.length,1,u.toast());assert.doesNotMatch(u.html(),/class="editor-overlay"/);
  // A failed choice keeps the picker open with the message.
  await u.click('action','picker-open','');await u.click('action','add',pick);assert.match(u.toast(),/bereits enthalten/);assert.match(u.html(),/class="editor-overlay"/);

@@ -853,3 +853,19 @@ button.link{background:none;border:0;padding:2px 0;margin:0;color:var(--green);t
 .paper-stage .source-sheet.paper-alternative::after{content:attr(data-alternative);position:absolute;top:8px;left:8px;z-index:3;padding:3px 10px;border-radius:999px;background:#fff6b8;border:1px solid #d9c77a;color:#5b4c0f;font:700 11px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 /* An open page menu stays visible even when the pointer or focus leaves the page (the menu sits in the top layer). */
 .editor-v2 .paper-task-tools:has(.paper-item-menu[open]),.editor-v2 .paper-item-menu[open],.editor-v2 .paper-item-menu[open] *{visibility:visible}
+/* ---- Aufgabe wählen: Reiter, Vorschläge zuerst ---- */
+.picker-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.picker-tab{width:auto;margin:0;padding:9px 16px;border-radius:999px;border:1px solid var(--line);background:white;color:var(--ink);font-weight:600;font-size:14px}
+.picker-tab[aria-selected="true"]{background:var(--green);border-color:var(--green);color:white}
+.picker-search{display:flex;align-items:center;gap:10px;height:48px;padding:0 14px;margin-bottom:10px;border-radius:12px;border:1px solid var(--line);background:white}
+.picker-search input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:16px}
+.picker-search svg{width:18px;height:18px;color:var(--muted)}
+.picker-hint{margin:0 0 12px;color:var(--muted);font-size:14px}
+.picker-foot{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:16px}
+.picker-foot button{width:auto;margin:0}
+.picker-panel{max-width:760px;padding:22px;background:white;border:1px solid var(--line);border-radius:14px}
+.picker-panel h3{margin:0 0 8px}
+.picker-panel p{margin:0 0 14px;color:var(--muted);line-height:1.5}
+.picker-panel button{width:auto;margin:0;padding:11px 18px}
+.editor-picker .layout-switch,.editor-picker .library-actions,.editor-picker .library-title{display:none}
+.picker-suggest [data-action="task-template"]{display:none}
