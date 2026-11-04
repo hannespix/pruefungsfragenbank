@@ -470,7 +470,7 @@ function groupTask(seed,mutate=()=>{}){
 const groupFamily={id:'group-family',title:'Neue Gruppenaufgabe',reviewStatus:'review'};
 test('groups create new tasks and families in their own area as drafts and use them in their exam',async()=>{
  const t=await setup(),g=await group(t),session=await t.req('/api/session',undefined,g.token),task=groupTask(t.seed),e=workflowExam(t.seed);e.pattern.slots=[{categoryId:'plantwork',count:1}];C.addItem(e,task);
- assert.deepEqual(session.body.capabilities,['group-tasks'],'the client unlocks the buttons only with this flag');
+ assert.deepEqual(session.body.capabilities,['group-tasks','ai-draft'],'the client unlocks the buttons only with these flags');
  const r=await t.req('/api/save',{changes:[{kind:'families',id:groupFamily.id,version:0,value:groupFamily},{kind:'tasks',id:task.id,version:0,value:task},{kind:'exams',id:e.id,version:0,value:e}]},g.token);
  assert.equal(r.status,200,JSON.stringify(r.body));
  const p=(await t.req('/api/project',undefined,g.token)).body.project;assert.ok(p.tasks.some(x=>x.id==='group-task'&&x.reviewStatus==='review'));assert.ok(p.exams.find(x=>x.id===e.id).items.some(i=>i.originTaskId==='group-task'));

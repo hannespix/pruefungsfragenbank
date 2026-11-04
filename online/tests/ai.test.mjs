@@ -217,3 +217,31 @@ test('AI group budgets survive new sessions and the global daily budget protects
  x.DB.db.prepare("UPDATE attempts SET count=500 WHERE key='ai:global:day'").run();assert.equal((await x.req('/api/ai/suggest',input,x.admin.token)).status,429);
  assert.equal(x.fetch.mock.callCount(),2);
 });
+
+// KI-Assistent: task drafts from a proposal.
+const draftInput={proposal:'Die Prüflinge sollen eine Hecke aus Hainbuchen auf 1,20 m Höhe schneiden und das Schnittgut entsorgen.',context:{examType:'ZP',specialty:'Baumschule',kind:'practical',themes:['Durchführen von Arbeiten an der Pflanze','Einsatz von Werkzeug und Geräten']}};
+const drafted={title:'Hainbuchenhecke schneiden',theme:'Durchführen von Arbeiten an der Pflanze',text:'Aufgabe: Durchführen von Arbeiten an der Pflanze\nHier: Hainbuchenhecke schneiden\nSchneiden Sie die Hecke auf 1,20 m Höhe.\n•\tSchnittgut entsorgen',points:null,minutes:null,materials:['Heckenschere','Maßband'],solution:'Gerader Schnitt, Höhe 1,20 m eingehalten.',criteria:[{text:'Schnitthöhe',answer:'1,20 m eingehalten',points:null}],questions:['Wie lang ist der Heckenabschnitt?','Wie viele Punkte und Minuten sind vorgesehen?'],notes:[]};
+test('task drafts use a bounded, schema-constrained request, keep nothing and ask back for missing details',async t=>{
+ const x=await setup(t);let sent;x.fetch.mock.mockImplementation(async(url,options)=>{sent={url,options,data:JSON.parse(options.body)};return provider(drafted,{content:[{type:'thinking',thinking:'',signature:'s'},{type:'text',text:JSON.stringify(drafted)}]});});
+ const before=x.DB.db.prepare('SELECT version FROM state_clock').get().version,response=await x.req('/api/ai/draft',{...draftInput,answers:[{question:'Gibt es eine Vorgabe zur Länge?',answer:'5 m'}]},x.admin.token);
+ assert.equal(response.status,200,JSON.stringify(response.body));assert.deepEqual(response.body,{draft:drafted,model:'claude-sonnet-5-5'});
+ assert.equal(sent.data.model,'claude-sonnet-5-5');assert.equal(sent.data.max_tokens,16000);assert.equal(sent.data.thinking,undefined,'adaptive thinking');assert.equal(sent.data.output_config.effort,'medium');assert.equal(sent.data.tools,undefined);
+ const schema=sent.data.output_config.format.schema;assert.equal(schema.additionalProperties,false);assert.deepEqual(schema.required,['title','theme','text','points','minutes','materials','solution','criteria','questions','notes']);assert.deepEqual(schema.properties.points.anyOf,[{type:'number'},{type:'null'}]);
+ assert.ok(!JSON.stringify(schema).match(/minimum|maximum|maxLength|maxItems/),'only schema features the API supports');
+ const user=JSON.parse(sent.data.messages[0].content);assert.deepEqual(Object.keys(user),['proposal','context','answers']);assert.equal(user.answers[0].answer,'5 m');
+ assert.match(sent.data.system,/unvertrauenswürdige/);assert.match(sent.data.system,/Erfinde keine/);assert.match(sent.data.system,/Rückfrage/);assert.match(sent.data.system,/Berichtsheft/);
+ for(const table of ['records','assets','audit'])assert.equal(x.DB.db.prepare('SELECT count(*) AS n FROM '+table).get().n,0);assert.equal(x.DB.db.prepare('SELECT version FROM state_clock').get().version,before);
+ assert.ok(!JSON.stringify(x.DB.db.prepare('SELECT * FROM attempts').all()).includes('Hecke'),'counters only, no proposal text');
+});
+test('task drafts validate input and output strictly and are available to approved groups',async t=>{
+ const x=await setup(t);x.fetch.mock.mockImplementation(async()=>provider(drafted));
+ for(const bad of [{...draftInput,proposal:'zu kurz'},{...draftInput,context:{...draftInput.context,examType:'XX'}},{...draftInput,context:{...draftInput.context,kind:'written'}},{...draftInput,extra:1},{...draftInput,answers:[{question:'q',answer:'a',x:1}]},{...draftInput,draft:{...drafted,points:-1}},{...draftInput,proposal:'x'.repeat(12001)}])
+  assert.equal((await x.req('/api/ai/draft',bad,x.admin.token)).status,400,JSON.stringify(bad).slice(0,90));
+ assert.equal(x.fetch.mock.callCount(),0,'invalid input never reaches the provider');
+ const again=await x.req('/api/ai/draft',{...draftInput,draft:drafted,answers:[{question:'Punkte?',answer:'20 Punkte, 30 Minuten'}]},x.admin.token);assert.equal(again.status,200);
+ const group=await x.addSession({role:'group'});assert.equal((await x.req('/api/ai/draft',draftInput,group.token)).status,200,'groups use it for their own drafts');
+ const pending=await x.addSession({role:'group',status:'pending',meeting:'other'});assert.equal((await x.req('/api/ai/draft',draftInput,pending.token)).status,403);
+ for(const bad of [{...drafted,points:-5},{...drafted,title:''},{...drafted,extra:true},{...drafted,questions:['1','2','3','4','5','6']}]){x.fetch.mock.mockImplementation(async()=>provider(bad));assert.equal((await x.req('/api/ai/draft',draftInput,x.admin.token)).status,502,JSON.stringify(bad).slice(0,80));}
+ x.fetch.mock.mockImplementation(async()=>provider(drafted,{stop_reason:'refusal'}));assert.equal((await x.req('/api/ai/draft',draftInput,x.admin.token)).status,422);
+ delete x.env.ANTHROPIC_API_KEY;assert.equal((await x.req('/api/ai/draft',draftInput,x.admin.token)).status,503);
+});

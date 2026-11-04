@@ -126,12 +126,13 @@ Aus den Rückmeldungen der Aufgabenersteller, präzisiert. Reihenfolge = Umsetzu
      - Im Blatt und im Druck saubere Abschnittsüberschrift „Mündliche Prüfung“ mit Thema, Zeit und Punkten.
    - **Fertig wenn:** Auswahl und Ausdruck der mündlichen Aufgabe sind ohne doppelte oder missverständliche Überschriften.
    - **Umgesetzt:** einheitlich „Mündliche Prüfungsaufgabe“ (statt teils „Mündliche Aufgabe“), Vorlagen nach Thema gruppiert, ausgewählte Aufgabe als Karte mit Thema, Punkten und Zeit; Thema auch auf Deckblatt, Aufgabenseite und in Word.
-6. [ ] **KI-Assistent: aus Vorschlägen neue Aufgaben erstellen, auch für Arbeitsgruppen.**
+6. [x] **KI-Assistent: aus Vorschlägen neue Aufgaben erstellen, auch für Arbeitsgruppen.**
    - **Umsetzung:**
      - Vorschlag hochladen (Word, Text) oder einfügen. Die KI erstellt daraus Aufgabenentwürfe im Prüfungsformat (Titel, „Aufgabe: … Hier: …“, Punkte, Zeit, Material, Lösungshinweise als Entwurf) und stellt Rückfragen zu fehlenden Angaben.
      - Nach den Antworten wird der Entwurf verfeinert und mit einem Klick als Aufgabe übernommen; bei Gruppen als Entwurf zur Freigabe.
      - Läuft über den vorhandenen, abgesicherten KI-Zugang des Servers, ohne Speicherung beim Anbieter.
    - **Fertig wenn:** Aus einem eingefügten Vorschlag entsteht nach Rückfragen eine speicherbare Aufgabe, die direkt in die Prüfung übernommen werden kann.
+   - **Umgesetzt:** Worker-Endpunkt `/api/ai/draft` (strukturierte Ausgabe, Ratenbegrenzung, nichts gespeichert) und Dialog „Aus Vorschlag (KI)“. **Wird erst sichtbar, nachdem der Worker über „Worker ausrollen“ neu ausgerollt wurde.**
 
 ## Rückmeldungen
 

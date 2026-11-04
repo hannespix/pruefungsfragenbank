@@ -690,6 +690,33 @@ test('oral templates are grouped by theme under one heading; the chosen task sho
  assert.equal(C.oralTheme(e.oralItem.task),'Pflanzenschutz');
 });
 
+test('KI-Assistent: a pasted proposal becomes a draft with questions, is refined with the answers and saved as a group draft in the exam',async()=>{
+ const u=await ui('group',false,{capabilities:['group-tasks','ai-draft']}),d=u.sandbox.testUI.getDb();await createDraft(u,'ZP');const e=d.exams.at(-1),theme=L.label(e.pattern.slots[0].categoryId,e);
+ assert.match(u.elements.get('#app').innerHTML,/data-action="ai-draft-open"/,'groups see "Aus Vorschlag (KI)"');
+ const first={title:'Synthetische Heckenpflege',theme,text:`Aufgabe: ${theme}\nHier: Synthetische Hecke schneiden\nSchneiden Sie die Hecke.\n•\tSchnittgut entsorgen`,points:null,minutes:null,materials:['Heckenschere','Maßband'],solution:'Synthetische Lösung: gerader Schnitt.',criteria:[{text:'Schnitt',answer:'gerade',points:null}],questions:['Wie viele Punkte und Minuten?'],notes:['Höhe angenommen.']};
+ const calls=[];u.online.request=async(path,body)=>{calls.push({path,body:structuredClone(body)});return {draft:calls.length===1?first:{...first,points:20,minutes:30,criteria:[{text:'Schnitt',answer:'gerade',points:20}],questions:[]},model:'test'};};
+ await u.click('action','ai-draft-open');assert.match(u.elements.get('#dialog').innerHTML,/id="ai-proposal"/);assert.match(u.elements.get('#dialog').innerHTML,/keine Prüfungen oder Aufgaben aus dem Bestand/);
+ u.elements.set('#ai-proposal',{value:'zu kurz'});await u.click('action','ai-draft-create');assert.equal(calls.length,0);assert.match(u.elements.get('#dialog').innerHTML,/mindestens 20 Zeichen/);
+ u.elements.set('#ai-proposal',{value:'Die Prüflinge schneiden eine synthetische Hecke und entsorgen das Schnittgut.'});await u.click('action','ai-draft-create');assert.equal(calls.length,1,u.elements.get('#toast').textContent+' | '+u.elements.get('#dialog').innerHTML.slice(0,600));
+ assert.equal(calls[0].path,'/api/ai/draft');assert.deepEqual(Object.keys(calls[0].body),['proposal','context','answers']);assert.deepEqual(calls[0].body.context,{examType:'ZP',specialty:'Baumschule',kind:'practical',themes:calls[0].body.context.themes});assert.ok(calls[0].body.context.themes.includes(theme));
+ assert.ok(!JSON.stringify(calls[0].body).includes(e.id)&&!JSON.stringify(calls[0].body).includes('demo-task'),'no exam or bank data');
+ let html=u.elements.get('#dialog').innerHTML;assert.match(html,/Synthetische Heckenpflege/);assert.match(html,/Wie viele Punkte und Minuten\?/);assert.match(html,/Punkte offen/);assert.match(html,/class="pl pl-ind pl-li"/,'lists shown like on the sheet');
+ u.elements.set('#ai-answer-0',{value:'20 Punkte, 30 Minuten'});await u.click('action','ai-draft-refine');
+ assert.deepEqual(calls[1].body.answers,[{question:'Wie viele Punkte und Minuten?',answer:'20 Punkte, 30 Minuten'}]);assert.equal(calls[1].body.draft.title,'Synthetische Heckenpflege');
+ html=u.elements.get('#dialog').innerHTML;assert.match(html,/20 Punkte/);assert.match(html,/Keine Rückfragen/);
+ await u.click('action','ai-draft-adopt');html=u.elements.get('#dialog').innerHTML;assert.match(html,/id="task-title"/);assert.match(html,/Synthetische Heckenpflege/);assert.match(html,/KI-Entwurf aus einem Vorschlag/);
+ const t={title:'Synthetische Heckenpflege',text:first.text,specialty:'Baumschule',examType:'ZP',kind:'practical',familyId:'',category:'Praktische Arbeitsaufgabe',tags:[],qualification:'Nicht gesondert angegeben',points:20,minutes:30,solution:first.solution,flags:['KI-Entwurf aus einem Vorschlag: Inhalt, Punkte, Zeit, Material und Lösung fachlich prüfen.'],criteria:[{text:'Schnitt',answer:'gerade',points:20}],assetLinks:[],planningCategories:[e.pattern.slots[0].categoryId]};
+ taskFormValues(u,t);const count=d.tasks.length;await u.click('action','save-task');assert.equal(d.tasks.length,count+1,u.elements.get('#toast').textContent);
+ const saved=d.tasks.at(-1);assert.equal(saved.reviewStatus,'review');assert.notEqual(saved.solutionStatus,'approved');assert.match(saved.flags.join(' '),/KI-Entwurf/);assert.ok(d.exams.find(x=>x.id===e.id).items.some(i=>i.originTaskId===saved.id),'added to the group draft');C.validate(d);
+});
+
+test('the KI-Assistent appears only where the server offers it and groups may create tasks',async()=>{
+ for(const [role,capabilities,offline,shown] of [['group',['group-tasks'],false,false],['group',['ai-draft'],false,false],['admin',['ai-draft'],false,true],['admin',[],true,false]]){
+  const u=await ui(role,offline,{capabilities});if(role==='admin')await u.click('action','open-group','Baumschule');await createDraft(u,'ZP');const html=u.elements.get('#app').innerHTML;
+  assert.equal(/data-action="ai-draft-open"/.test(html),shown,JSON.stringify([role,capabilities,offline]));
+ }
+});
+
 test('until the server accepts group tasks, groups keep the previous view without create buttons',async()=>{
  const u=await ui('group',false,{capabilities:[]}),d=u.sandbox.testUI.getDb();await createDraft(u,'ZP');const html=u.elements.get('#app').innerHTML;
  assert.doesNotMatch(html,/data-action="new-task"|class="paper-new-task"/);const count=d.tasks.length;await u.click('action','new-task');assert.equal(d.tasks.length,count);assert.doesNotMatch(u.elements.get('#dialog').innerHTML,/id="task-title"/);
