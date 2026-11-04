@@ -375,3 +375,65 @@ dialog.preview-dialog{max-width:1000px}
 .task-steps{position:relative;top:auto}
 @media(max-width:700px){.preview-dialog .modal-foot{flex-wrap:wrap}.preview-dialog .modal-foot .primary{order:-1;flex:1 1 100%}.preview-dialog .modal-foot>button:not(.primary){flex:1}}
 .task-thumb-open,.task-thumb-open:hover,.task-thumb-open:active,.task-thumb-open:focus{background:transparent!important;border-color:transparent!important}
+/* ---- Small screens (Surface, tablets, small laptops) ---- */
+/* Compact Baukasten: one scrollable row of blocks; still a drop target for every place. */
+.board-toggle{margin-left:auto;display:inline-flex;align-items:center;gap:5px;padding:4px 8px;font-size:12px;color:var(--green)}
+.board-toggle svg{width:14px;height:14px;transition:transform .2s}
+.exam-board:not(.is-compact) .board-toggle svg{transform:rotate(180deg)}
+.exam-board.is-compact{padding:8px 10px;margin-bottom:8px}
+.exam-board.is-compact .exam-board-head{margin-bottom:6px;font-size:11.5px}
+.exam-board.is-compact .exam-board-grid{display:flex;gap:8px;overflow-x:auto;scrollbar-width:thin;padding:2px 2px 4px}
+.exam-board.is-compact .board-block,.exam-board.is-compact .board-slot{flex:0 0 auto;width:auto;max-width:280px;min-height:0;padding:6px 10px 6px 16px;gap:8px;border-radius:11px}
+.exam-board.is-compact .board-block:hover{transform:none}
+.exam-board.is-compact .board-icon{width:28px;height:28px;border-radius:8px}
+.exam-board.is-compact .board-icon svg{width:16px;height:16px}
+.exam-board.is-compact .board-body small,.exam-board.is-compact .board-hint,.exam-board.is-compact .board-plus,.exam-board.is-compact .board-open,.exam-board.is-compact .board-chips i:not(.open){display:none}
+.exam-board.is-compact .board-body{display:flex;align-items:center;gap:6px}
+.exam-board.is-compact .board-body strong{display:block;max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
+.exam-board.is-compact .board-chips{margin:0;flex-wrap:nowrap}
+.exam-board.is-compact .board-slot .board-body strong::before{content:"＋ ";color:var(--cat)}
+/* Focus / full screen for the sheet */
+.focus-toggle{display:inline-flex;align-items:center;gap:6px;font-weight:650}
+.focus-toggle svg{width:16px;height:16px}
+.focus-toggle.is-on{background:var(--dark);border-color:var(--dark);color:white}
+.focus-toggle.is-on:hover{background:var(--green)}
+.focus-hints{font-weight:700}
+.focus-hints.has-violation{background:#fde8e4;border-color:#f3b4a6;color:#8f2614}
+.focus-hints.has-open{background:#fcf1df;border-color:#ecd3a8;color:#8a5a14}
+.focus-hints.is-ok{background:#e3f1e6;border-color:#a9d0b4;color:#22663d}
+.shell.sheet-focus{grid-template-columns:minmax(0,1fr)}
+.sheet-focus>.nav,.sheet-focus .simple-editor-heading,.sheet-focus .exam-workflow,.sheet-focus .editor-status,.sheet-focus .editor-oral,.sheet-focus .workflow-nav,.sheet-focus .storage-footnote,.sheet-focus .breadcrumb .ghost{display:none!important}
+.sheet-focus .topbar{min-height:0;height:auto;padding:6px 14px}
+.sheet-focus .content{padding:8px 10px 6px}
+.sheet-focus .paper-workspace{--workspace-height:calc(100dvh - 72px);grid-template-columns:minmax(250px,290px) minmax(0,1fr);gap:10px}
+.sheet-focus .paper-library{height:var(--workspace-height)}
+.sheet-focus.library-hidden .paper-workspace{grid-template-columns:minmax(0,1fr)}
+.sheet-focus.library-hidden .paper-library{display:none}
+.sheet-focus .paper-preview-heading{padding:8px 12px;gap:8px}
+.sheet-focus .paper-preview-heading>.workspace-panel-heading{min-width:0}
+.sheet-focus .paper-preview-heading .step-dot{display:none}
+.sheet-focus .paper-stage{padding:18px 12px}
+@media(max-width:1000px){
+ .sheet-focus .mobile-editor-switch{margin-bottom:6px}
+ .sheet-focus .paper-preview-pane{display:flex;flex-direction:column;height:calc(100dvh - 120px)}
+ .sheet-focus .paper-workspace[data-mobile-pane=library]>.paper-preview-pane{display:none}
+ .sheet-focus .paper-preview-pane .paper-stage{height:auto;flex:1;min-height:0}
+ .sheet-focus .library-toggle{display:none}
+}
+/* Short screens without focus mode: compact heading, steps and preview header, taller workspace. */
+@media(max-height:900px) and (min-width:1001px){
+ .is-paper:not(.sheet-focus) .simple-editor-heading{margin-bottom:6px}
+ .is-paper:not(.sheet-focus) .simple-editor-heading h1{font-size:21px;margin:0}
+ .is-paper:not(.sheet-focus) .simple-editor-heading .eyebrow{margin-bottom:1px}
+ .is-paper:not(.sheet-focus) .desktop-editor-hint,.is-paper:not(.sheet-focus) .mobile-editor-hint{display:none}
+ .is-paper:not(.sheet-focus) .exam-workflow{margin:6px 0 8px;gap:8px}
+ .is-paper:not(.sheet-focus) .exam-workflow .workflow-step{padding:6px 10px}
+ .is-paper:not(.sheet-focus) .exam-workflow .workflow-step small{display:none}
+ .is-paper:not(.sheet-focus) .exam-workflow .step-dot{width:24px;height:24px;font-size:12px}
+ .is-paper:not(.sheet-focus) .paper-workspace{--workspace-height:max(420px,calc(100dvh - 120px))}
+ .is-paper .paper-preview-heading{padding:8px 12px}
+ .is-paper .content{padding-top:14px}
+}
+@media print{.focus-toggle,.focus-hints,.library-toggle,.board-toggle{display:none!important}}
+.sheet-focus .paper-preview-heading>.workspace-panel-heading{display:none}.sheet-focus .paper-preview-actions{flex:1;flex-wrap:wrap}.sheet-focus .paper-preview-heading #paper-page{min-width:160px}
+.sheet-focus .paper-preview-actions{flex:0 0 auto;flex-wrap:nowrap}.sheet-focus .paper-preview-heading #paper-page{flex:1 1 160px}.library-toggle{display:inline-flex;align-items:center;gap:6px}.library-toggle svg{width:16px;height:16px}.library-toggle[aria-pressed=true]{background:#eaf2e3;border-color:#9fc29a}@media(max-width:1250px){.sheet-focus .paper-preview-actions{flex-wrap:wrap}}

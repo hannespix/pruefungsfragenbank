@@ -51,3 +51,12 @@ test('a regulation violation appears as a visible card with its fix',async()=>{
  const h=u.html();assert.match(h,/class="rule-board"/);assert.match(h,/Zeitrahmen überschritten/);
  assert.match(h,/<div class="rule-card rule-violation"[\s\S]*?data-action="timing-plan"/);assert.match(h,/1 Verstoß/);
 });
+
+test('full-screen focus gives the sheet the room and the Baukasten folds into one row',async()=>{
+ const u=await ui();assert.doesNotMatch(u.html(),/class="shell[^"]*sheet-focus/);assert.match(u.html(),/class="exam-board"/);
+ await u.click('action','sheet-focus');let h=u.html();
+ assert.match(h,/class="shell is-paper sheet-focus /);assert.match(h,/Vollbild beenden/);assert.match(h,/class="exam-board is-compact"/);assert.match(h,/data-action="library-toggle"/);assert.match(h,/class="small focus-hints/);
+ await u.click('action','library-toggle');assert.match(u.html(),/sheet-focus library-hidden/);
+ await u.click("action","sheet-focus");h=u.html();assert.doesNotMatch(h,/class="shell[^"]*sheet-focus/);assert.match(h,/>Vollbild</);
+ await u.click('action','board-toggle');assert.match(u.html(),/class="exam-board is-compact"/);assert.match(u.html(),/aria-expanded="false"/);
+});

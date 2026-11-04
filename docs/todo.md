@@ -32,6 +32,11 @@ Jedes Paket geht als eigener PR raus und wird nach grüner CI automatisch gemerg
   - Live-Vorschau des Blatts neben dem Formular; auf schmalen Bildschirmen per Knopf „Vorschau“.
   - Das Thema aus der aktuellen Auswahl wird vorbelegt.
 - [x] **Rückfrage bei ungespeicherten Eingaben.** Esc, ✕ und „Abbrechen“ zeigen eine Karte mit „Weiter bearbeiten“, „Verwerfen“ und „Speichern“. Auch beim Verlassen der Seite wird gefragt.
+- [x] **Kleine Bildschirme (Surface, Tablet, Laptop).**
+  - Der Knopf „Vollbild“ blendet Navigation, Überschriften, Schritte und Statuszeile aus. Auf Tablets nutzt er echtes Browser-Vollbild.
+  - Im Vollbild lässt sich die Aufgabenliste ausblenden, und ein Hinweis-Chip zeigt den Stand der Prüfungsordnung.
+  - Der Baukasten lässt sich einklappen; bei wenig Höhe, im Vollbild oder wenn alles belegt ist, ist er automatisch eine kompakte Zeile.
+  - Auf niedrigen Bildschirmen sind Kopf und Schritte kompakter, und der Arbeitsbereich ist höher.
 - [ ] Rund 20 Formularfeldern fehlt ein `<label for>` (Barrierefreiheit).
 
 ## Technik & Sicherheit (aus `docs/code-audit-2026-11.md`)
