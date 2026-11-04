@@ -127,3 +127,63 @@ button:focus-visible,summary:focus-visible{outline:3px solid #73985d;outline-off
 @media print{#toast[popover]{display:none!important}}
 /* Floating help and menus also escape clipping and stacking contexts. */
 .floating-layer[popover]{position:fixed!important;inset:auto;margin:0!important;max-width:calc(100vw - 24px)!important;max-height:calc(100dvh - 24px)!important;overflow:auto!important;z-index:1000;box-sizing:border-box}.floating-layer[popover]:not(:popover-open){display:none!important}.floating-layer[popover]::backdrop{background:transparent;pointer-events:none}
+/* Undo/redo with history in the top bar. Large, always visible while editing. */
+.history-controls{display:inline-flex;align-items:stretch;gap:0;border:1px solid #c9d7c4;border-radius:12px;background:white;box-shadow:0 1px 0 #20392d0d}
+.history-controls .history-btn{display:inline-flex;align-items:center;gap:7px;border:0;border-radius:0;background:transparent;padding:9px 14px;font-weight:650;font-size:13px;color:var(--dark)}
+.history-controls .history-btn:first-child{border-radius:11px 0 0 11px}
+.history-controls .history-btn+.history-btn{border-left:1px solid #e1e8dd}
+.history-controls .history-btn:hover:not(:disabled){background:#eaf2e4}
+.history-controls .history-btn:disabled{opacity:1;color:#a3ada6}
+.history-controls .history-btn svg{width:18px;height:18px}
+.history-controls .history-btn:not(:disabled):active svg{transform:scale(.88)}
+.history-controls .history-btn svg{transition:transform .12s ease}
+.history-menu{position:relative;border-left:1px solid #e1e8dd}
+.history-menu>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:4px;height:100%;padding:0 12px;border-radius:0 11px 11px 0;color:var(--dark)}
+.history-menu>summary::-webkit-details-marker{display:none}
+.history-menu>summary:hover{background:#eaf2e4}
+.history-menu>summary svg{width:18px;height:18px}
+.history-count{min-width:18px;padding:1px 6px;border-radius:999px;background:var(--green);color:white;font-size:11px;font-weight:700;text-align:center}
+.history-panel{position:absolute;right:0;top:calc(100% + 8px);width:340px;max-width:calc(100vw - 24px);max-height:min(70vh,520px);overflow:auto;padding:14px;background:white;border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px #193b2a29;z-index:60}
+.history-title{margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--green)}
+.history-panel ol{list-style:none;margin:0;padding:0;display:grid;gap:3px;position:relative}
+.history-panel li button{width:100%;display:flex;justify-content:space-between;gap:12px;text-align:left;border:0;border-radius:9px;padding:8px 10px;background:transparent;font-size:13px}
+.history-panel li button:hover{background:#eef5e9}
+.history-panel li time{flex:none;color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
+.history-panel li.is-redo button{color:#8a958d;font-style:italic}
+.history-panel li.is-current span{display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:9px;background:var(--light);font-weight:700;font-size:13px;color:var(--dark)}
+.history-panel li.is-current svg{width:15px;height:15px;color:var(--green)}
+.history-hint{margin:10px 2px 0;font-size:11px;color:var(--muted)}
+@media(max-width:800px){.history-controls .history-btn span{display:none}.history-controls .history-btn{padding:10px 12px}.history-controls .history-btn svg{width:20px;height:20px}}
+@media print{.history-controls{display:none!important}}
+/* "Aufgaben automatisch ergänzen": was white text on a pale background (primary colour + override). */
+.paper-suggestion button.primary{background:white;color:var(--green);border:1.5px solid var(--green);font-weight:700}
+.paper-suggestion button.primary:hover:not(:disabled){background:var(--green);color:white}
+.paper-suggestion button.primary svg{color:currentColor}
+.paper-suggestion button.primary:disabled{opacity:1;background:#f3f5f1;color:#7f8a83;border:1.5px dashed #c9d3c6}
+/* Editing view without blank sheets: text-less original pages collapse, duplex blanks become a slim marker. */
+.source-blank-marker{width:var(--paper-width,210mm);max-width:100%;margin:6px auto 18px;padding:9px 14px;border:1.5px dashed #b9c8b4;border-radius:10px;background:#f4f7f1;color:#5d6d62;font-size:12px;text-align:center}
+.source-page-collapsed{margin:6px auto 18px;max-width:100%;border:1px solid #cfdccb;border-radius:12px;background:white;box-shadow:0 1px 0 #20392d0d}
+.source-page-collapsed>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:11px 14px;font-size:13px;color:#4f5f55}
+.source-page-collapsed>summary::-webkit-details-marker{display:none}
+.source-page-collapsed>summary strong{color:var(--dark)}
+.source-page-collapsed>summary em{margin-left:auto;font-style:normal;font-weight:700;color:var(--green);white-space:nowrap}
+.source-page-collapsed[open]>summary em{font-size:0}.source-page-collapsed[open]>summary em::after{content:"Einklappen";font-size:13px}
+.source-page-collapsed-icon{flex:none;width:26px;height:34px;border:1.5px solid #9fb59a;border-radius:4px;background:repeating-linear-gradient(#fff,#fff 6px,#e3ebdf 7px,#fff 8px)}
+.source-page-collapsed[open]{padding-bottom:12px}
+.source-page-collapsed[open]>.source-sheet{margin:0 auto}
+/* Text that does not fit: visible chip inside the page instead of a clipped browser tooltip. */
+.paper-stage .source-text.source-overflow{outline:2px solid #c2410c;outline-offset:1px;background:#fff1e6}
+.paper-stage .source-text.source-overflow::before{content:"zu viel Text";position:absolute;right:0;bottom:100%;margin-bottom:3px;padding:1px 7px;border-radius:999px;background:#c2410c;color:white;font:700 10px/16px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;white-space:nowrap;z-index:3;pointer-events:none}
+.source-overflow-flash{animation:overflowFlash 1.2s ease-out}
+@keyframes overflowFlash{0%,60%{box-shadow:0 0 0 6px #fdba7499}100%{box-shadow:0 0 0 0 #fdba7400}}
+.layout-fix-card{position:relative;z-index:20;display:flex;align-items:center;gap:14px;margin:0 0 12px;padding:12px 16px;border:1px solid #f1b48a;border-left:5px solid #c2410c;border-radius:12px;background:#fff8f2;box-shadow:0 10px 30px #7c2d1222;animation:cardIn .25s ease-out}
+.layout-fix-icon{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#c2410c;color:white;font-weight:800}
+.layout-fix-text{display:grid;gap:2px;font-size:13px;color:#5b3a26}
+.layout-fix-text strong{color:#7c2d12;font-size:14px}
+.layout-fix-actions{margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.layout-fix-actions .primary{background:#c2410c;border-color:#c2410c}
+.layout-fix-actions .primary:hover{background:#9a3412}
+@keyframes cardIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@media(max-width:700px){.layout-fix-card{flex-wrap:wrap}.layout-fix-actions{margin-left:0}}
+@media print{.layout-fix-card,.source-blank-marker{display:none!important}}
+@media(prefers-reduced-motion:reduce){.layout-fix-card,.source-overflow-flash{animation:none}}
