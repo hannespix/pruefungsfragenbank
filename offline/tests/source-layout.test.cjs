@@ -21,3 +21,12 @@ test('editing view leaves out blank sheets but printing keeps them',()=>{
  const item=two.e.items.find(i=>i.task.sourceLayout);item.pageNotes={1:'Skizze auf der Rückseite prüfen'};
  assert.match(W.pages(two.e,two.d,false,false),/<details class="source-page-collapsed" data-source-collapsed="2">/);
 });
+test('a reverse side with only its page number ("- 2 -") counts as blank while editing; real text keeps a page visible',()=>{
+ const {d,e,t}=fixture(2),num=text=>({id:'page-number',x:280,y:40,width:40,height:15,fontSize:10,lineHeight:12,text,originalText:text,lines:[{text,runs:[{text,bold:false,italic:false}]}]});
+ t.sourceLayout.pages[1].blocks=[num('- 2 -')];C.checkTask(t);
+ const edit=W.pages(e,d,false,false),print=W.pages(e,d,false,true);
+ assert.equal((edit.match(/data-source-page=/g)||[]).length,1,'the page-number-only reverse is left out');assert.ok(!edit.includes('- 2 -'));
+ assert.equal((print.match(/data-source-page=/g)||[]).length,2,'print keeps it');assert.match(print,/- 2 -/);
+ t.sourceLayout.pages[1].blocks=[num('Bewertung der Durchführung')];
+ assert.equal((W.pages(e,d,false,false).match(/data-source-page=/g)||[]).length,2,'a page with real text stays');
+});
