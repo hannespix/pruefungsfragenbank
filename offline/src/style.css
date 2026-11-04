@@ -503,3 +503,13 @@ button.quiet-danger:hover{background:#fde8e4;border-color:#c2381f;color:#8f2512}
 .trash-bar button.danger{background:#c2381f;border-color:#c2381f;color:white}
 .trash-bar button.danger:hover{background:#a52f19;border-color:#a52f19}
 .trash-bar button.danger svg{color:white}
+
+/* Original pages: "+ Zeile" on the active text section and a short hint in the sheet tools */
+.paper-stage .source-add-line{position:absolute;right:0;top:100%;margin-top:4px;z-index:4;display:none;padding:3px 10px;border-radius:999px;border:1px solid #2a6548;background:#fff;color:#2a6548;font:650 11.5px/1.5 system-ui,sans-serif;cursor:pointer;box-shadow:0 6px 16px -8px #1d3b2a90}
+.paper-stage .source-add-line:hover{background:#e3f1e6}
+.paper-stage .source-point:focus-within .source-add-line{display:block}
+.source-tools-hint{margin-left:auto;font-size:11px;color:#68776e}
+@media(pointer:coarse){.paper-stage .source-add-line{padding:7px 14px;font-size:13px}}
+@media print{.source-add-line,.source-tools-hint{display:none!important}}
+.template-block{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-bottom:12px}
+.template-block label{width:100%}
