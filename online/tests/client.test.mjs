@@ -678,7 +678,7 @@ test('meeting export is coordinator-only, asks the server for export rights and 
  let blob,authorizations=0;u.sandbox.JSZip=Zip;u.sandbox.URL={createObjectURL:b=>{blob=b;return 'blob:test';},revokeObjectURL(){}};u.elements.set('#ready-download',{addEventListener(){}});u.online.ensureAssets=async()=>{};u.online.request=async path=>{assert.equal(path,'/api/export');authorizations++;};
  await u.click('route','results');assert.match(u.elements.get('#app').innerHTML,/data-action="export-meeting" data-id="meeting"/);
  const before=JSON.stringify(d);await u.click('action','export-meeting','meeting');assert.ok(blob,u.elements.get('#toast').textContent);assert.ok(authorizations>=2,'checked before and after building');
- const z=await Zip.loadAsync(await blob.arrayBuffer()),files=Object.keys(z.files);assert.ok(files.some(f=>/^[^/]+\/Baumschule\/01_Zwischenpruefung [^/]+\/01_Teilnehmerfassung\.docx$/.test(f)),files.join(', '));assert.ok(files.some(f=>/^[^/]+\/00_Uebersicht\.html$/.test(f)));
+ const z=await Zip.loadAsync(await blob.arrayBuffer()),files=Object.keys(z.files);assert.ok(files.some(f=>/^[^/]+\/Baumschule\/01_ZP Baumschule[^/]*\/ZP Baumschule[^/]* - 01 Pruefungsbogen\.docx$/.test(f)),files.join(', '));assert.ok(files.some(f=>/\/Aufgaben einzeln\/[^/]+ - A1 [^/]+ - Pruefungsbogen\.docx$/.test(f)),'each task on its own');assert.ok(files.some(f=>/^[^/]+\/00_Uebersicht\.html$/.test(f)));
  assert.equal(JSON.stringify(d),before);
 });
 

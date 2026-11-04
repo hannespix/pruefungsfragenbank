@@ -95,7 +95,7 @@ async function sourceElements(page,d){
  const graphics=[];for(const [n,box]of bands.entries()){box.x0=Math.max(0,box.x0-2);box.x1=Math.min(w-1,box.x1+2);box.y0=Math.max(0,box.y0-2);box.y1=Math.min(h-1,box.y1+2);const assetId=page.backgroundAssetId+'-word-'+n;d.assets.push({id:assetId,name:'Originalzeichnung '+(n+1),mime:'image/png',data:await croppedPng(raster,box)});graphics.push({assetId,x:box.x0*sx,y:box.y0*sy,width:(box.x1-box.x0+1)*sx,height:(box.y1-box.y0+1)*sy});}
  return {graphics,rules};
 }
-async function documentFile(e,input,examiner=false){
+async function documentFile(e,input,examiner=false,opts={}){
  const entries=C.examEntries(e);if(!entries.length)throw Error('Die Prüfung enthält keine Aufgaben.');C.assertExamPolicy(e);S.assertExport(e);
  const d=await A.wordImages(e,input,examiner),fonts=A.fontAssets(d),regular=fonts.find(a=>a.docxFontKey==='sansRegular'),bold=fonts.find(a=>a.docxFontKey==='sansBold'),serif=fonts.find(a=>a.docxFontKey==='serifBold');
  if(entries.some(i=>i.task.assetLinks.some(l=>l.design==='bw-2024'))&&(!regular||!bold||!serif))throw Error('Die geschützten Word-Schriften fehlen. Bitte den Datenbestand aktualisieren.');
@@ -103,7 +103,7 @@ async function documentFile(e,input,examiner=false){
  await prepareLogoMargins(e,d);
  const sans=regular?.fontFamily||'Arial',heading=serif?.fontFamily||sans;
  let drawingId=0;
- const draft=!C.readiness(e).ready,label=examiner?'Vertrauliche Prüferfassung':'Teilnehmerfassung',sections=[];
+ const draft=opts.draft??!C.readiness(e).ready,label=examiner?'Vertrauliche Prüferfassung':'Teilnehmerfassung',sections=[];
  const border={style:X.BorderStyle.SINGLE,size:4,color:line},none={style:X.BorderStyle.NONE,size:0,color:'FFFFFF'};
  const borders=value=>({top:value,bottom:value,left:value,right:value,insideHorizontal:value,insideVertical:value});
  const run=(text,options={})=>new X.TextRun({text:clean(text),...options});
@@ -137,7 +137,7 @@ async function documentFile(e,input,examiner=false){
  function planningBox(){return table([{height:mm(44),cells:[p('','ExamBody')]}],[paperWidth],{padding:140});}
  const graphics=(t,audience)=>t.assetLinks.filter(l=>l.audience===audience&&!['letterhead','brand-font','source-page'].includes(l.role)&&!(t.sourceLayout&&l.role==='source-embedded'));
  function graphic(l){const a=A.requireAsset(d,l.assetId);if(/^image\//.test(a.mime))return [new X.Paragraph({children:[image(a,paperWidth/20,mm(175)/20)],keepNext:true,spacing:{before:180,after:80}}),p(l.caption||a.name,'ExamSmall')];const file=P.attachments({items:[{task:{assetLinks:[l]}}]},d,true)[0];return [callout('Separate Anlage: '+(file?.path||a.name)+' – vor Ausgabe beifügen.')];}
- if(!entries.some(i=>i.task.sourceLayout)){
+ if(!opts.single&&!entries.some(i=>i.task.sourceLayout)){
   const total=C.totals(e);
   section([p((C.examTypeLabel(e.examType))+' '+(e.examYear||''),'ExamEyebrow'),p(e.title,'ExamTitle'),p(e.specialty,'ExamSubtitle'),gap(10),table([{cells:[p('Prüfungstermin','ExamMeta',{run:{bold:true}}),p(e.date||'Noch festzulegen','ExamMeta')]},{cells:[p('Umfang','ExamMeta',{run:{bold:true}}),p(`Praktischer Teil: ${e.items.length} Aufgaben · ${total.points}${total.unknownPoints?' + offene':''} Punkte`,'ExamMeta')]},{cells:[p('Bearbeitungszeit','ExamMeta',{run:{bold:true}}),p(C.durationSummary(total),'ExamMeta')]},...(e.oralItem?[{cells:[p('Mündliche Aufgabe','ExamMeta',{run:{bold:true}}),p(`${e.oralItem.task.points??'offene'} Punkte · ${e.oralItem.task.minutes??'offene'} Minuten`,'ExamMeta')]}]:[])],[mm(38),paperWidth-mm(38)],{bordered:false,padding:100}),gap(14),identity(),gap(14),p('Hinweise zur Durchführung','ExamHeading'),p(e.notes||'','ExamBody'),gap(12),callout(draft?'ENTWURF · Vor Verwendung Aufgaben, Punkte, Zeiten und Lösungen fachlich prüfen.':'Freigaben vollständig')]);
  }
@@ -209,7 +209,7 @@ async function documentFile(e,input,examiner=false){
   }
  }
  for(const item of entries)if(item.task.sourceLayout)for(const l of graphics(item.task,'candidate'))section([p('Zusätzliche Anlage · '+item.label,'TaskTitle'),...graphic(l)],{task:item.task});
- if(examiner){const g=P.regulationGuidance(e);if(g){
+ if(examiner&&!opts.single){const g=P.regulationGuidance(e);if(g){
   const compact=text=>p(text,'ExamMeta',{spacing:{line:260,after:100}}),children=[p(g.title,'TaskTitle'),compact(g.status),compact(g.areas),...g.rules.map(compact)];
   if(g.units.length)children.push(p('Ausdrücklich erklärte komplexe Prüfungsaufgaben','ExamHeading'),table([{header:true,cells:['Aufgabenblatt','Komplexe Prüfungsaufgabe','Bereich / Begründung'].map(v=>p(v,'ExamTable',{run:{bold:true}}))},...g.units.map(u=>({keepTogether:false,cells:[compact(u.document),compact(u.title),compact(u.area+(u.reason?'\n'+u.reason:'') )]}))],[mm(28),mm(62),paperWidth-mm(90)],{padding:100}));
   if(g.review.length)children.push(p('Fachliche Bestätigungen','ExamHeading'),...g.review.map(compact));

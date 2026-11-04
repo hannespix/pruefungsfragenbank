@@ -82,6 +82,7 @@ Jedes Paket geht als eigener PR raus und wird nach grüner CI automatisch gemerg
   - Knopf „Alle Prüfungen dieses Termins exportieren (ZIP)“ unter „Prüfungen & Ergebnisse“.
   - Aufbau: `<Termin>/<Fachrichtung>/<NN>_<Prüfungsart> <Titel>/`. Je Prüfung liegen dort Prüfungsbogen, Lösung & Bewertung, Materialliste, interne Bemerkungen und Zeitplan (jeweils Word und Druckfassung) sowie die Anlagen.
   - Je Fachrichtung `00_Materialuebersicht.html`, oben `00_Uebersicht.html` mit Links und Stand sowie `LESEN.txt`.
+  - Zusätzlich jede Aufgabe einzeln (Prüfungsbogen und Lösung) und die Materialliste je praktischer Aufgabe als eigene Word-Datei. Eindeutige Dateinamen nach dem Muster `ZP Baumschule - Gruppe Nord - A1 <Aufgabe> - Pruefungsbogen.docx`, Pfade für Windows kurz genug.
   - Prüfungen ohne Aufgaben und Prüfungen, die sich nicht ausgeben ließen, stehen mit Grund in der Übersicht; der Rest wird trotzdem exportiert.
 - [ ] Rund 20 Formularfeldern fehlt ein `<label for>` (Barrierefreiheit).
 
