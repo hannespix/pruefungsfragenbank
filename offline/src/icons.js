@@ -22,7 +22,7 @@ const paths={archive:'<path d="M3 4h18v4H3zM5 8v13h14V8M9 12h6"/>',trash:'<path 
  arrowUp:'<path d="M12 20V4m-6 6 6-6 6 6"/>',
  arrowDown:'<path d="M12 4v16m-6-6 6 6 6-6"/>',
  grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
- list:'<path d="M8 5h13M8 12h13M8 19h13M3 5h.01M3 12h.01M3 19h.01"/>',
+ list:'<path d="M8 5h13M8 12h13M8 19h13M3 5h.01M3 12h.01M3 19h.01"/>','list-ul':'<path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/>','list-ol':'<path d="M10 6h11M10 12h11M10 18h11M4 4.5h1.5V9M3.5 9h3.5M3.5 13.5a1.6 1.6 0 1 1 2.6 1.3L3.5 17.5H7"/>',indent:'<path d="M3 5h18M11 10h10M11 14h10M3 19h18M3 9l4 3-4 3"/>',outdent:'<path d="M3 5h18M11 10h10M11 14h10M3 19h18M7 9l-4 3 4 3"/>',newline:'<path d="M20 5v7a3 3 0 0 1-3 3H5"/><path d="m9 11-4 4 4 4"/>',
  idea:'<path d="M9 18h6m-5 3h4M9 15a6 6 0 1 1 6 0v3H9Z"/>',
  help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4 2c-1 .6-1.5 1-1.5 2M12 17h.01"/>',
  eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'

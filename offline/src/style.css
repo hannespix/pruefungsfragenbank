@@ -645,4 +645,8 @@ body.is-resizing .paper-stage,body.is-resizing .paper-library{pointer-events:non
 .archive-year-sources{margin:5px 14px 0;font-size:11.5px;color:var(--muted)}
 .word-workspace .archive-empty{margin:12px 14px}
 @media(max-width:1000px){.archive-years{padding:10px 12px 0}.archive-year-head{margin:12px 12px 0}.archive-year-sources{margin:5px 12px 0}.layout-switch button{min-height:40px}}
+.sheet-text-tools{gap:2px;padding:0 4px;border-left:1px solid #dfe5dc;border-right:1px solid #dfe5dc}
+.word-workspace .sheet-toolbar .text-tool{padding:6px 7px;background:transparent;border-color:transparent}
+.word-workspace .sheet-toolbar .text-tool:hover{background:#eef3ea;border-color:#d5e0cf}
+.word-workspace .sheet-toolbar .text-tool svg{width:17px;height:17px}
 @media print{.library-resizer,.sheet-statusbar,.sheet-toolbar{display:none!important}}
