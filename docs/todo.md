@@ -161,6 +161,8 @@ Ziel: viel einfacher und intuitiver. Prüfungseditor mit einer Aufgabe: sichtbar
 
 ## Rückmeldungen
 
+- [x] **Leerseiten wurden weiterhin angezeigt (Rückseite mit „- 2 -“ und leerem Rahmen).** Eine Seite gilt im Editor jetzt auch dann als leer, wenn darauf nur eine Seitenzahl („- 2 -“, „Seite 2 von 3“, „2/3“) oder ein Füllwort steht („bitte wenden“, „Notizen“, „Platz für Notizen“, „Diese Seite bleibt frei“). Rahmen und Linien im Hintergrund zählen nicht als Inhalt. Gedruckt wird unverändert.
+  - Offene Aufgabendetails rechts wechseln beim Scrollen mit der Aufgabe im Blick (vorher blieb z. B. Aufgabe 3 stehen, während Aufgabe 1 zu sehen war). Während man im Detailfeld schreibt, bleibt es stehen. Sprünge über die Gliederung lassen die überflogenen Aufgaben nicht aufblitzen.
 - [x] **Leerseiten im Editor sind Platzverschwendung.** Leere Rückseiten für den Duplexdruck und Originalseiten ohne Text erscheinen im Editor gar nicht mehr, auch nicht als Balken oder Markierung. „Vorschau & Druck“ und der Druck enthalten sie unverändert. Nur eine solche Seite mit Notiz bleibt eingeklappt erreichbar.
 - [x] **Checkliste passend zur Aufgabe im Blick.** Beim Scrollen wechselt oben in der Checkliste die Karte zur Aufgabe, die gerade auf dem Blatt zu sehen ist (kurze Animation, Farbe der Aufgabe, Markierung in der Gliederung). Die Karte zeigt Aufgabenstellung, Punkte & Zeit, Materialliste und Lösung dieser Aufgabe, je mit Knopf, falls etwas fehlt. Bei einer fehlenden Aufgabe zeigt sie den Vorschlag. Darunter steht „Ganze Prüfung“. Auf dem Handy erscheint die Karte im aufgeklappten Checklisten-Balken.
 - [x] Das Deckblatt zählt keine „Hinweise vor dem Einsatz“ mehr, sondern sagt nur „Entwurf · noch nicht freigegeben“.

@@ -982,3 +982,6 @@ button.link{background:none;border:0;padding:2px 0;margin:0;color:var(--green);t
 @keyframes checklist-in-above{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.checklist-task.is-entering{animation:none}}
 @media(max-width:1000px){.editor-checklist:not(.is-open) .checklist-task,.editor-checklist:not(.is-open) .checklist-sub{display:none}}
+.editor-details.is-entering{animation:checklist-in .26s ease-out both}
+.editor-details.is-entering.from-above{animation-name:checklist-in-above}
+@media(prefers-reduced-motion:reduce){.editor-details.is-entering{animation:none}}
