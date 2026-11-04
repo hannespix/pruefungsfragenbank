@@ -29,8 +29,12 @@ ${C.examEntries(e).map((i,n)=>{const t=i.task;return `<section class="task"><p c
 const fontDefinitions={sansRegular:['BaWue Sans',400],sansBold:['BaWue Sans',700],serifBold:['BaWue Serif',700]};
 function font(a,key){const def=fontDefinitions[key];if(!def||a?.mime!=='font/woff2')return '';return a.data?`<style>@font-face{font-family:"${def[0]}";font-weight:${def[1]};font-style:normal;font-display:swap;src:url("data:font/woff2;base64,${a.data.replace(/[^A-Za-z0-9+/=]/g,'')}") format("woff2")}</style>`:`<span data-pending-asset="${esc(a.id)}" data-brand-font="${key}" data-asset-alt="Prüfungsschrift"></span>`;}
 function fonts(e,d){const seen=new Set();return '<div class="paper-fonts" hidden>'+C.examEntries(e).flatMap(i=>i.task.assetLinks).filter(l=>l.role==='brand-font'&&l.audience==='candidate'&&!seen.has(l.fontKey)&&seen.add(l.fontKey)).map(l=>font(d.assets.find(a=>a.id===l.assetId),l.fontKey)).join('')+'</div>';}
+// Lists in plain task text: indentation by tabs, a marker (•, –, -, 1., 1), a)) and the text. A tab after the marker
+// also allows an empty item; with a space the item needs text, so that ordinary sentences are not mistaken for lists.
+const LIST_LINE=/^([\t ]*)([•·▪◦‣–-]|\d{1,3}[.)]|[a-z]\))(\t|[\t ]+(?=\S))/;
+function listLine(line){const s=String(line??''),m=LIST_LINE.exec(s);if(m){const ws=m[1];return {list:true,level:Math.min(6,(ws.match(/\t/g)||[]).length+Math.floor(ws.replace(/\t/g,'').length/3)),marker:m[2],prefix:m[0],text:s.slice(m[0].length),numbered:/^\d/.test(m[2])};}const t=/^\t+/.exec(s);return t?{list:false,level:Math.min(6,t[0].length),marker:'',prefix:t[0],text:s.slice(t[0].length),numbered:false}:null;}
 function timingNotes(t){const x=t.timing;if(!x||x.referenceOnly||!Array.isArray(x.phases)||x.totalMinutes!==t.minutes)return '';return x.phases.map(p=>`${p.label}: ${p.minutes} Minuten${p.maxMinutes?` (höchstens ${p.maxMinutes} Minuten)`:''}`).join(' · ');}
 
 function brandLinks(d){const seen=new Set();return d.tasks.flatMap(t=>t.assetLinks).filter(l=>l.design==='bw-2024'&&l.audience==='candidate'&&!seen.has(l.assetId)&&seen.add(l.assetId)).map(l=>({...l}));}
-const api={brandLinks,font,fonts,timingNotes,letterhead,identity,regulationGuidance,regulationHtml,document:documentHtml,esc,graphics,attachments,image};root.HortiPrint=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
+const api={listLine,brandLinks,font,fonts,timingNotes,letterhead,identity,regulationGuidance,regulationHtml,document:documentHtml,esc,graphics,attachments,image};root.HortiPrint=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(globalThis);

@@ -119,6 +119,7 @@ Aus den Rückmeldungen der Aufgabenersteller, präzisiert. Reihenfolge = Umsetzu
        - bearbeitete Abschnitte nutzen die Breite der Textspalte, statt an der zufälligen PDF-Zeilenbreite umzubrechen;
        - die Breite lässt sich am rechten Rand ziehen und rastet an Seitenrand und Spaltenkanten ein.
    - **Fertig wenn:** Listen lassen sich ohne Tippen von Zeichen anlegen, und Zeilen brechen nicht mehr unerwartet früh um.
+   - **Stand:** Teil 1 erledigt – Werkzeugleiste mit Aufzählung, Nummerierung, Einzug und neuer Zeile; Enter/Tab wie in Word; hängender Einzug in Blatt, Druck und Word. Teil 2 (Breite bearbeiteter Abschnitte auf Originalseiten mit Einrasten) folgt.
 5. [ ] **Mündliche Prüfung übersichtlicher.**
    - **Umsetzung:**
      - Mündliche Vorlagen nach Themen gruppiert, mit klaren Überschriften.
