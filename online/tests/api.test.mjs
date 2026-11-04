@@ -460,3 +460,35 @@ test('login limit groups IPv6 clients by /64 and expired limiter rows are remove
  assert.equal((await login('2001:db8:1:3::1')).status,401);
  t.DB.db.prepare('UPDATE attempts SET expires=?').run(Date.now()-1);await login('198.51.100.7');assert.equal(t.DB.db.prepare('SELECT COUNT(*) AS n FROM attempts').get().n,1);
 });
+
+// Working groups may add new tasks to their own area; the coordinator reviews and approves them.
+function groupTask(seed,mutate=()=>{}){
+ const base=seed.tasks.find(x=>x.specialty==='Baumschule'&&x.kind==='practical'&&x.examType==='ZP'),x=structuredClone(base);
+ Object.assign(x,{id:'group-task',familyId:'group-family',title:'Neue Gruppenaufgabe',text:'Aufgabe: Durchführen von Arbeiten an der Pflanze\nHier: Synthetische neue Aufgabe der Arbeitsgruppe.',reviewStatus:'review',solutionStatus:x.solution?'draft':'missing',reviewedBy:'',flags:[]});
+ for(const k of ['reviewKey','reviewedAt','sourceReview','pointsReview','supersededBy','previousId'])delete x[k];x.assetLinks=x.assetLinks.filter(a=>a.audience!=='source');mutate(x);return x;
+}
+const groupFamily={id:'group-family',title:'Neue Gruppenaufgabe',reviewStatus:'review'};
+test('groups create new tasks and families in their own area as drafts and use them in their exam',async()=>{
+ const t=await setup(),g=await group(t),session=await t.req('/api/session',undefined,g.token),task=groupTask(t.seed),e=workflowExam(t.seed);e.pattern.slots=[{categoryId:'plantwork',count:1}];C.addItem(e,task);
+ assert.deepEqual(session.body.capabilities,['group-tasks'],'the client unlocks the buttons only with this flag');
+ const r=await t.req('/api/save',{changes:[{kind:'families',id:groupFamily.id,version:0,value:groupFamily},{kind:'tasks',id:task.id,version:0,value:task},{kind:'exams',id:e.id,version:0,value:e}]},g.token);
+ assert.equal(r.status,200,JSON.stringify(r.body));
+ const p=(await t.req('/api/project',undefined,g.token)).body.project;assert.ok(p.tasks.some(x=>x.id==='group-task'&&x.reviewStatus==='review'));assert.ok(p.exams.find(x=>x.id===e.id).items.some(i=>i.originTaskId==='group-task'));
+ const admin=(await t.req('/api/project',undefined,t.admin)).body.project;assert.equal(admin.tasks.find(x=>x.id==='group-task').reviewStatus,'review','waits for the coordinator');
+ // A variant of a visible task joins its family without a new family record.
+ const variant=groupTask(t.seed,x=>{x.id='group-variant';x.familyId=t.seed.tasks.find(y=>y.specialty==='Baumschule').familyId;});
+ assert.equal((await t.req('/api/save',{changes:[{kind:'tasks',id:variant.id,version:0,value:variant}]},g.token)).status,200);
+});
+test('groups cannot change bank tasks, approve new tasks or create tasks outside their area',async()=>{
+ const t=await setup(),g=await group(t),base=t.seed.tasks.find(x=>x.specialty==='Baumschule'&&x.kind==='practical');
+ t.DB.db.prepare('INSERT INTO records VALUES(?,?,?,1)').run('assets','secret',JSON.stringify({id:'secret',mime:'image/png',name:'secret.png',data:''}));
+ const one=change=>t.req('/api/save',{changes:[change]},g.token),withFamily=value=>t.req('/api/save',{changes:[{kind:'families',id:groupFamily.id,version:0,value:groupFamily},{kind:'tasks',id:value.id,version:0,value}]},g.token);
+ const edited=structuredClone(base);edited.title+=' · geändert';assert.equal((await one({kind:'tasks',id:base.id,version:1,value:edited})).status,403,'existing bank tasks stay with the coordinator');
+ assert.equal((await one({kind:'tasks',id:base.id,version:1,value:null})).status,403);
+ assert.equal((await one({kind:'families',id:'approved-family',version:0,value:{id:'approved-family',title:'x',reviewStatus:'approved'}})).status,403);
+ const foreign=t.seed.tasks.find(x=>x.specialty!=='Baumschule');
+ for(const [label,mutate] of [['self approval',x=>{x.reviewStatus='approved';x.reviewedBy='Gruppe';}],['approved solution',x=>{x.solutionStatus='approved';x.solution||='Lösung';}],['forged review key',x=>{x.reviewKey='forged';}],['other specialty',x=>{x.specialty=foreign.specialty;}],['foreign source',x=>{x.sourceIds=[...foreign.sourceIds];}],['unseen attachment',x=>{x.assetLinks=[{assetId:'secret',audience:'candidate'}];}],['foreign family',x=>{x.familyId=foreign.familyId;}]]){
+  const r=await withFamily(groupTask(t.seed,mutate));assert.equal(r.status,403,label+': '+JSON.stringify(r.body));
+ }
+ const p=(await t.req('/api/project',undefined,t.admin)).body.project;assert.ok(!p.tasks.some(x=>x.id==='group-task'));assert.ok(!p.families.some(x=>x.id==='group-family'),'rejected batches leave nothing behind');
+});
