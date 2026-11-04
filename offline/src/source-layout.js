@@ -186,8 +186,10 @@ function fit(container=document){
    if(!content||!box.clientWidth)continue; // not rendered (closed details, hidden thumbnails)
    if(point&&(box.classList.contains('source-point-editor')?!active:active)){flag(box,false);continue;}
    content.style.transform='none';
-   if(box.classList.contains('source-text-flow')&&(!point||point.classList.contains('source-point-edited'))){
-    // Edited text: same font size, the box takes the height it needs.
+   if(box.classList.contains('source-text-flow')&&(!point||active)){
+    // Edited text – and original text someone has clicked into – keeps its font size; the box takes the height it needs.
+    // The editor wraps the section as one paragraph in the browser's font, which can run wider than the original's;
+    // shrinking that to the original height made it tiny and blocked printing although nothing was changed.
     const holder=point||box,have=pt(holder.style.height),need=have*content.scrollHeight/Math.max(1,box.clientHeight),line=pt(box.style.lineHeight)||12;
     flag(box,false);if(need>have+Math.max(1.5,line*.35))grown.push({holder,box,top:pt(holder.style.top),have,need,line});
     continue;

@@ -127,3 +127,11 @@ test('writing lines in the planning field move closer evenly; only a full page i
   const tooMuch=point(100,30,{edited:true,need:700}),footer2=point(800,10.6);assert.equal(S.fit(pageWith(framedPage({lines}),[tooMuch,footer2])),1,'more text than the frame can give is flagged');
  }finally{delete globalThis.document;delete globalThis.__hortiSourceRows;}
 });
+
+test('clicking into original text never shrinks it: a focused, unedited section that wraps grows like edited text',()=>{
+ const a=point(100,20,{need:40}),b=point(140,20);a.content.focus=true;
+ const n=S.fit(sheet([a,b]));
+ assert.equal(n,0,'nothing blocks printing');assert.equal(a.content.style.transform,'none','full size, not tiny');assert.equal(a.editor.dataset.sourceOverflow,'false');
+ assert.equal(a.style.height,'40pt','the box takes the extra line');assert.match(b.style.translate,/^0 20/,'the text below moves down');
+ a.content.focus=false;S.fit(sheet([a,b]));assert.equal(a.style.height,'20pt','leaving it unchanged restores the original');assert.equal(b.style.translate,'');
+});
